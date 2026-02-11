@@ -1,114 +1,390 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Search as SearchIcon, TrendingUp, X } from "lucide-react";
-import { mockTracks, mockPlaylists, type Track } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Play, Music, User, AlertCircle, Loader2 } from "lucide-react";
+import { Track } from "@/lib/mock-data";
+import { useSearch, usePlayMutation } from "@/hooks/useSpotify";
+import { SpotifyTrack } from "@/types/spotify";
+import { formatTime } from "@/lib/mock-data";
+import { useDebounce } from "@/hooks/use-mobile";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 interface SearchContentProps {
   onPlayTrack: (track: Track) => void;
 }
 
-const genres = [
-  { name: "Pop", color: "from-pink-500 to-rose-600" },
-  { name: "Hip-Hop", color: "from-amber-500 to-orange-600" },
-  { name: "Rock", color: "from-red-500 to-red-700" },
-  { name: "Electronic", color: "from-cyan-400 to-blue-600" },
-  { name: "Jazz", color: "from-yellow-500 to-amber-600" },
-  { name: "Classica", color: "from-indigo-400 to-purple-600" },
-  { name: "R&B", color: "from-fuchsia-500 to-pink-600" },
-  { name: "Lo-Fi", color: "from-teal-400 to-emerald-600" },
-  { name: "Indie", color: "from-lime-400 to-green-600" },
-  { name: "Metal", color: "from-slate-500 to-zinc-700" },
-  { name: "Ambient", color: "from-sky-400 to-indigo-500" },
-  { name: "Latin", color: "from-orange-400 to-red-500" },
-];
+const convertSpotifyTrack = (spotifyTrack: SpotifyTrack): Track => ({
+  id: spotifyTrack.id,
+  title: spotifyTrack.name,
+  artist: spotifyTrack.artists[0]?.name || "Unknown Artist",
+  album: spotifyTrack.album.name,
+  cover: spotifyTrack.album.images[0]?.url || "",
+  duration: Math.floor(spotifyTrack.duration_ms / 1000),
+  bpm: undefined,
+});
 
-export default function SearchContent({ onPlayTrack }: SearchContentProps) {
+const SearchContent = ({ onPlayTrack }: SearchContentProps) => {
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 500);
+  const playMutation = usePlayMutation();
+  const { toast } = useToast();
+  
+  const { data: searchResults, isLoading, error, isFetching } = useSearch(
+    debouncedQuery,
+    ["track", "artist", "album", "playlist"],
+    20
+  );
 
-  const filtered = query.trim()
-    ? mockTracks.filter(
-        (t) =>
-          t.title.toLowerCase().includes(query.toLowerCase()) ||
-          t.artist.toLowerCase().includes(query.toLowerCase()) ||
-          t.album.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const handlePlaySpotifyTrack = async (spotifyTrack: SpotifyTrack) => {
+    try {
+      toast({
+        title: "Playing...",
+        description: `${spotifyTrack.name} by ${spotifyTrack.artists[0]?.name}`,
+      });
+
+      await playMutation.mutateAsync({
+        uris: [spotifyTrack.uri]
+      });
+      
+      const track = convertSpotifyTrack(spotifyTrack);
+      onPlayTrack(track);
+      
+      toast({
+        title: "Now Playing",
+        description: `${spotifyTrack.name}`,
+      });
+    } catch (err: any) {
+      console.error("Error playing track:", err);
+      
+      let errorMessage = "Could not play track";
+      if (err.message?.includes("Premium")) {
+        errorMessage = "Spotify Premium required to play music";
+      } else if (err.message?.includes("device")) {
+        errorMessage = "No active device found. Open Spotify on a device first.";
+      }
+      
+      toast({
+        title: "Playback Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const tracks = searchResults?.tracks?.items || [];
+  const artists = searchResults?.artists?.items || [];
+  const albums = searchResults?.albums?.items || [];
+  const playlists = searchResults?.playlists?.items || [];
+
+  const hasResults = tracks.length > 0 || artists.length > 0 || albums.length > 0 || playlists.length > 0;
+  const showSearch = debouncedQuery.trim().length >= 2;
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      {/* Search bar */}
-      <div className="relative max-w-xl mb-8">
-        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cosa vuoi ascoltare?"
-          className="w-full h-12 pl-12 pr-10 rounded-full bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-        />
-        {query && (
-          <button
-            onClick={() => setQuery("")}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="space-y-4">
+        <h1 className="text-4xl font-bold tracking-tight">Search</h1>
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search for songs, artists, albums..."
+            className="pl-10 h-12 text-lg"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          {(isLoading || isFetching) && showSearch && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        
+        {query.length > 0 && query.length < 2 && (
+          <p className="text-sm text-muted-foreground">
+            Type at least 2 characters to search...
+          </p>
         )}
       </div>
 
-      {query.trim() ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="text-lg font-bold text-foreground mb-4">Risultati</h2>
-          {filtered.length === 0 ? (
-            <p className="text-muted-foreground">Nessun risultato per "{query}"</p>
-          ) : (
-            <div className="space-y-1">
-              {filtered.map((track, i) => (
-                <motion.button
-                  key={track.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => onPlayTrack(track)}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-secondary/50 transition-colors group"
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to search. Please try again or check your connection.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!showSearch ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Search className="h-20 w-20 text-muted-foreground mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">Search Spotify</h2>
+          <p className="text-muted-foreground">
+            Find your favorite songs, artists, albums, and playlists
+          </p>
+        </div>
+      ) : !hasResults && !isLoading && !isFetching ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Search className="h-20 w-20 text-muted-foreground mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">No results found</h2>
+          <p className="text-muted-foreground">
+            Try different keywords or check your spelling
+          </p>
+        </div>
+      ) : hasResults ? (
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 max-w-md">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="tracks">Songs</TabsTrigger>
+            <TabsTrigger value="artists">Artists</TabsTrigger>
+            <TabsTrigger value="albums">Albums</TabsTrigger>
+            <TabsTrigger value="playlists">Playlists</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all" className="space-y-6 mt-6">
+            {/* Top Result */}
+            {tracks.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold">Top Result</h2>
+                <Card 
+                  className="max-w-md cursor-pointer hover:bg-accent/50 transition-all group"
+                  onClick={() => handlePlaySpotifyTrack(tracks[0])}
                 >
-                  <img src={track.cover} alt="" className="w-10 h-10 rounded object-cover" />
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{track.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{track.artist} · {track.album}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, "0")}
-                  </span>
-                </motion.button>
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        {tracks[0].album.images[0]?.url && (
+                          <img
+                            src={tracks[0].album.images[0].url}
+                            alt={tracks[0].name}
+                            className="object-cover w-full h-full"
+                            loading="lazy"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-2">
+                        <h3 className="text-3xl font-bold truncate mb-2">{tracks[0].name}</h3>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Music className="h-4 w-4" />
+                          <span className="truncate">{tracks[0].artists[0]?.name}</span>
+                        </div>
+                      </div>
+                      <Button 
+                        size="icon" 
+                        className="rounded-full w-12 h-12 mt-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                        disabled={playMutation.isPending}
+                      >
+                        {playMutation.isPending ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Play className="h-5 w-5 fill-current" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Songs */}
+            {tracks.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold">Songs</h2>
+                <div className="space-y-2">
+                  {tracks.slice(0, 5).map((track: SpotifyTrack) => (
+                    <div
+                      key={track.id}
+                      className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent/50 transition-colors group cursor-pointer"
+                      onClick={() => handlePlaySpotifyTrack(track)}
+                    >
+                      <div className="relative w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                        {track.album.images[0]?.url && (
+                          <img
+                            src={track.album.images[0].url}
+                            alt={track.name}
+                            className="object-cover w-full h-full"
+                            loading="lazy"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium truncate">{track.name}</h3>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {track.artists.map(a => a.name).join(", ")}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {formatTime(Math.floor(track.duration_ms / 1000))}
+                      </span>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        disabled={playMutation.isPending}
+                      >
+                        {playMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4 fill-current" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Artists */}
+            {artists.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold">Artists</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {artists.slice(0, 6).map((artist: any) => (
+                    <Card key={artist.id} className="group cursor-pointer hover:bg-accent/50">
+                      <CardContent className="p-4 text-center">
+                        <div className="relative aspect-square mb-3 rounded-full overflow-hidden bg-muted mx-auto">
+                          {artist.images[0]?.url && (
+                            <img
+                              src={artist.images[0].url}
+                              alt={artist.name}
+                              className="object-cover w-full h-full"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                        <h3 className="font-semibold truncate">{artist.name}</h3>
+                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                          <User className="h-3 w-3" />
+                          Artist
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+          </TabsContent>
+
+          <TabsContent value="tracks" className="space-y-2 mt-6">
+            {tracks.map((track: SpotifyTrack) => (
+              <div
+                key={track.id}
+                className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent/50 transition-colors group cursor-pointer"
+                onClick={() => handlePlaySpotifyTrack(track)}
+              >
+                <div className="relative w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                  {track.album.images[0]?.url && (
+                    <img
+                      src={track.album.images[0].url}
+                      alt={track.name}
+                      className="object-cover w-full h-full"
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium truncate">{track.name}</h3>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {track.artists.map(a => a.name).join(", ")} • {track.album.name}
+                  </p>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {formatTime(Math.floor(track.duration_ms / 1000))}
+                </span>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  disabled={playMutation.isPending}
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                </Button>
+              </div>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="artists" className="mt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {artists.map((artist: any) => (
+                <Card key={artist.id} className="group cursor-pointer hover:bg-accent/50">
+                  <CardContent className="p-4 text-center">
+                    <div className="relative aspect-square mb-3 rounded-full overflow-hidden bg-muted mx-auto">
+                      {artist.images[0]?.url && (
+                        <img
+                          src={artist.images[0].url}
+                          alt={artist.name}
+                          className="object-cover w-full h-full"
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                    <h3 className="font-semibold truncate">{artist.name}</h3>
+                    <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                      <User className="h-3 w-3" />
+                      Artist
+                    </p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          )}
-        </motion.div>
-      ) : (
-        <>
-          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-muted-foreground" />
-            Esplora generi
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {genres.map((genre, i) => (
-              <motion.button
-                key={genre.name}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.04, type: "spring" as const, stiffness: 200 }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setQuery(genre.name)}
-                className={`relative h-28 rounded-xl overflow-hidden bg-gradient-to-br ${genre.color} p-4 text-left`}
-              >
-                <span className="text-lg font-bold text-foreground">{genre.name}</span>
-              </motion.button>
-            ))}
-          </div>
-        </>
-      )}
+          </TabsContent>
+
+          <TabsContent value="albums" className="mt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {albums.map((album: any) => (
+                <Card key={album.id} className="group cursor-pointer hover:bg-accent/50">
+                  <CardContent className="p-4">
+                    <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-muted">
+                      {album.images[0]?.url && (
+                        <img
+                          src={album.images[0].url}
+                          alt={album.name}
+                          className="object-cover w-full h-full"
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                    <h3 className="font-semibold truncate">{album.name}</h3>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {album.artists[0]?.name}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="playlists" className="mt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {playlists.map((playlist: any) => (
+                <Card key={playlist.id} className="group cursor-pointer hover:bg-accent/50">
+                  <CardContent className="p-4">
+                    <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-muted">
+                      {playlist.images[0]?.url && (
+                        <img
+                          src={playlist.images[0].url}
+                          alt={playlist.name}
+                          className="object-cover w-full h-full"
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                    <h3 className="font-semibold truncate">{playlist.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      By {playlist.owner.display_name}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      ) : null}
     </div>
   );
-}
+};
+
+export default SearchContent;

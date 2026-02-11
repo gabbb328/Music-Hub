@@ -1,162 +1,212 @@
-import { motion } from "framer-motion";
-import { Play, Sparkles, TrendingUp, Clock } from "lucide-react";
-import { mockTracks, mockPlaylists, recentlyPlayed, type Track } from "@/lib/mock-data";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Play, Clock } from "lucide-react";
+import { Track } from "@/lib/mock-data";
+import { useRecentlyPlayed, useTopTracks, useUserPlaylists } from "@/hooks/useSpotify";
+import { SpotifyTrack } from "@/types/spotify";
+import { formatTime } from "@/lib/mock-data";
 
 interface HomeContentProps {
   onPlayTrack: (track: Track) => void;
 }
 
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
+// Converti SpotifyTrack in Track per compatibilità con i componenti esistenti
+const convertSpotifyTrack = (spotifyTrack: SpotifyTrack): Track => ({
+  id: spotifyTrack.id,
+  title: spotifyTrack.name,
+  artist: spotifyTrack.artists[0]?.name || "Unknown Artist",
+  album: spotifyTrack.album.name,
+  cover: spotifyTrack.album.images[0]?.url || "",
+  duration: Math.floor(spotifyTrack.duration_ms / 1000),
+  bpm: undefined,
+});
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring" as const, damping: 25, stiffness: 200 } },
-};
+const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
+  const { data: recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed(6);
+  const { data: topTracks, isLoading: loadingTop } = useTopTracks("medium_term");
+  const { data: playlists, isLoading: loadingPlaylists } = useUserPlaylists();
 
-export default function HomeContent({ onPlayTrack }: HomeContentProps) {
-  const greeting = getGreeting();
+  const handlePlaySpotifyTrack = (spotifyTrack: SpotifyTrack) => {
+    const track = convertSpotifyTrack(spotifyTrack);
+    onPlayTrack(track);
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      <motion.div variants={container} initial="hidden" animate="show">
-        {/* Greeting */}
-        <motion.h1 variants={item} className="text-3xl font-bold text-foreground mb-8">
-          {greeting}
-        </motion.h1>
+    <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      {/* Welcome Section */}
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Welcome back
+        </h1>
+        <p className="text-muted-foreground text-lg">
+          Your personal music hub awaits
+        </p>
+      </div>
 
-        {/* Quick picks grid */}
-        <motion.div variants={item} className="grid grid-cols-3 gap-3 mb-10">
-          {recentlyPlayed.map((track) => (
-            <motion.button
-              key={track.id}
-              onClick={() => onPlayTrack(track)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-center gap-3 bg-secondary/50 hover:bg-secondary rounded-lg overflow-hidden group transition-colors duration-200"
-            >
-              <img src={track.cover} alt="" className="w-12 h-12 object-cover" />
-              <span className="text-sm font-medium text-foreground truncate pr-2">
-                {track.title}
-              </span>
-              <div className="ml-auto pr-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                  <Play className="w-4 h-4 text-primary-foreground ml-0.5" />
-                </div>
-              </div>
-            </motion.button>
-          ))}
-        </motion.div>
-
-        {/* AI DJ Section */}
-        <motion.div variants={item} className="mb-10">
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-music p-6 cursor-pointer group"
-          >
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <span className="text-sm font-semibold text-primary uppercase tracking-wider">AI DJ</span>
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-1">Il tuo DJ personale</h3>
-              <p className="text-muted-foreground text-sm">
-                Lascia che l'AI scelga la musica perfetta per il tuo momento
-              </p>
-            </div>
-            <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-60 group-hover:opacity-100 transition-opacity">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                className="w-20 h-20 rounded-full border-2 border-primary/30 border-t-primary"
-              />
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Playlists */}
-        <Section title="Le tue playlist" icon={<TrendingUp className="w-5 h-5" />}>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-            {mockPlaylists.map((pl) => (
-              <motion.div
-                key={pl.id}
-                variants={item}
-                whileHover={{ y: -4 }}
-                className="group cursor-pointer"
-              >
-                <div className="relative rounded-xl overflow-hidden mb-3 aspect-square shadow-lg">
-                  <img src={pl.cover} alt={pl.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-background/0 group-hover:bg-background/20 transition-colors duration-300" />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    whileHover={{ opacity: 1, y: 0 }}
-                    className="absolute bottom-3 right-3"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-xl">
-                      <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+      {/* Recently Played */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold tracking-tight">Recently Played</h2>
+        </div>
+        
+        {loadingRecent ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="aspect-square bg-muted rounded-lg mb-3" />
+                  <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-muted rounded w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {recentlyPlayed?.items?.slice(0, 6).map((item: any) => {
+              const track = item.track;
+              return (
+                <Card 
+                  key={track.id + item.played_at} 
+                  className="group cursor-pointer transition-all hover:bg-accent/50"
+                  onClick={() => handlePlaySpotifyTrack(track)}
+                >
+                  <CardContent className="p-4">
+                    <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-muted">
+                      {track.album.images[0]?.url && (
+                        <img
+                          src={track.album.images[0].url}
+                          alt={track.name}
+                          className="object-cover w-full h-full"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Button size="icon" className="rounded-full w-12 h-12">
+                          <Play className="h-5 w-5 fill-current" />
+                        </Button>
+                      </div>
                     </div>
-                  </motion.div>
+                    <h3 className="font-semibold truncate">{track.name}</h3>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {track.artists[0]?.name}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Your Top Tracks */}
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-tight">Your Top Tracks</h2>
+        
+        {loadingTop ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-3 rounded-lg animate-pulse">
+                <div className="w-12 h-12 bg-muted rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-muted rounded w-1/3" />
+                  <div className="h-3 bg-muted rounded w-1/4" />
                 </div>
-                <h4 className="text-sm font-semibold text-foreground truncate">{pl.name}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">{pl.description}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
-        </Section>
-
-        {/* Recently played tracks */}
-        <Section title="Ascoltati di recente" icon={<Clock className="w-5 h-5" />}>
-          <div className="space-y-1">
-            {mockTracks.map((track, i) => (
-              <motion.button
+        ) : (
+          <div className="space-y-2">
+            {topTracks?.items?.slice(0, 5).map((track: SpotifyTrack, index: number) => (
+              <div
                 key={track.id}
-                variants={item}
-                onClick={() => onPlayTrack(track)}
-                whileHover={{ backgroundColor: "hsl(var(--secondary) / 0.5)" }}
-                className="w-full flex items-center gap-4 px-4 py-3 rounded-lg group transition-colors"
+                className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent/50 transition-colors group cursor-pointer"
+                onClick={() => handlePlaySpotifyTrack(track)}
               >
-                <span className="w-6 text-right text-sm text-muted-foreground tabular-nums group-hover:hidden">
-                  {i + 1}
-                </span>
-                <Play className="w-4 h-4 text-foreground hidden group-hover:block ml-1" />
-                <img src={track.cover} alt="" className="w-10 h-10 rounded object-cover" />
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium text-foreground truncate">{track.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                <div className="w-4 text-center text-muted-foreground font-medium">
+                  {index + 1}
                 </div>
-                <span className="text-sm text-muted-foreground">{track.album}</span>
-                <span className="text-sm text-muted-foreground tabular-nums ml-8">
-                  {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, "0")}
-                </span>
-              </motion.button>
+                <div className="relative w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                  {track.album.images[0]?.url && (
+                    <img
+                      src={track.album.images[0].url}
+                      alt={track.name}
+                      className="object-cover w-full h-full"
+                    />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium truncate">{track.name}</h3>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {track.artists.map(a => a.name).join(", ")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  {formatTime(Math.floor(track.duration_ms / 1000))}
+                </div>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                </Button>
+              </div>
             ))}
           </div>
-        </Section>
+        )}
+      </section>
 
-        {/* Spacer for player bar */}
-        <div className="h-8" />
-      </motion.div>
+      {/* Your Playlists */}
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-tight">Your Playlists</h2>
+        
+        {loadingPlaylists ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="aspect-square bg-muted rounded-lg mb-3" />
+                  <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-muted rounded w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {playlists?.items?.slice(0, 10).map((playlist: any) => (
+              <Card 
+                key={playlist.id} 
+                className="group cursor-pointer transition-all hover:bg-accent/50"
+              >
+                <CardContent className="p-4">
+                  <div className="relative aspect-square mb-3 rounded-lg overflow-hidden bg-muted">
+                    {playlist.images[0]?.url && (
+                      <img
+                        src={playlist.images[0].url}
+                        alt={playlist.name}
+                        className="object-cover w-full h-full"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button size="icon" className="rounded-full w-12 h-12">
+                        <Play className="h-5 w-5 fill-current" />
+                      </Button>
+                    </div>
+                  </div>
+                  <h3 className="font-semibold truncate">{playlist.name}</h3>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {playlist.tracks.total} songs
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
-}
+};
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <motion.section variants={item} className="mb-10">
-      <div className="flex items-center gap-2 mb-5">
-        <span className="text-muted-foreground">{icon}</span>
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-      </div>
-      {children}
-    </motion.section>
-  );
-}
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Buongiorno ☀️";
-  if (h < 18) return "Buon pomeriggio 🌤";
-  return "Buonasera 🌙";
-}
+export default HomeContent;

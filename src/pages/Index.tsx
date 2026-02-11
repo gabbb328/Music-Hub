@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import Sidebar from "@/components/Sidebar";
 import PlayerBar from "@/components/PlayerBar";
 import HomeContent from "@/components/HomeContent";
@@ -12,6 +13,7 @@ import StatsContent from "@/components/StatsContent";
 import DevicesContent from "@/components/DevicesContent";
 import QueueContent from "@/components/QueueContent";
 import RadioContent from "@/components/RadioContent";
+import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 
 const Index = () => {
@@ -46,21 +48,24 @@ const Index = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <div className="flex flex-1 min-h-0">
-        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-        <main className="flex-1 flex flex-col min-w-0">
-          {renderContent()}
-        </main>
-      </div>
-      <PlayerBar {...player} onExpandClick={() => setShowNowPlaying(true)} />
+    <SpotifyProvider>
+      <div className="flex flex-col h-screen overflow-hidden bg-background">
+        <SpotifyStatus />
+        <div className="flex flex-1 min-h-0">
+          <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+          <main className="flex-1 flex flex-col min-w-0">
+            {renderContent()}
+          </main>
+        </div>
+        <PlayerBar {...player} onExpandClick={() => setShowNowPlaying(true)} />
 
-      <AnimatePresence>
-        {showNowPlaying && (
-          <NowPlayingView {...player} onClose={() => setShowNowPlaying(false)} />
-        )}
-      </AnimatePresence>
-    </div>
+        <AnimatePresence>
+          {showNowPlaying && (
+            <NowPlayingView {...player} onClose={() => setShowNowPlaying(false)} />
+          )}
+        </AnimatePresence>
+      </div>
+    </SpotifyProvider>
   );
 };
 

@@ -1,5 +1,14 @@
 import { useState, useCallback } from "react";
-import { Track, mockTracks } from "@/lib/mock-data";
+
+export interface Track {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  cover: string;
+  duration: number;
+  bpm?: number;
+}
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -13,13 +22,13 @@ export interface PlayerState {
 
 export function usePlayerStore() {
   const [state, setState] = useState<PlayerState>({
-    currentTrack: mockTracks[0],
+    currentTrack: null,
     isPlaying: false,
-    progress: 35,
+    progress: 0,
     volume: 75,
     shuffle: false,
     repeat: "off",
-    queue: mockTracks,
+    queue: [],
   });
 
   const play = useCallback(() => setState((s) => ({ ...s, isPlaying: true })), []);
@@ -37,13 +46,20 @@ export function usePlayerStore() {
     })), []);
 
   const playTrack = useCallback((track: Track) => {
-    setState((s) => ({ ...s, currentTrack: track, isPlaying: true, progress: 0 }));
+    setState((s) => ({ 
+      ...s, 
+      currentTrack: track, 
+      isPlaying: true, 
+      progress: 0,
+      queue: s.queue.length === 0 ? [track] : s.queue
+    }));
   }, []);
 
   const nextTrack = useCallback(() => {
     setState((s) => {
-      if (!s.currentTrack) return s;
+      if (!s.currentTrack || s.queue.length === 0) return s;
       const idx = s.queue.findIndex((t) => t.id === s.currentTrack!.id);
+      if (idx === -1) return s;
       const next = s.queue[(idx + 1) % s.queue.length];
       return { ...s, currentTrack: next, progress: 0 };
     });
@@ -51,12 +67,25 @@ export function usePlayerStore() {
 
   const prevTrack = useCallback(() => {
     setState((s) => {
-      if (!s.currentTrack) return s;
+      if (!s.currentTrack || s.queue.length === 0) return s;
       const idx = s.queue.findIndex((t) => t.id === s.currentTrack!.id);
+      if (idx === -1) return s;
       const prev = s.queue[(idx - 1 + s.queue.length) % s.queue.length];
       return { ...s, currentTrack: prev, progress: 0 };
     });
   }, []);
 
-  return { ...state, play, pause, toggle, setProgress, setVolume, toggleShuffle, toggleRepeat, playTrack, nextTrack, prevTrack };
+  return { 
+    ...state, 
+    play, 
+    pause, 
+    toggle, 
+    setProgress, 
+    setVolume, 
+    toggleShuffle, 
+    toggleRepeat, 
+    playTrack, 
+    nextTrack, 
+    prevTrack 
+  };
 }

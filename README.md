@@ -1,73 +1,152 @@
-# Welcome to your Lovable project
+# 🎵 Harmony Hub
 
-## Project info
+Un moderno music player web integrato con Spotify, costruito con React, TypeScript e TailwindCSS.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Harmony Hub](https://img.shields.io/badge/Spotify-Integrated-1DB954?style=for-the-badge&logo=spotify)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript)
 
-## How can I edit this code?
+## ✨ Caratteristiche
 
-There are several ways of editing your application.
+- 🎵 **Riproduzione Spotify** - Player integrato con Web Playback SDK
+- 🔍 **Ricerca Avanzata** - Cerca brani, artisti, album e playlist
+- 📚 **Gestione Libreria** - Accedi alle tue playlist e brani salvati
+- 📊 **Statistiche** - Visualizza le tue abitudini di ascolto
+- 🎨 **Visualizzatore Audio** - Animazioni sincronizzate con la musica
+- 📱 **Multi-Device** - Controlla la riproduzione su tutti i tuoi dispositivi
+- 🎧 **Queue Management** - Gestisci la coda di riproduzione
+- 🤖 **AI DJ** - Raccomandazioni musicali intelligenti
+- 📝 **Testi Sincronizzati** - Visualizza i testi mentre ascolti
+- 🎛️ **Controlli Completi** - Play, pause, skip, volume, shuffle, repeat
 
-**Use Lovable**
+## 🚀 Quick Start
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Metodo Facile (Raccomandato)
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Esegui lo script di setup:**
 
-**Use your preferred IDE**
+   **Windows:**
+   ```bash
+   setup.bat
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+   **PowerShell:**
+   ```powershell
+   .\setup.ps1
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. **Segui le istruzioni** e inserisci il tuo Spotify Client ID
 
-Follow these steps:
+3. **Avvia l'app:**
+   ```bash
+   npm run dev
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Setup Manuale
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Vedi [SETUP_COMPLETO.md](SETUP_COMPLETO.md) per istruzioni dettagliate.
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 📋 Prerequisiti
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+- **Node.js** 18+ 
+- **Account Spotify** (Premium consigliato per la riproduzione)
+- **Spotify Developer App** (gratuita)
+
+## 🛠️ Tecnologie
+
+- **Frontend:** React 18, TypeScript
+- **Styling:** TailwindCSS, shadcn/ui
+- **State Management:** React Query, Zustand
+- **API:** Spotify Web API, Spotify Web Playback SDK
+- **Animations:** Framer Motion
+- **Build Tool:** Vite
+
+## 📁 Struttura Progetto
+
+```
+harmony-hub-84/
+├── src/
+│   ├── components/       # Componenti UI
+│   ├── hooks/           # Custom hooks
+│   ├── services/        # Servizi API Spotify
+│   ├── contexts/        # React contexts
+│   ├── types/           # TypeScript types
+│   ├── pages/           # Pagine dell'app
+│   └── lib/             # Utilities
+├── public/              # Asset statici
+├── .env                 # Configurazione (da creare)
+└── setup.bat/ps1        # Script di setup
 ```
 
-**Edit a file directly in GitHub**
+## 🎯 Funzionalità Disponibili
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Con Account Spotify (anche Free):
+- ✅ Visualizzazione brani recenti
+- ✅ Top tracks e artisti
+- ✅ Gestione playlist
+- ✅ Ricerca completa
+- ✅ Visualizzazione statistiche
 
-**Use GitHub Codespaces**
+### Solo con Spotify Premium:
+- 🎵 Riproduzione musica nel browser
+- 🎵 Controllo completo del player
+- 🎵 Trasferimento tra dispositivi
+- 🎵 Web Playback SDK
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🔐 Privacy & Sicurezza
 
-## What technologies are used for this project?
+- Le credenziali sono salvate solo nel tuo browser
+- Nessun dato viene inviato a server esterni
+- OAuth 2.0 per autenticazione sicura
+- Puoi revocare i permessi in qualsiasi momento dalle impostazioni Spotify
 
-This project is built with:
+## 📚 Documentazione
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- [QUICK_START.md](QUICK_START.md) - Guida rapida (5 minuti)
+- [SETUP_COMPLETO.md](SETUP_COMPLETO.md) - Setup dettagliato
+- [README_SPOTIFY.md](README_SPOTIFY.md) - Documentazione tecnica
 
-## How can I deploy this project?
+## 🐛 Troubleshooting
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Il player non funziona
+1. Verifica di avere Spotify Premium
+2. Controlla che il browser sia supportato
+3. Verifica le credenziali in `.env`
 
-## Can I connect a custom domain to my Lovable project?
+### Errore di autenticazione
+1. Verifica il Client ID
+2. Controlla il Redirect URI nel Spotify Dashboard
+3. Prova a fare logout e login
 
-Yes, you can!
+Vedi [SETUP_COMPLETO.md](SETUP_COMPLETO.md#-risoluzione-problemi) per altri problemi comuni.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🤝 Contribuire
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+I contributi sono benvenuti! Sentiti libero di:
+- Aprire issue per bug o feature request
+- Proporre pull request
+- Migliorare la documentazione
+
+## 📄 Licenza
+
+MIT License - vedi [LICENSE](LICENSE) per dettagli
+
+## 🙏 Crediti
+
+- [Spotify Web API](https://developer.spotify.com/documentation/web-api)
+- [Spotify Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Lucide Icons](https://lucide.dev/)
+
+## 📞 Supporto
+
+Hai problemi? 
+1. Controlla la [documentazione](SETUP_COMPLETO.md)
+2. Cerca nelle [issue esistenti](../../issues)
+3. Apri una nuova issue
+
+---
+
+Sviluppato con ❤️ e ☕ usando Spotify Web API
+
+**Buon ascolto! 🎶**

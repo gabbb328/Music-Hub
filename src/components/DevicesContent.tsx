@@ -1,117 +1,174 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Monitor, Smartphone, Speaker, Mic2, Volume2, Check } from "lucide-react";
-import { mockDevices, type Device } from "@/lib/mock-data";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Laptop, Smartphone, Speaker, Radio, Check } from "lucide-react";
+import { useAvailableDevices, useTransferPlaybackMutation } from "@/hooks/useSpotify";
+import { SpotifyDevice } from "@/types/spotify";
+import { useToast } from "@/hooks/use-toast";
 
-const iconMap = {
-  desktop: Monitor,
-  phone: Smartphone,
-  speaker: Speaker,
-  echo: Mic2,
+const DeviceIcon = ({ type }: { type: string }) => {
+  switch (type.toLowerCase()) {
+    case "computer":
+      return <Laptop className="h-5 w-5" />;
+    case "smartphone":
+      return <Smartphone className="h-5 w-5" />;
+    case "speaker":
+      return <Speaker className="h-5 w-5" />;
+    default:
+      return <Radio className="h-5 w-5" />;
+  }
 };
 
-export default function DevicesContent() {
-  const [devices, setDevices] = useState<Device[]>(mockDevices);
+const DevicesContent = () => {
+  const { data: devicesData, isLoading } = useAvailableDevices();
+  const transferPlayback = useTransferPlaybackMutation();
+  const { toast } = useToast();
 
-  const setActive = (id: string) => {
-    setDevices((prev) =>
-      prev.map((d) => ({ ...d, isActive: d.id === id }))
-    );
+  const devices: SpotifyDevice[] = devicesData?.devices || [];
+
+  const handleTransferPlayback = async (deviceId: string, deviceName: string) => {
+    try {
+      await transferPlayback.mutateAsync({ deviceId, play: true });
+      toast({
+        title: "Playback transferred",
+        description: `Now playing on ${deviceName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Transfer failed",
+        description: "Could not transfer playback to this device",
+        variant: "destructive",
+      });
+    }
   };
 
-  const activeDevice = devices.find((d) => d.isActive);
-
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      <motion.h1
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-3xl font-bold text-foreground mb-2"
-      >
-        Dispositivi
-      </motion.h1>
-      <p className="text-muted-foreground mb-8">Controlla la riproduzione su tutti i tuoi dispositivi</p>
-
-      {/* Active device */}
-      {activeDevice && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass-surface rounded-2xl p-6 mb-8 glow-primary"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Volume2 className="w-4 h-4 text-primary animate-pulse-glow" />
-            <span className="text-sm font-medium text-primary">In riproduzione su</span>
-          </div>
-          <div className="flex items-center gap-4">
-            {(() => {
-              const Icon = iconMap[activeDevice.type];
-              return <Icon className="w-10 h-10 text-foreground" />;
-            })()}
-            <div>
-              <h3 className="text-xl font-bold text-foreground">{activeDevice.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{activeDevice.type === "echo" ? "Amazon Echo" : activeDevice.type}</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* All devices */}
-      <h2 className="text-lg font-bold text-foreground mb-4">Tutti i dispositivi</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {devices.map((device, i) => {
-          const Icon = iconMap[device.type];
-          return (
-            <motion.button
-              key={device.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setActive(device.id)}
-              className={`flex items-center gap-4 p-5 rounded-xl transition-colors ${
-                device.isActive
-                  ? "bg-primary/10 border border-primary/30"
-                  : "glass-surface hover:bg-secondary/80"
-              }`}
-            >
-              <Icon className={`w-8 h-8 ${device.isActive ? "text-primary" : "text-muted-foreground"}`} />
-              <div className="flex-1 text-left">
-                <p className={`font-medium ${device.isActive ? "text-foreground" : "text-foreground/80"}`}>
-                  {device.name}
-                </p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {device.type === "echo" ? "Amazon Echo · Alexa" : device.type}
-                </p>
-              </div>
-              {device.isActive && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="w-6 h-6 rounded-full bg-primary flex items-center justify-center"
-                >
-                  <Check className="w-4 h-4 text-primary-foreground" />
-                </motion.div>
-              )}
-            </motion.button>
-          );
-        })}
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight">Devices</h1>
+        <p className="text-muted-foreground">
+          Manage your listening experience across devices
+        </p>
       </div>
 
-      {/* Spotify Connect info */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="mt-8 p-5 rounded-xl bg-secondary/50 border border-border/50"
-      >
-        <h3 className="text-sm font-semibold text-foreground mb-1">Spotify Connect</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Trasferisci la riproduzione istantaneamente tra dispositivi. I tuoi dispositivi Amazon Echo con Alexa
-          sono automaticamente disponibili tramite Spotify Connect.
-        </p>
-      </motion.div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Available Devices</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-4 rounded-lg border animate-pulse"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-muted rounded-lg" />
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-32" />
+                      <div className="h-3 bg-muted rounded w-20" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : devices.length === 0 ? (
+            <div className="text-center py-8">
+              <Speaker className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="font-semibold mb-2">No devices found</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Open Spotify on another device or start playing music to see available devices
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Make sure Spotify is running on your device and you're logged in with the same account
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {devices.map((device) => (
+                <div
+                  key={device.id}
+                  className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                    device.is_active
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-accent/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`p-2 rounded-lg ${
+                        device.is_active ? "bg-primary text-primary-foreground" : "bg-muted"
+                      }`}
+                    >
+                      <DeviceIcon type={device.type} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{device.name}</h3>
+                        {device.is_active && (
+                          <span className="flex items-center gap-1 text-xs text-primary font-medium">
+                            <Check className="h-3 w-3" />
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {device.type.replace("_", " ")} • Volume: {device.volume_percent}%
+                      </p>
+                    </div>
+                  </div>
+                  {!device.is_active && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTransferPlayback(device.id, device.name)}
+                      disabled={transferPlayback.isPending}
+                    >
+                      Transfer Here
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 p-4 bg-muted rounded-lg">
+            <h4 className="font-semibold mb-2 text-sm">Harmony Hub Web Player</h4>
+            <p className="text-xs text-muted-foreground">
+              This browser is also a playback device. If you don't see it in the list above,
+              try playing a song to activate it.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tips</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex gap-3">
+            <div className="text-primary">•</div>
+            <p>
+              Switch playback between devices seamlessly without interrupting your music
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <div className="text-primary">•</div>
+            <p>
+              Spotify Premium is required to use the Web Player and transfer playback
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <div className="text-primary">•</div>
+            <p>
+              Make sure your devices are connected to the internet and logged in to Spotify
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
+
+export default DevicesContent;
