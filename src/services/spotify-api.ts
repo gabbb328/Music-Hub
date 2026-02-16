@@ -24,7 +24,6 @@ const spotifyFetch = async (endpoint: string, options: SpotifyApiOptions = {}) =
       },
     });
 
-    // Check if response is ok
     if (!response.ok) {
       let errorText = "";
       try {
@@ -40,7 +39,6 @@ const spotifyFetch = async (endpoint: string, options: SpotifyApiOptions = {}) =
       } else if (response.status === 403) {
         throw new Error("Permission denied. Check your Spotify Premium status.");
       } else if (response.status === 404) {
-        // 404 può significare "no active device" o "resource not found"
         if (endpoint.includes('/player/play')) {
           throw new Error("NO_ACTIVE_DEVICE");
         }
@@ -52,12 +50,10 @@ const spotifyFetch = async (endpoint: string, options: SpotifyApiOptions = {}) =
       throw new Error(`Spotify API error: ${response.statusText}`);
     }
 
-    // Handle empty responses (204 No Content)
     if (response.status === 204 || response.headers.get('content-length') === '0') {
       return null;
     }
 
-    // Try to parse JSON
     const text = await response.text();
     if (!text || text.trim() === '') return null;
     
@@ -75,6 +71,31 @@ const spotifyFetch = async (endpoint: string, options: SpotifyApiOptions = {}) =
   }
 };
 
+// Helper function to fetch all pages
+const fetchAllPages = async (endpoint: string, limit: number = 50): Promise<any[]> => {
+  const allItems: any[] = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const data = await spotifyFetch(`${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=${limit}&offset=${offset}`);
+    
+    if (!data || !data.items) {
+      break;
+    }
+
+    allItems.push(...data.items);
+    
+    if (data.items.length < limit || !data.next) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
+  }
+
+  return allItems;
+};
+
 // Player endpoints
 export const getCurrentlyPlaying = () => 
   spotifyFetch("/me/player/currently-playing");
@@ -87,12 +108,10 @@ export const play = async (deviceId?: string, contextUri?: string, uris?: string
   if (contextUri) body.context_uri = contextUri;
   if (uris) body.uris = uris;
 
-  // Se non c'è deviceId, prova a trovarne uno
   if (!deviceId) {
     try {
       const devicesData = await getAvailableDevices();
       if (devicesData?.devices && devicesData.devices.length > 0) {
-        // Trova device attivo o prendi il primo
         const activeDevice = devicesData.devices.find((d: any) => d.is_active);
         deviceId = activeDevice?.id || devicesData.devices[0].id;
         console.log("Using device:", deviceId);
@@ -111,7 +130,6 @@ export const play = async (deviceId?: string, contextUri?: string, uris?: string
     });
     return result;
   } catch (error: any) {
-    // Se fallisce con NO_ACTIVE_DEVICE e avevamo un deviceId, riprova senza
     if (error.message === "NO_ACTIVE_DEVICE" && deviceId) {
       console.warn("Retrying play without device_id");
       return await spotifyFetch(`/me/player/play`, {
@@ -224,14 +242,27 @@ export const getTopTracks = (timeRange: "short_term" | "medium_term" | "long_ter
 export const getTopArtists = (timeRange: "short_term" | "medium_term" | "long_term" = "medium_term", limit: number = 20) => 
   spotifyFetch(`/me/top/artists?time_range=${timeRange}&limit=${limit}`);
 
-export const getUserPlaylists = (limit: number = 50) => 
-  spotifyFetch(`/me/playlists?limit=${limit}`);
+// Get ALL user playlists (not just first 50)
+export const getUserPlaylists = async (): Promise<{ items: any[] }> => {
+  const allPlaylists = await fetchAllPages("/me/playlists", 50);
+  return { items: allPlaylists };
+};
 
 export const getPlaylist = (playlistId: string) => 
   spotifyFetch(`/playlists/${playlistId}`);
 
-export const getSavedTracks = (limit: number = 50) => 
-  spotifyFetch(`/me/tracks?limit=${limit}`);
+// Get ALL saved tracks (not just first 50)
+export const getSavedTracks = async (limit?: number): Promise<{ items: any[] }> => {
+  if (limit) {
+    // If specific limit requested, use it
+    const data = await spotifyFetch(`/me/tracks?limit=${limit}`);
+    return data || { items: [] };
+  }
+  
+  // Otherwise fetch all
+  const allTracks = await fetchAllPages("/me/tracks", 50);
+  return { items: allTracks };
+};
 
 export const saveTrack = (trackId: string) => 
   spotifyFetch("/me/tracks", {
@@ -250,7 +281,6 @@ export const checkSavedTracks = (trackIds: string[]) =>
 
 // Search endpoints
 export const search = async (query: string, type: string[] = ["track", "artist", "album", "playlist"], limit: number = 20) => {
-  // Validazione input
   if (!query || typeof query !== 'string') {
     return {
       tracks: { items: [] },
@@ -275,7 +305,6 @@ export const search = async (query: string, type: string[] = ["track", "artist",
     const types = type.join(",");
     const result = await spotifyFetch(`/search?q=${encodeURIComponent(cleanQuery)}&type=${types}&limit=${limit}`);
     
-    // Assicurati che il risultato abbia la struttura corretta
     return {
       tracks: result?.tracks || { items: [] },
       artists: result?.artists || { items: [] },
@@ -284,7 +313,6 @@ export const search = async (query: string, type: string[] = ["track", "artist",
     };
   } catch (error) {
     console.error("Search error:", error);
-    // Ritorna oggetto vuoto invece di lanciare errore
     return {
       tracks: { items: [] },
       artists: { items: [] },
@@ -294,19 +322,15 @@ export const search = async (query: string, type: string[] = ["track", "artist",
   }
 };
 
-// Get user profile
 export const getUserProfile = () => 
   spotifyFetch("/me");
 
-// Get available devices
 export const getAvailableDevices = () => 
   spotifyFetch("/me/player/devices");
 
-// Get track audio features
 export const getAudioFeatures = (trackId: string) => 
   spotifyFetch(`/audio-features/${trackId}`);
 
-// Get recommendations
 export const getRecommendations = (seedTracks?: string[], seedArtists?: string[], seedGenres?: string[]) => {
   const params = new URLSearchParams();
   if (seedTracks && seedTracks.length > 0) params.append("seed_tracks", seedTracks.join(","));

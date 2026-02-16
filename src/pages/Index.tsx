@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
+import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
 import Sidebar from "@/components/Sidebar";
 import PlayerBar from "@/components/PlayerBar";
 import HomeContent from "@/components/HomeContent";
@@ -13,6 +14,9 @@ import StatsContent from "@/components/StatsContent";
 import DevicesContent from "@/components/DevicesContent";
 import QueueContent from "@/components/QueueContent";
 import RadioContent from "@/components/RadioContent";
+import LikedSongsContent from "@/components/LikedSongsContent";
+import RecentlyPlayedContent from "@/components/RecentlyPlayedContent";
+import PlaylistDetail from "@/components/PlaylistDetail";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 
@@ -20,13 +24,29 @@ const Index = () => {
   const player = usePlayerStore();
   const [activeSection, setActiveSection] = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
+  
+  useLyricsPreloader();
+
+  const handleOpenPlaylist = (playlistId: string) => {
+    setActiveSection(`playlist-${playlistId}`);
+  };
 
   const renderContent = () => {
+    if (activeSection.startsWith('playlist-')) {
+      const playlistId = activeSection.replace('playlist-', '');
+      return (
+        <PlaylistDetail 
+          playlistId={playlistId}
+          onBack={() => setActiveSection('library')}
+        />
+      );
+    }
+
     switch (activeSection) {
       case "search":
         return <SearchContent onPlayTrack={player.playTrack} />;
       case "library":
-        return <LibraryContent onPlayTrack={player.playTrack} />;
+        return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={handleOpenPlaylist} />;
       case "ai-dj":
         return <AIDJContent onPlayTrack={player.playTrack} />;
       case "lyrics":
@@ -40,8 +60,9 @@ const Index = () => {
       case "radio":
         return <RadioContent />;
       case "liked":
+        return <LikedSongsContent />;
       case "recent":
-        return <LibraryContent onPlayTrack={player.playTrack} />;
+        return <RecentlyPlayedContent />;
       default:
         return <HomeContent onPlayTrack={player.playTrack} />;
     }
@@ -57,10 +78,14 @@ const Index = () => {
             {renderContent()}
           </main>
         </div>
-        <PlayerBar {...player} onExpandClick={() => setShowNowPlaying(true)} />
+        <PlayerBar 
+          {...player} 
+          onExpandClick={() => setShowNowPlaying(true)}
+          onNavigate={setActiveSection}
+        />
 
         <AnimatePresence>
-          {showNowPlaying && (
+          {showNowPlaying && player.currentTrack && (
             <NowPlayingView {...player} onClose={() => setShowNowPlaying(false)} />
           )}
         </AnimatePresence>

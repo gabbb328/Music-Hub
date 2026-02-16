@@ -1,105 +1,71 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAuthUrl, getToken, removeToken } from "@/services/spotify-auth";
-import { Music, LogOut, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Headphones, ExternalLink } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { redirectToSpotifyAuth } from "@/services/spotify-auth";
 
-const SpotifyLogin = () => {
-  const navigate = useNavigate();
-  const token = getToken();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const authUrl = await getAuthUrl();
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error("Login error:", error);
-      setIsLoading(false);
-    }
+export default function SpotifyLogin() {
+  const handleLogin = () => {
+    redirectToSpotifyAuth();
   };
-
-  const handleLogout = () => {
-    removeToken();
-    navigate("/");
-  };
-
-  if (token) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500">
-              <Music className="h-8 w-8 text-white" />
-            </div>
-            <CardTitle className="text-2xl">Already Connected</CardTitle>
-            <CardDescription>
-              You're already connected to Spotify
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={() => navigate("/")} 
-              className="w-full"
-              size="lg"
-            >
-              Go to App
-            </Button>
-            <Button 
-              onClick={handleLogout} 
-              variant="outline" 
-              className="w-full"
-              size="lg"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500">
-            <Music className="h-8 w-8 text-white" />
-          </div>
-          <CardTitle className="text-2xl">Connect to Spotify</CardTitle>
-          <CardDescription>
-            Login with your Spotify account to start using Harmony Hub
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button 
-            onClick={handleLogin} 
-            className="w-full bg-green-500 hover:bg-green-600"
-            size="lg"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Music className="mr-2 h-5 w-5" />
+    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-background flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <Card className="glass-surface border-2 border-primary/20">
+          <CardContent className="p-8 space-y-6">
+            <div className="text-center space-y-2">
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: "reverse"
+                }}
+                className="inline-block"
+              >
+                <Headphones className="w-20 h-20 text-primary mx-auto" />
+              </motion.div>
+              <h1 className="text-4xl font-bold">
+                <span className="text-gradient-primary">Music</span>
+                <span className="text-foreground">Hub</span>
+              </h1>
+              <p className="text-muted-foreground">
+                Your personal music experience
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleLogin}
+                className="w-full bg-[#1DB954] hover:bg-[#1ed760] text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-colors shadow-lg shadow-[#1DB954]/20"
+              >
+                <ExternalLink className="w-5 h-5" />
                 Login with Spotify
-              </>
-            )}
-          </Button>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            By logging in, you agree to allow Harmony Hub to access your Spotify account
-          </p>
-        </CardContent>
-      </Card>
+              </motion.button>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Music Hub uses Spotify to provide you with personalized music experience
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground text-center">
+                By logging in, you agree to Spotify's Terms of Service
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
-};
-
-export default SpotifyLogin;
+}

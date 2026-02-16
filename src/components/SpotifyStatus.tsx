@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Wifi, WifiOff, Music, AlertCircle, CheckCircle } from "lucide-react";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
 import { useUserProfile } from "@/hooks/useSpotify";
-import { getToken, removeToken, getAuthUrl } from "@/services/spotify-auth";
+import { getToken, clearToken, redirectToSpotifyAuth } from "@/services/spotify-auth";
 
 export const SpotifyStatus = () => {
   const { isReady, deviceId } = useSpotifyContext();
@@ -14,7 +14,6 @@ export const SpotifyStatus = () => {
   const token = getToken();
 
   useEffect(() => {
-    // Nascondi automaticamente dopo 5 secondi se tutto è OK
     if (isReady && profile && !error) {
       const timer = setTimeout(() => setShowStatus(false), 5000);
       return () => clearTimeout(timer);
@@ -24,13 +23,12 @@ export const SpotifyStatus = () => {
   if (!showStatus && isReady && profile) return null;
 
   const handleReconnect = () => {
-    removeToken();
-    window.location.href = getAuthUrl();
+    clearToken();
+    redirectToSpotifyAuth();
   };
 
   return (
     <div className="fixed top-4 right-4 z-50 max-w-md">
-      {/* Loading State */}
       {isLoading && token && (
         <Alert>
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -40,7 +38,6 @@ export const SpotifyStatus = () => {
         </Alert>
       )}
 
-      {/* Error State */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -53,7 +50,6 @@ export const SpotifyStatus = () => {
         </Alert>
       )}
 
-      {/* Web Player Status */}
       {!error && profile && (
         <Card className="bg-background/95 backdrop-blur">
           <CardContent className="p-4">

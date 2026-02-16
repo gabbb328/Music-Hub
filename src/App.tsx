@@ -3,7 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { getToken } from "@/services/spotify-auth";
+import { useDeepLinking } from "@/hooks/useDeepLinking";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SpotifyLogin from "./pages/SpotifyLogin";
@@ -17,28 +19,38 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
+// App Router with Deep Linking
+const AppRouter = () => {
+  useDeepLinking();
+
+  return (
+    <Routes>
+      <Route path="/login" element={<SpotifyLogin />} />
+      <Route path="/callback" element={<SpotifyCallback />} />
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Index />
+          </ProtectedRoute>
+        } 
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<SpotifyLogin />} />
-          <Route path="/callback" element={<SpotifyCallback />} />
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } 
-          />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRouter />
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

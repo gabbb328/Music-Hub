@@ -31,7 +31,10 @@ export const useRecentlyPlayed = (limit: number = 20) => {
   });
 };
 
-export const useTopTracks = (timeRange: "short_term" | "medium_term" | "long_term" = "medium_term", limit: number = 20) => {
+export const useTopTracks = (
+  timeRange: "short_term" | "medium_term" | "long_term" = "medium_term",
+  limit: number = 20,
+) => {
   return useQuery({
     queryKey: ["topTracks", timeRange, limit],
     queryFn: () => spotifyApi.getTopTracks(timeRange, limit),
@@ -40,7 +43,10 @@ export const useTopTracks = (timeRange: "short_term" | "medium_term" | "long_ter
   });
 };
 
-export const useTopArtists = (timeRange: "short_term" | "medium_term" | "long_term" = "medium_term", limit: number = 20) => {
+export const useTopArtists = (
+  timeRange: "short_term" | "medium_term" | "long_term" = "medium_term",
+  limit: number = 20,
+) => {
   return useQuery({
     queryKey: ["topArtists", timeRange, limit],
     queryFn: () => spotifyApi.getTopArtists(timeRange, limit),
@@ -95,9 +101,13 @@ export const useAvailableDevices = () => {
   });
 };
 
-export const useSearch = (query: string, type: string[] = ["track", "artist", "album", "playlist"], limit: number = 20) => {
+export const useSearch = (
+  query: string,
+  type: string[] = ["track", "artist", "album", "playlist"],
+  limit: number = 20,
+) => {
   const trimmedQuery = query?.trim() || "";
-  
+
   return useQuery({
     queryKey: ["search", trimmedQuery, type, limit],
     queryFn: () => spotifyApi.search(trimmedQuery, type, limit),
@@ -130,10 +140,17 @@ export const useAudioFeatures = (trackId: string) => {
 // Mutations
 export const usePlayMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ deviceId, contextUri, uris }: { deviceId?: string; contextUri?: string; uris?: string[] }) =>
-      spotifyApi.play(deviceId, contextUri, uris),
+    mutationFn: ({
+      deviceId,
+      contextUri,
+      uris,
+    }: {
+      deviceId?: string;
+      contextUri?: string;
+      uris?: string[];
+    }) => spotifyApi.play(deviceId, contextUri, uris),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playbackState"] });
       queryClient.invalidateQueries({ queryKey: ["currentlyPlaying"] });
@@ -144,7 +161,7 @@ export const usePlayMutation = () => {
 
 export const usePauseMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: spotifyApi.pause,
     onSuccess: () => {
@@ -156,7 +173,7 @@ export const usePauseMutation = () => {
 
 export const useNextMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: spotifyApi.next,
     onSuccess: () => {
@@ -168,7 +185,7 @@ export const useNextMutation = () => {
 
 export const usePreviousMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: spotifyApi.previous,
     onSuccess: () => {
@@ -180,7 +197,7 @@ export const usePreviousMutation = () => {
 
 export const useSeekMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (positionMs: number) => spotifyApi.seek(positionMs),
     onSuccess: () => {
@@ -197,7 +214,7 @@ export const useSetVolumeMutation = () => {
 
 export const useShuffleMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (state: boolean) => spotifyApi.setShuffle(state),
     onSuccess: () => {
@@ -208,9 +225,10 @@ export const useShuffleMutation = () => {
 
 export const useRepeatMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (state: "track" | "context" | "off") => spotifyApi.setRepeat(state),
+    mutationFn: (state: "track" | "context" | "off") =>
+      spotifyApi.setRepeat(state),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playbackState"] });
     },
@@ -219,7 +237,7 @@ export const useRepeatMutation = () => {
 
 export const useSaveTrackMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (trackId: string) => spotifyApi.saveTrack(trackId),
     onSuccess: () => {
@@ -230,7 +248,7 @@ export const useSaveTrackMutation = () => {
 
 export const useRemoveTrackMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (trackId: string) => spotifyApi.removeTrack(trackId),
     onSuccess: () => {
@@ -241,7 +259,7 @@ export const useRemoveTrackMutation = () => {
 
 export const useAddToQueueMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (uri: string) => spotifyApi.addToQueue(uri),
     onSuccess: () => {
@@ -252,7 +270,7 @@ export const useAddToQueueMutation = () => {
 
 export const useTransferPlaybackMutation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ deviceId, play }: { deviceId: string; play?: boolean }) =>
       spotifyApi.transferPlayback(deviceId, play),
@@ -260,5 +278,14 @@ export const useTransferPlaybackMutation = () => {
       queryClient.invalidateQueries({ queryKey: ["playbackState"] });
       queryClient.invalidateQueries({ queryKey: ["availableDevices"] });
     },
+  });
+};
+
+export const useCheckSavedTracks = (trackIds: string[]) => {
+  return useQuery({
+    queryKey: ["checkSavedTracks", ...trackIds],
+    queryFn: () => spotifyApi.checkSavedTracks(trackIds),
+    enabled: !!getToken() && trackIds.length > 0,
+    staleTime: 30000,
   });
 };

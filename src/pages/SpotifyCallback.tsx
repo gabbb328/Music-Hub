@@ -1,110 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  getTokenFromUrl, 
-  getCodeFromUrl,
-  exchangeCodeForToken,
-  setToken, 
-  setRefreshToken,
-  setTokenExpiry 
-} from "@/services/spotify-auth";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
+import { handleSpotifyCallback } from "@/services/spotify-auth";
 
-const SpotifyCallback = () => {
+export default function SpotifyCallback() {
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
+    const processCallback = async () => {
       try {
-        // Check for authorization code (PKCE flow)
-        const code = getCodeFromUrl();
-        
-        if (code) {
-          // PKCE flow - exchange code for token
-          console.log("Using PKCE flow...");
-          const tokens = await exchangeCodeForToken(code);
-          
-          setToken(tokens.access_token);
-          if (tokens.refresh_token) {
-            setRefreshToken(tokens.refresh_token);
-          }
-          setTokenExpiry(tokens.expires_in);
-          
-          // Clean up URL
-          window.history.replaceState({}, document.title, "/callback");
-          
-          navigate("/");
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const error = params.get('error');
+
+        if (error) {
+          console.error('Spotify auth error:', error);
+          navigate('/login');
           return;
         }
 
-        // Check for token in hash (Implicit flow - fallback)
-        const hash = getTokenFromUrl();
-        window.location.hash = "";
-
-        const access_token = hash.access_token;
-        const expires_in = hash.expires_in;
-
-        if (access_token) {
-          // Implicit flow
-          console.log("Using Implicit flow...");
-          setToken(access_token);
-          setTokenExpiry(expires_in);
-          navigate("/");
+        if (!code) {
+          console.error('No code in callback');
+          navigate('/login');
           return;
         }
 
-        // Check for error
-        const urlParams = new URLSearchParams(window.location.search);
-        const errorParam = urlParams.get('error');
-        
-        if (errorParam) {
-          setError(`Authentication failed: ${errorParam}`);
-          setTimeout(() => navigate("/login"), 3000);
-          return;
-        }
-
-        // No token or code received
-        setError("No authentication data received");
-        setTimeout(() => navigate("/login"), 3000);
-        
-      } catch (err) {
-        console.error("Callback error:", err);
-        setError(err instanceof Error ? err.message : "Authentication failed");
-        setTimeout(() => navigate("/login"), 3000);
+        await handleSpotifyCallback(code);
+        navigate('/');
+      } catch (error) {
+        console.error('Callback processing error:', error);
+        navigate('/login');
       }
     };
 
-    handleCallback();
+    processCallback();
   }, [navigate]);
 
-  if (error) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600">
-        <div className="max-w-md w-full mx-4">
-          <Alert variant="destructive" className="bg-white">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <p className="font-semibold mb-2">Authentication Error</p>
-              <p className="text-sm">{error}</p>
-              <p className="text-sm mt-2">Redirecting to login...</p>
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600">
-      <div className="text-center">
-        <Loader2 className="mx-auto h-16 w-16 animate-spin text-white" />
-        <h2 className="mt-4 text-2xl font-bold text-white">Connecting to Spotify...</h2>
-        <p className="mt-2 text-white/80">Please wait while we authenticate your account</p>
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
+        <p className="text-muted-foreground">Completing login...</p>
       </div>
     </div>
   );
-};
-
-export default SpotifyCallback;
+}

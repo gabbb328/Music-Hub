@@ -4,106 +4,144 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 95%;
-
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 95%;
-
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 95%;
-
-    --primary: 141 73% 42%;
-    --primary-foreground: 0 0% 0%;
-
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 80%;
-
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 55%;
-
-    --accent: 260 60% 55%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 141 73% 42%;
-
-    --radius: 0.75rem;
-
-    --surface-raised: 0 0% 12%;
-    --surface-overlay: 0 0% 8%;
-    --glow-primary: 141 73% 42%;
-    --glow-accent: 260 60% 55%;
-    --gradient-music: linear-gradient(135deg, hsl(260 60% 20%), hsl(200 80% 15%), hsl(141 73% 12%));
-
-    --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 0 0% 80%;
-    --sidebar-primary: 141 73% 42%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 141 73% 42%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    --radius: 0.5rem;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
-
+  
   body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "kern" 1, "liga" 1;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 25%);
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(0 0% 35%);
+  
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    position: fixed;
+    touch-action: pan-y;
   }
 }
 
 @layer utilities {
   .glass-surface {
-    @apply bg-card/60 backdrop-blur-xl border border-border/50;
+    @apply bg-card/40 backdrop-blur-xl border border-border/50;
   }
+  
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
 
-  .glow-primary {
-    box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.3);
-  }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-  .glow-accent {
-    box-shadow: 0 0 30px -5px hsl(var(--accent) / 0.3);
-  }
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary) / 0.2);
+  border-radius: 3px;
+}
 
-  .text-gradient-primary {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-  }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
 
-  .bg-gradient-music {
-    background: var(--gradient-music);
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.7);
+}
 
-  .surface-raised {
-    background: hsl(var(--surface-raised));
-  }
+::-webkit-scrollbar-thumb:active {
+  background: hsl(var(--primary) / 0.9);
+}
 
-  .surface-overlay {
-    background: hsl(var(--surface-overlay));
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--secondary) / 0.2);
+  scroll-behavior: smooth;
+}
+
+@media screen and (max-width: 767px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
   }
+  
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"], [type="button"] {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  input[type="range"] {
+    height: 48px;
+  }
+}
+
+.no-bounce {
+  overscroll-behavior-y: contain;
+}
+
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
 }
