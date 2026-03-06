@@ -1,0 +1,130 @@
+/**
+ * acoustid.ts
+ * 
+ * Invia il fingerprint ad AcoustID (gratuito, illimitato) e risolve
+ * i metadati tramite MusicBrainz (anch'esso gratuito e open source).
+ */
+
+import { generateFingerprint } from "./chromaprint";
+
+const ACOUSTID_KEY = import.meta.env.VITE_ACOUSTID_API_KEY as string;
+
+export interface AcoustIDResult {
+  title: string;
+  artist: string;
+  album: string;
+  releaseDate?: string;
+  mbRecordingId?: string;
+  mbReleaseId?: string;
+}
+
+// ── Decodifica Blob audio → AudioBuffer ───────────────────────────────────────
+async function blobToAudioBuffer(blob: Blob): Promise<AudioBuffer> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx = new AudioContext({ sampleRate: 44100 });
+  try {
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+    return decoded;
+  } finally {
+    audioCtx.close();
+  }
+}
+
+// ── Query AcoustID ─────────────────────────────────────────────────────────────
+async function queryAcoustID(fingerprint: string, duration: number): Promise<any> {
+  const params = new URLSearchParams({
+    client:      ACOUSTID_KEY,
+    fingerprint,
+    duration:    String(duration),
+    meta:        "recordings releases",
+    format:      "json",
+  });
+
+  // Usa proxy Vite in dev (evita CORS), diretto in prod
+  const base = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "/api/acoustid"
+    : "https://api.acoustid.org";
+
+  const res = await fetch(`${base}/v2/lookup?${params.toString()}`);
+  if (!res.ok) throw new Error(`AcoustID HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Lookup MusicBrainz per dettagli aggiuntivi ────────────────────────────────
+async function queryMusicBrainz(recordingId: string): Promise<{ album: string; date: string } | null> {
+  try {
+    const res = await fetch(
+      `https://musicbrainz.org/ws/2/recording/${recordingId}?inc=releases&fmt=json`,
+      { headers: { "User-Agent": "MusicHub/1.0 (personal app)" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const release = data.releases?.[0];
+    return {
+      album: release?.title ?? "",
+      date:  release?.date?.slice(0, 4) ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Entry point principale ────────────────────────────────────────────────────
+export async function recognizeWithAcoustID(blob: Blob): Promise<AcoustIDResult | null> {
+  // 1. Decodifica audio
+  const audioBuffer = await blobToAudioBuffer(blob);
+  console.log("[acoustid] audio decoded:", audioBuffer.duration.toFixed(1), "s,", audioBuffer.sampleRate, "Hz");
+
+  // 2. Genera fingerprint Chromaprint (async — carica WASM al primo uso)
+  const { fingerprint, duration } = await generateFingerprint(audioBuffer);
+  console.log("[acoustid] fingerprint length:", fingerprint.length, "chars, duration:", duration, "s");
+
+  // 3. Invia ad AcoustID
+  const data = await queryAcoustID(fingerprint, duration);
+  console.log("[acoustid] response:", JSON.stringify(data, null, 2));
+
+  if (data.status !== "ok" || !data.results?.length) return null;
+
+  // Prendi il risultato con score più alto
+  const best = data.results
+    .filter((r: any) => r.score > 0.7)
+    .sort((a: any, b: any) => b.score - a.score)[0];
+
+  if (!best) {
+    console.log("[acoustid] no result above score threshold");
+    return null;
+  }
+
+  // Prendi la prima recording
+  const recording = best.recordings?.[0];
+  if (!recording) return null;
+
+  const title  = recording.title ?? "";
+  const artist = recording.artists?.[0]?.name ?? "";
+  const mbId   = recording.id ?? "";
+
+  let album = "";
+  let releaseDate = "";
+  let mbReleaseId = "";
+
+  // Prova a prendere album dalla risposta diretta
+  const release = recording.releases?.[0];
+  if (release) {
+    album       = release.title ?? "";
+    releaseDate = release.date?.slice(0, 4) ?? "";
+    mbReleaseId = release.id ?? "";
+  }
+
+  // Se manca l'album, chiedi a MusicBrainz
+  if (!album && mbId) {
+    const mb = await queryMusicBrainz(mbId);
+    if (mb) {
+      album       = mb.album;
+      releaseDate = releaseDate || mb.date;
+    }
+  }
+
+  console.log("[acoustid] result:", { title, artist, album, releaseDate, score: best.score });
+
+  return { title, artist, album, releaseDate, mbRecordingId: mbId, mbReleaseId };
+}

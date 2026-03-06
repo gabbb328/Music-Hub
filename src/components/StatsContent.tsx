@@ -16,22 +16,18 @@ const timeRangeLabels: Record<TimeRange, string> = {
 export default function StatsContent() {
   const [timeRange, setTimeRange] = useState<TimeRange>("medium_term");
   
-  const { data: topTracksData, isLoading: loadingTracks } = useTopTracks(timeRange);
-  const { data: topArtistsData, isLoading: loadingArtists } = useTopArtists(timeRange);
+  const { data: topTracksData, isLoading: loadingTracks } = useTopTracks(timeRange, 50);
+  const { data: topArtistsData, isLoading: loadingArtists } = useTopArtists(timeRange, 50);
   const { data: recentData } = useRecentlyPlayed(50);
 
   const topTracks = topTracksData?.items || [];
   const topArtists = topArtistsData?.items || [];
   const recentTracks = recentData?.items || [];
 
-  // Calculate stats
-  const totalTracks = topTracks.length;
-  const totalArtists = topArtists.length;
-  
-  // Calculate total listening time from top tracks
-  const totalDurationMs = topTracks.reduce((acc, track) => acc + track.duration_ms, 0);
-  const totalHours = Math.floor(totalDurationMs / (1000 * 60 * 60));
-  const totalMinutes = Math.floor((totalDurationMs % (1000 * 60 * 60)) / (1000 * 60));
+  // Calculate total listening time from recent plays
+  const recentDurationMs = recentTracks.reduce((acc, item) => acc + item.track.duration_ms, 0);
+  const totalHours = Math.floor(recentDurationMs / (1000 * 60 * 60));
+  const totalMinutes = Math.floor((recentDurationMs % (1000 * 60 * 60)) / (1000 * 60));
 
   // Extract genres from top artists
   const genreCounts: Record<string, number> = {};
@@ -41,13 +37,14 @@ export default function StatsContent() {
     });
   });
 
+  const totalGenreCount = Object.values(genreCounts).reduce((a, b) => a + b, 0);
   const topGenres = Object.entries(genreCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, count], index) => ({
       name: name.charAt(0).toUpperCase() + name.slice(1),
       count,
-      pct: Math.round((count / topArtists.length) * 100),
+      pct: totalGenreCount > 0 ? Math.round((count / totalGenreCount) * 100) : 0,
       color: [
         "bg-cyan-500",
         "bg-indigo-500", 
@@ -57,7 +54,7 @@ export default function StatsContent() {
       ][index]
     }));
 
-  // Calculate listening by day of week from recent plays
+  // Calculate listening by day of week
   const dayListening: Record<string, number> = {
     Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0
   };
@@ -66,7 +63,7 @@ export default function StatsContent() {
     const date = new Date(item.played_at);
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const day = dayNames[date.getDay()];
-    dayListening[day] += item.track.duration_ms / (1000 * 60 * 60); // Convert to hours
+    dayListening[day] += item.track.duration_ms / (1000 * 60 * 60);
   });
 
   const listeningHours = Object.entries(dayListening).map(([day, hours]) => ({
@@ -76,13 +73,13 @@ export default function StatsContent() {
 
   const maxHours = Math.max(...listeningHours.map(d => d.hours), 1);
 
-  // Calculate top artists with plays (using popularity as proxy)
+  // Top artists with proper percentage (rank-based scaling to 100%)
   const topArtistsWithPlays = topArtists.slice(0, 5).map((artist, index) => {
-    const maxPopularity = topArtists[0]?.popularity || 100;
+    const pct = 100 - (index * 18); // 100%, 82%, 64%, 46%, 28%
     return {
       name: artist.name,
       plays: artist.popularity,
-      pct: Math.round((artist.popularity / maxPopularity) * 100),
+      pct: Math.max(pct, 20),
       image: artist.images[0]?.url
     };
   });
@@ -90,17 +87,17 @@ export default function StatsContent() {
   const stats = [
     { 
       label: "Listening Time", 
-      value: totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : "0h", 
+      value: totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`, 
       icon: Clock 
     },
     { 
       label: "Top Tracks", 
-      value: totalTracks.toString(), 
+      value: topTracks.length.toString(), 
       icon: Music 
     },
     { 
       label: "Top Artists", 
-      value: totalArtists.toString(), 
+      value: topArtists.length.toString(), 
       icon: Headphones 
     },
     { 
@@ -145,7 +142,6 @@ export default function StatsContent() {
           Your Statistics
         </h1>
         
-        {/* Time Range Selector */}
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           <div className="flex gap-2">
@@ -163,7 +159,6 @@ export default function StatsContent() {
         </div>
       </motion.div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {stats.map((stat, i) => (
           <motion.div
@@ -181,7 +176,6 @@ export default function StatsContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Weekly chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -197,7 +191,7 @@ export default function StatsContent() {
               <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
                 <motion.div
                   initial={{ height: 0 }}
-                  animate={{ height: `${(d.hours / maxHours) * 100}%` }}
+                  animate={{ height: `${Math.max((d.hours / maxHours) * 100, 2)}%` }}
                   transition={{ delay: 0.5 + i * 0.08, type: "spring", stiffness: 100 }}
                   className="w-full rounded-t-lg bg-gradient-to-t from-primary/60 to-primary min-h-[4px]"
                   title={`${d.hours}h`}
@@ -208,7 +202,6 @@ export default function StatsContent() {
           </div>
         </motion.div>
 
-        {/* Top artists */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -250,7 +243,6 @@ export default function StatsContent() {
           </div>
         </motion.div>
 
-        {/* Top Tracks */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -278,7 +270,6 @@ export default function StatsContent() {
           </div>
         </motion.div>
 
-        {/* Genre breakdown */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

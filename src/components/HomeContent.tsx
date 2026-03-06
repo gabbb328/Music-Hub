@@ -6,10 +6,10 @@ import { Track } from "@/lib/mock-data";
 import { useRecentlyPlayed, useTopTracks, useUserPlaylists } from "@/hooks/useSpotify";
 import { SpotifyTrack } from "@/types/spotify";
 import { formatTime } from "@/lib/mock-data";
-import SettingsPanel from "./SettingsPanel";
 
 interface HomeContentProps {
   onPlayTrack: (track: Track) => void;
+  onOpenSettings?: () => void;
 }
 
 const convertSpotifyTrack = (spotifyTrack: SpotifyTrack): Track => ({
@@ -22,8 +22,7 @@ const convertSpotifyTrack = (spotifyTrack: SpotifyTrack): Track => ({
   bpm: undefined,
 });
 
-const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
-  const [showSettings, setShowSettings] = useState(false);
+const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
   const { data: recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed(12);
   const { data: topTracks, isLoading: loadingTop } = useTopTracks("medium_term");
   const { data: playlists, isLoading: loadingPlaylists } = useUserPlaylists();
@@ -42,7 +41,7 @@ const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
             <p className="text-muted-foreground text-lg">Your personal music experience</p>
           </div>
           
-          <Button size="icon" variant="outline" onClick={() => setShowSettings(true)} className="rounded-full w-12 h-12">
+          <Button size="icon" variant="outline" onClick={() => onOpenSettings?.()} className="rounded-full w-12 h-12 hidden md:flex">
             <Settings className="w-5 h-5" />
           </Button>
         </div>
@@ -51,7 +50,7 @@ const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
           <h2 className="text-2xl font-semibold tracking-tight">Recently Played</h2>
           
           {loadingRecent ? (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 min-[400px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {[...Array(12)].map((_, i) => (
                 <Card key={i} className="animate-pulse">
                   <CardContent className="p-3">
@@ -63,7 +62,7 @@ const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 min-[400px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {recentlyPlayed?.items?.slice(0, 12).map((item: any) => {
                 const track = item.track;
                 return (
@@ -171,8 +170,6 @@ const HomeContent = ({ onPlayTrack }: HomeContentProps) => {
           )}
         </section>
       </div>
-
-      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </>
   );
 };

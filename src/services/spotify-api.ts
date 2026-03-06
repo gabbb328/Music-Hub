@@ -251,17 +251,37 @@ export const getUserPlaylists = async (): Promise<{ items: any[] }> => {
 export const getPlaylist = (playlistId: string) => 
   spotifyFetch(`/playlists/${playlistId}`);
 
-// Get ALL saved tracks (not just first 50)
-export const getSavedTracks = async (limit?: number): Promise<{ items: any[] }> => {
-  if (limit) {
-    // If specific limit requested, use it
-    const data = await spotifyFetch(`/me/tracks?limit=${limit}`);
-    return data || { items: [] };
+// Fetch ALL tracks from a playlist (handles pagination beyond Spotify's 100-track limit)
+export const getAllPlaylistTracks = async (playlistId: string): Promise<any[]> => {
+  const allItems: any[] = [];
+  let offset = 0;
+  const limit = 100;
+  let hasMore = true;
+
+  while (hasMore) {
+    const data = await spotifyFetch(`/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`);
+    if (!data || !data.items) break;
+    allItems.push(...data.items);
+    if (data.items.length < limit || !data.next) {
+      hasMore = false;
+    } else {
+      offset += limit;
+    }
   }
-  
-  // Otherwise fetch all
+
+  return allItems;
+};
+
+// Get saved tracks — if limit specified, single request; otherwise fetch all pages
+export const getSavedTracks = async (limit?: number): Promise<{ items: any[]; total: number }> => {
+  if (limit) {
+    // Single request — also returns the `total` field from Spotify
+    const data = await spotifyFetch(`/me/tracks?limit=${limit}`);
+    return data || { items: [], total: 0 };
+  }
+  // Fetch all pages
   const allTracks = await fetchAllPages("/me/tracks", 50);
-  return { items: allTracks };
+  return { items: allTracks, total: allTracks.length };
 };
 
 export const saveTrack = (trackId: string) => 

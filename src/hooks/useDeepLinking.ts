@@ -1,65 +1,64 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Deep linking hook - works only in Capacitor build (APK)
-// In browser mode, this hook does nothing
 export const useDeepLinking = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only runs in mobile app builds
-    // This will be handled by Capacitor when building APK
-    console.log('Deep linking hook initialized (browser mode - no action needed)');
-    
-    // In APK build, you'll need to:
-    // 1. Install @capacitor/app: npm install @capacitor/app
-    // 2. Uncomment the code below
-    // 3. Build APK with: npm run build && npx cap sync
-    
-    /*
+    // Gestisce deep link quando l'app viene aperta da URL esterno
     const setupDeepLinking = async () => {
       try {
+        // Import dinamico - funziona solo se @capacitor/app è installato
         const { App } = await import('@capacitor/app');
         
+        // Listener per URL ricevuti mentre l'app è già aperta
         App.addListener('appUrlOpen', (event) => {
           console.log('Deep link received:', event.url);
           
           const url = new URL(event.url);
-          const pathname = url.pathname;
-          const params = url.searchParams || new URLSearchParams(url.hash.substring(1));
+          const pathname = url.pathname || url.host; // host per scheme custom
           
+          // Esempio: com.musichub.app://callback?code=xxx
           if (pathname.includes('callback')) {
-            const accessToken = params.get('access_token');
-            const error = params.get('error');
-            
-            if (accessToken) {
-              console.log('✓ Access token received via deep link');
-              navigate('/callback' + url.hash);
-            } else if (error) {
-              console.error('Spotify auth error:', error);
-              navigate('/login');
-            }
+            // Chiude il browser di Capacitor per far rivedere l'app sotto
+            import('@capacitor/browser').then(({ Browser }) => {
+              Browser.close().catch(console.error);
+            }).catch(console.error);
+
+            const params = new URLSearchParams(url.search || url.hash.substring(1));
+            navigate(`/callback${url.search || url.hash}`);
           }
         });
 
+        // Controlla se l'app è stata aperta tramite URL
         const result = await App.getLaunchUrl();
         if (result?.url) {
           console.log('App launched with URL:', result.url);
           const url = new URL(result.url);
-          if (url.pathname.includes('callback')) {
-            navigate('/callback' + url.hash);
+          const pathname = url.pathname || url.host;
+          
+          if (pathname.includes('callback')) {
+            // Chiude il browser anche in caso di cold start, per sicurezza
+            import('@capacitor/browser').then(({ Browser }) => {
+              Browser.close().catch(console.error);
+            }).catch(console.error);
+
+            navigate(`/callback${url.search || url.hash}`);
           }
         }
       } catch (error) {
-        console.log('Capacitor not available - running in browser mode');
+        // @capacitor/app non disponibile - modalità browser
+        console.log('Deep linking not available (browser mode)');
       }
     };
 
     setupDeepLinking();
-    */
 
     return () => {
-      // Cleanup if needed
+      // Cleanup - importa dinamicamente per evitare errori se non disponibile
+      import('@capacitor/app').then(({ App }) => {
+        App.removeAllListeners();
+      }).catch(() => {});
     };
   }, [navigate]);
 };

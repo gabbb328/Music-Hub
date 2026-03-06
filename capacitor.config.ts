@@ -6,12 +6,14 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: true
+    cleartext: true,
+    allowNavigation: ['*']
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: true,
+    useLegacyBridge: false
   },
   plugins: {
     SplashScreen: {
@@ -19,18 +21,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#0a0e27",
       androidScaleType: "CENTER_CROP",
       showSpinner: false,
-      androidSpinnerStyle: "small",
       splashFullScreen: true,
       splashImmersive: true
-    },
-    StatusBar: {
-      style: "DARK",
-      backgroundColor: "#0a0e27"
-    },
-    Keyboard: {
-      resize: "body",
-      style: "DARK",
-      resizeOnFullScreen: true
     }
   }
 };

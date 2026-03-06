@@ -14,7 +14,8 @@ type ColorTheme =
   | "indigo"
   | "lime"
   | "sky"
-  | "fuchsia";
+  | "fuchsia"
+  | "dynamic";
 
 interface ThemeContextType {
   theme: Theme;
@@ -22,11 +23,15 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   toggleTheme: () => void;
+  isDynamicTheme: boolean;
+  autoDarkMode: boolean;
+  setAutoDarkMode: (enabled: boolean) => void;
+  activeAppIcon: string;
+  setActiveAppIcon: (iconName: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Professional color palettes with beautiful contrasts
 const colorThemes = {
   blue: {
     light: { 
@@ -233,19 +238,31 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     return (saved as ColorTheme) || "blue";
   });
 
+  const [autoDarkMode, setAutoDarkModeState] = useState<boolean>(() => {
+    const saved = localStorage.getItem("autoDarkMode");
+    return saved === "true";
+  });
+
+  const [activeAppIcon, setActiveAppIconState] = useState<string>(() => {
+    const saved = localStorage.getItem("activeAppIcon");
+    return saved || "auto"; // "auto" will resolve dynamically
+  });
+
   const applyTheme = (newTheme: Theme, newColorTheme: ColorTheme) => {
     const root = document.documentElement;
-    const colors = colorThemes[newColorTheme][newTheme];
-
+    root.style.transition = 'background-color 0.6s ease, color 0.6s ease';
+    
     root.classList.remove("light", "dark");
     root.classList.add(newTheme);
+    
+    if (newColorTheme === "dynamic") return;
+    
+    const colors = colorThemes[newColorTheme][newTheme];
 
-    // Apply main colors
     root.style.setProperty("--primary", colors.primary);
     root.style.setProperty("--background", colors.background);
     root.style.setProperty("--foreground", colors.foreground);
 
-    // Additional theme-specific variables
     if (newTheme === "light") {
       root.style.setProperty("--card", "0 0 100");
       root.style.setProperty("--card-foreground", colors.foreground);
@@ -279,11 +296,55 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       root.style.setProperty("--destructive", "0 62 51");
       root.style.setProperty("--destructive-foreground", "0 0 98");
     }
+    
+    setTimeout(() => {
+      root.style.transition = '';
+    }, 600);
+  };
+
+  const setActiveAppIcon = (iconName: string) => {
+    setActiveAppIconState(iconName);
+    localStorage.setItem("activeAppIcon", iconName);
+  };
+
+  const getResolvedAppIcon = (currentTheme: Theme, color: ColorTheme, manualIcon: string): string => {
+    if (manualIcon !== "auto") return manualIcon;
+    
+    // Automatically determine icon based on theme and color
+    const isLight = currentTheme === "light";
+    const mappedColor = color === "dynamic" ? "blu" : getIconColorCategory(color);
+    
+    return `app_${mappedColor}_${isLight ? "chiaro" : "scuro"}.png`;
+  };
+
+  const getIconColorCategory = (color: ColorTheme): string => {
+    switch(color) {
+      case "blue": 
+      case "sky":
+      case "indigo": return "blu";
+      case "teal": return "azzurro";
+      case "purple":
+      case "violet":
+      case "fuchsia": return "viola";
+      case "emerald":
+      case "lime": return "verde";
+      case "amber": return "arancione";
+      case "rose": return "rosa";
+      case "crimson": return "rosso";
+      default: return "blu";
+    }
   };
 
   useEffect(() => {
     applyTheme(theme, colorTheme);
-  }, [theme, colorTheme]);
+    
+    // Update Document Favicon/Icon
+    const resolvedIconName = getResolvedAppIcon(theme, colorTheme, activeAppIcon);
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = `/icons/${resolvedIconName}`;
+    }
+  }, [theme, colorTheme, activeAppIcon]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -295,12 +356,30 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("colorTheme", newColorTheme);
   };
 
+  const setAutoDarkMode = (enabled: boolean) => {
+    setAutoDarkModeState(enabled);
+    localStorage.setItem("autoDarkMode", String(enabled));
+  };
+
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  const isDynamicTheme = colorTheme === "dynamic";
+
   return (
-    <ThemeContext.Provider value={{ theme, colorTheme, setTheme, setColorTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      colorTheme, 
+      setTheme, 
+      setColorTheme, 
+      toggleTheme, 
+      isDynamicTheme, 
+      autoDarkMode, 
+      setAutoDarkMode,
+      activeAppIcon,
+      setActiveAppIcon
+    }}>
       {children}
     </ThemeContext.Provider>
   );

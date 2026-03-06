@@ -14,7 +14,10 @@ export const translateText = async (
     return null;
   }
 
-  try {
+  return { translatedText: text, targetLanguage: targetLang };
+
+
+  /* try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -53,6 +56,7 @@ export const translateText = async (
     }
     return fallbackTranslate(text, targetLang);
   }
+ */
 };
 
 async function fallbackTranslate(text: string, targetLang: string): Promise<TranslationResult | null> {

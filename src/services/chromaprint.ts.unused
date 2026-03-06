@@ -1,0 +1,99 @@
+/**
+ * chromaprint.ts
+ * 
+ * Usa @acoustid/chromaprint-wasm — il vero binario Chromaprint compilato in WASM.
+ * Produce fingerprint 100% compatibili con AcoustID.
+ * 
+ * Installa con: npm install @acoustid/chromaprint-wasm
+ */
+
+let chromaprintModule: any = null;
+
+async function getModule() {
+  if (!chromaprintModule) {
+    // Import dinamico — il WASM viene caricato solo quando serve
+    const mod = await import("@acoustid/chromaprint-wasm");
+    chromaprintModule = await mod.default();
+  }
+  return chromaprintModule;
+}
+
+// ── Resample Float32Array verso targetRate ─────────────────────────────────────
+function resampleLinear(input: Float32Array, fromRate: number, toRate: number): Float32Array {
+  if (fromRate === toRate) return input;
+  const ratio = fromRate / toRate;
+  const outLen = Math.floor(input.length / ratio);
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const lo = Math.floor(pos);
+    const hi = Math.min(lo + 1, input.length - 1);
+    out[i] = input[lo] + (input[hi] - input[lo]) * (pos - lo);
+  }
+  return out;
+}
+
+// ── AudioBuffer → mono PCM s16 a 11025 Hz ────────────────────────────────────
+function audioBufferToMono11025(buffer: AudioBuffer): Int16Array {
+  // Mix canali in mono Float32
+  const len = buffer.length;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const ch = buffer.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += ch[i] / buffer.numberOfChannels;
+  }
+
+  // Resample a 11025 Hz (richiesto da Chromaprint)
+  const resampled = resampleLinear(mono, buffer.sampleRate, 11025);
+
+  // Converti Float32 → Int16
+  const pcm = new Int16Array(resampled.length);
+  for (let i = 0; i < resampled.length; i++) {
+    const s = Math.max(-1, Math.min(1, resampled[i]));
+    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return pcm;
+}
+
+export interface FingerprintResult {
+  fingerprint: string;
+  duration: number;
+}
+
+// ── Entry point: AudioBuffer → fingerprint Chromaprint ───────────────────────
+export async function generateFingerprint(buffer: AudioBuffer): Promise<FingerprintResult> {
+  const module = await getModule();
+
+  const pcm = audioBufferToMono11025(buffer);
+  const duration = buffer.duration;
+
+  // Alloca memoria WASM per i campioni PCM
+  const byteLen = pcm.length * 2; // Int16 = 2 byte
+  const ptr = module._malloc(byteLen);
+  module.HEAP16.set(pcm, ptr >> 1);
+
+  // Crea il contesto Chromaprint e processa l'audio
+  const ctx = module._chromaprint_new(1); // CHROMAPRINT_ALGORITHM_DEFAULT = 1
+  module._chromaprint_start(ctx, 11025, 1); // 11025 Hz, mono
+  module._chromaprint_feed(ctx, ptr, pcm.length);
+  module._chromaprint_finish(ctx);
+
+  // Leggi il fingerprint
+  const fpPtrPtr = module._malloc(4);
+  const fpLenPtr = module._malloc(4);
+  module._chromaprint_get_fingerprint(ctx, fpPtrPtr, fpLenPtr);
+
+  const fpPtr = module.HEAP32[fpPtrPtr >> 2];
+  const fpLen = module.HEAP32[fpLenPtr >> 2];
+  const fingerprint = module.UTF8ToString(fpPtr, fpLen);
+
+  // Libera memoria
+  module._chromaprint_dealloc(fpPtr);
+  module._free(fpPtrPtr);
+  module._free(fpLenPtr);
+  module._free(ptr);
+  module._chromaprint_free(ctx);
+
+  console.log("[chromaprint] fingerprint length:", fingerprint.length, "duration:", duration.toFixed(1), "s");
+  return { fingerprint, duration: Math.round(duration) };
+}
