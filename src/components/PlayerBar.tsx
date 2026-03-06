@@ -166,14 +166,23 @@ export default function PlayerBar(props: PlayerProps) {
     localToggleRepeat();
   };
 
+  const handleExpandClick = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('🔍 PlayerBar: Expand clicked!');
+    onExpandClick();
+  };
+
   return (
-    <div className="h-24 glass-surface border-t border-border/50 flex items-center px-4 gap-4 z-50 shrink-0">
-      <div className="flex items-center gap-3 w-72 min-w-0">
+    <div className="h-16 md:h-24 glass-surface border-t border-border/50 flex items-center px-2 md:px-4 gap-2 md:gap-4 z-50 shrink-0">
+      <div className="flex items-center gap-2 md:gap-3 w-auto md:w-72 min-w-0 flex-1 md:flex-none">
         <motion.button
-          onClick={onExpandClick}
+          onClick={handleExpandClick}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="relative shrink-0"
+          className="relative shrink-0 cursor-pointer touch-manipulation"
         >
           <AnimatePresence mode="wait">
             <motion.img
@@ -204,17 +213,17 @@ export default function PlayerBar(props: PlayerProps) {
           </p>
         </div>
         <motion.button
-          onClick={onExpandClick}
+          onClick={handleExpandClick}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground cursor-pointer touch-manipulation"
           title="Expand"
         >
           <ChevronUp className="w-4 h-4" />
         </motion.button>
       </div>
 
-      <div className="flex-1 max-w-2xl mx-auto flex flex-col gap-1">
+      <div className="hidden md:flex flex-1 max-w-2xl mx-auto flex-col gap-1">
         <div className="flex items-center justify-center gap-4">
           <ControlBtn
             onClick={handleToggleShuffle}
@@ -268,7 +277,7 @@ export default function PlayerBar(props: PlayerProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-56 justify-end">
+      <div className="hidden md:flex items-center gap-2 w-56 justify-end">
         <ControlBtn 
           icon={<Mic2 className="w-4 h-4" />}
           onClick={() => onNavigate?.('lyrics')}
@@ -314,9 +323,28 @@ export default function PlayerBar(props: PlayerProps) {
         </div>
 
         <ControlBtn
-          onClick={onExpandClick}
+          onClick={handleExpandClick}
           icon={<Maximize2 className="w-4 h-4" />}
           tooltip="Expand Player"
+        />
+      </div>
+
+      <div className="flex md:hidden items-center justify-end gap-1">
+        <motion.button
+          onClick={handleTogglePlay}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center shrink-0"
+        >
+          {isPlaying ? (
+            <Pause className="w-5 h-5 text-background" />
+          ) : (
+            <Play className="w-5 h-5 text-background ml-0.5" />
+          )}
+        </motion.button>
+        <ControlBtn
+          onClick={handleNext}
+          icon={<SkipForward className="w-5 h-5 fill-current" />}
         />
       </div>
     </div>

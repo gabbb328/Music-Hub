@@ -33,7 +33,7 @@ export const useRecentlyPlayed = (limit: number = 20) => {
 
 export const useTopTracks = (
   timeRange: "short_term" | "medium_term" | "long_term" = "medium_term",
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useQuery({
     queryKey: ["topTracks", timeRange, limit],
@@ -45,7 +45,7 @@ export const useTopTracks = (
 
 export const useTopArtists = (
   timeRange: "short_term" | "medium_term" | "long_term" = "medium_term",
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useQuery({
     queryKey: ["topArtists", timeRange, limit],
@@ -73,12 +73,21 @@ export const usePlaylist = (playlistId: string) => {
   });
 };
 
-export const useSavedTracks = (limit: number = 50) => {
+export const useSavedTracks = (limit?: number) => {
   return useQuery({
-    queryKey: ["savedTracks", limit],
+    queryKey: ["savedTracks", limit ?? "all"],
     queryFn: () => spotifyApi.getSavedTracks(limit),
     enabled: !!getToken(),
     staleTime: 30000,
+  });
+};
+
+export const useAllPlaylistTracks = (playlistId: string, totalTracks: number) => {
+  return useQuery({
+    queryKey: ["playlistTracks", playlistId],
+    queryFn: () => spotifyApi.getAllPlaylistTracks(playlistId),
+    enabled: !!getToken() && !!playlistId && totalTracks > 100,
+    staleTime: 60000,
   });
 };
 

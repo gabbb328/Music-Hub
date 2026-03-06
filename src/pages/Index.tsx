@@ -2,7 +2,9 @@ import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
+import { useDynamicTheme } from "@/hooks/useDynamicTheme";
 import Sidebar from "@/components/Sidebar";
+import MobileNav from "@/components/MobileNav";
 import PlayerBar from "@/components/PlayerBar";
 import HomeContent from "@/components/HomeContent";
 import NowPlayingView from "@/components/NowPlayingView";
@@ -17,6 +19,9 @@ import RadioContent from "@/components/RadioContent";
 import LikedSongsContent from "@/components/LikedSongsContent";
 import RecentlyPlayedContent from "@/components/RecentlyPlayedContent";
 import PlaylistDetail from "@/components/PlaylistDetail";
+import RecognizeContent from "@/components/RecognizeContent";
+import SettingsPanel from "@/components/SettingsPanel";
+import MoreContent from "@/components/MoreContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 
@@ -24,8 +29,10 @@ const Index = () => {
   const player = usePlayerStore();
   const [activeSection, setActiveSection] = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   useLyricsPreloader();
+  useDynamicTheme();
 
   const handleOpenPlaylist = (playlistId: string) => {
     setActiveSection(`playlist-${playlistId}`);
@@ -59,13 +66,23 @@ const Index = () => {
         return <QueueContent queue={player.queue} currentTrack={player.currentTrack} onPlayTrack={player.playTrack} />;
       case "radio":
         return <RadioContent />;
+      case "recognize":
+        return <RecognizeContent />;
       case "liked":
         return <LikedSongsContent />;
       case "recent":
         return <RecentlyPlayedContent />;
+      case "more":
+        return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
       default:
-        return <HomeContent onPlayTrack={player.playTrack} />;
+        return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
     }
+  };
+
+  const handleExpandClick = () => {
+    console.log('🔍 Index: setShowNowPlaying(true) called');
+    console.log('🔍 Index: currentTrack =', player.currentTrack);
+    setShowNowPlaying(true);
   };
 
   return (
@@ -80,15 +97,22 @@ const Index = () => {
         </div>
         <PlayerBar 
           {...player} 
-          onExpandClick={() => setShowNowPlaying(true)}
+          onExpandClick={handleExpandClick}
           onNavigate={setActiveSection}
+        />
+        <MobileNav 
+          activeSection={activeSection} 
+          onSectionChange={setActiveSection} 
+          onOpenSettings={() => setShowSettings(true)}
         />
 
         <AnimatePresence>
-          {showNowPlaying && player.currentTrack && (
+          {showNowPlaying && (
             <NowPlayingView {...player} onClose={() => setShowNowPlaying(false)} />
           )}
         </AnimatePresence>
+
+        <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
       </div>
     </SpotifyProvider>
   );

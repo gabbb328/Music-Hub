@@ -319,7 +319,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="relative flex items-center justify-between px-6 py-4 z-10">
+      <div className="relative flex items-center justify-between px-4 md:px-6 py-4 z-10">
         <motion.button onClick={onClose} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
           className="p-2 rounded-full text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition-colors">
           <X className="w-6 h-6" />
@@ -337,9 +337,9 @@ export default function NowPlayingView(props: NowPlayingProps) {
         </div>
       </div>
 
-      <div className="relative flex-1 flex flex-col items-center justify-center px-8 z-10">
+      <div className="relative flex-1 flex flex-col items-center justify-center px-4 md:px-8 z-10">
         {showVisualizer ? (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-80 h-80 flex items-center justify-center">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
             <VisualizerCanvas isPlaying={isPlaying} />
           </motion.div>
         ) : (
@@ -350,7 +350,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
               exit={{ opacity: 0, scale: 0.8, rotateY: 15 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="relative">
-              <img src={coverUrl} alt={currentTrack.album.name} className="w-80 h-80 rounded-2xl object-cover shadow-2xl" />
+              <img src={coverUrl} alt={currentTrack.album.name} className="w-64 h-64 md:w-80 md:h-80 rounded-2xl object-cover shadow-2xl" />
               {isPlaying && (
                 <motion.div className="absolute -inset-1 rounded-2xl glow-primary opacity-30"
                   animate={{ opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 3, repeat: Infinity }} />
@@ -359,14 +359,14 @@ export default function NowPlayingView(props: NowPlayingProps) {
           </AnimatePresence>
         )}
 
-        <div className="mt-10 text-center w-full max-w-md">
+        <div className="mt-6 md:mt-10 text-center w-full max-w-md px-2">
           <div className="flex items-center justify-between">
             <div className="text-left min-w-0 flex-1">
               <motion.h2 key={currentTrack.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className="text-2xl font-bold text-foreground truncate">
+                className="text-xl md:text-2xl font-bold text-foreground truncate">
                 {currentTrack.name}
               </motion.h2>
-              <p className="text-lg text-muted-foreground mt-1">{currentTrack.artists[0]?.name}</p>
+              <p className="text-base md:text-lg text-muted-foreground mt-1 truncate">{currentTrack.artists[0]?.name}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <motion.button 
@@ -395,7 +395,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-6">
+          <div className="flex items-center justify-center gap-4 md:gap-6 mt-6">
             <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={handleToggleShuffle}
               className={`p-2 ${shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"} transition-colors`}>
               <Shuffle className="w-5 h-5" />
@@ -404,8 +404,8 @@ export default function NowPlayingView(props: NowPlayingProps) {
               <SkipBack className="w-6 h-6 fill-current" />
             </motion.button>
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={handleTogglePlay}
-              className="w-16 h-16 rounded-full bg-foreground flex items-center justify-center shadow-xl">
-              {isPlaying ? <Pause className="w-7 h-7 text-background" /> : <Play className="w-7 h-7 text-background ml-1" />}
+              className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-foreground flex items-center justify-center shadow-xl">
+              {isPlaying ? <Pause className="w-6 h-6 md:w-7 md:h-7 text-background" /> : <Play className="w-6 h-6 md:w-7 md:h-7 text-background ml-1" />}
             </motion.button>
             <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={handleNext} className="p-2 text-foreground">
               <SkipForward className="w-6 h-6 fill-current" />
@@ -442,7 +442,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-full md:w-[600px] z-[120] flex overflow-hidden"
+              className="fixed right-0 top-0 bottom-0 w-full md:w-[600px] lg:w-[700px] z-[120] flex overflow-hidden"
             >
               <div 
                 className="absolute inset-0"
@@ -456,7 +456,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
               <div className="absolute inset-0 bg-background/90" />
 
               <div className="relative flex-1 flex">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold">Customize View</h2>
                     <button onClick={() => setShowMenu(false)} className="p-2 hover:bg-foreground/10 rounded-full transition-colors">
@@ -497,7 +497,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
                   </div>
                 </div>
 
-                <div className="w-20 border-l border-border/50 p-3 space-y-3 overflow-y-auto bg-black/30 backdrop-blur-sm">
+                <div className="w-16 md:w-20 border-l border-border/50 p-2 md:p-3 space-y-2 md:space-y-3 overflow-y-auto bg-black/30 backdrop-blur-sm">
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-center mb-2">Widgets</p>
                   
                   {availableWidgets.map((widget) => {

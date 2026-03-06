@@ -1,5 +1,14 @@
+import { Capacitor } from '@capacitor/core';
+
 const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const SPOTIFY_REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+const SPOTIFY_REDIRECT_URI_WEB = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+const SPOTIFY_REDIRECT_URI_MOBILE = import.meta.env.VITE_SPOTIFY_REDIRECT_URI_SMARTPHONE;
+
+// Determina il redirect URI in base alla piattaforma
+function getRedirectUri(): string {
+  const isNative = Capacitor.isNativePlatform();
+  return isNative ? SPOTIFY_REDIRECT_URI_MOBILE : SPOTIFY_REDIRECT_URI_WEB;
+}
 
 function generateRandomString(length: number): string {
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -40,16 +49,33 @@ export async function redirectToSpotifyAuth() {
     'playlist-read-collaborative'
   ].join(' ');
 
+  const redirectUri = getRedirectUri();
+  console.log('Using redirect URI:', redirectUri);
+
   const params = new URLSearchParams({
     client_id: SPOTIFY_CLIENT_ID,
     response_type: 'code',
-    redirect_uri: SPOTIFY_REDIRECT_URI,
+    redirect_uri: redirectUri,
     scope: scope,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,
   });
 
-  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  
+  // Su mobile, apre il browser esterno
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Import dinamico del plugin Browser
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: authUrl });
+    } catch (error) {
+      // Fallback: usa window.open
+      window.open(authUrl, '_system');
+    }
+  } else {
+    window.location.href = authUrl;
+  }
 }
 
 export async function handleSpotifyCallback(code: string) {
@@ -59,11 +85,13 @@ export async function handleSpotifyCallback(code: string) {
     throw new Error('Code verifier not found');
   }
 
+  const redirectUri = getRedirectUri();
+
   const params = new URLSearchParams({
     client_id: SPOTIFY_CLIENT_ID,
     grant_type: 'authorization_code',
     code: code,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
+    redirect_uri: redirectUri,
     code_verifier: codeVerifier,
   });
 
@@ -81,9 +109,21 @@ export async function handleSpotifyCallback(code: string) {
 
   const data = await response.json();
   
+  // Ensure we have a valid expires_in, default to 1 hour (3600s) if missing
+  const expiresIn = data.expires_in || 3600;
+  const expiresAt = Date.now() + (expiresIn * 1000);
+  
+  console.log('Token data received:', { 
+    has_access: !!data.access_token, 
+    has_refresh: !!data.refresh_token, 
+    expires_in: expiresIn 
+  });
+
   window.localStorage.setItem('spotify_access_token', data.access_token);
-  window.localStorage.setItem('spotify_refresh_token', data.refresh_token);
-  window.localStorage.setItem('spotify_token_expires_at', String(Date.now() + data.expires_in * 1000));
+  if (data.refresh_token) {
+    window.localStorage.setItem('spotify_refresh_token', data.refresh_token);
+  }
+  window.localStorage.setItem('spotify_token_expires_at', String(expiresAt));
   window.localStorage.removeItem('code_verifier');
 
   return data.access_token;

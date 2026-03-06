@@ -246,22 +246,16 @@ export const fetchSyncedLyrics = async (
 
   try {
     // Try LRCLIB first (best for synced lyrics)
-    console.log('Trying LRCLIB...');
     let result = await searchVariations(title, artist, duration, fetchFromLRCLIB);
     if (result && result.lines.length > 5) { // Minimum 5 lines
-      console.log('✓ Found lyrics on LRCLIB');
       return result;
     }
 
     // Try Lyrics.ovh
-    console.log('Trying Lyrics.ovh...');
     result = await searchVariations(title, artist, duration, fetchFromLyricsOvh);
     if (result && result.lines.length > 5) {
-      console.log('✓ Found lyrics on Lyrics.ovh');
       return result;
     }
-
-    console.log('✗ No lyrics found');
   } catch (error) {
     console.error('Lyrics fetch error:', error);
   }

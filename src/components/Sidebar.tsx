@@ -1,5 +1,19 @@
 import { motion } from "framer-motion";
-import { Home, Search, Library, Radio, Mic2, BarChart3, Headphones, Sparkles, Heart, Clock, ListMusic, Music } from "lucide-react";
+import {
+  Home,
+  Search,
+  Library,
+  Radio,
+  Mic2,
+  BarChart3,
+  Headphones,
+  Sparkles,
+  Heart,
+  Clock,
+  ListMusic,
+  Music,
+  ScanSearch,
+} from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
 interface SidebarProps {
@@ -17,6 +31,7 @@ const features = [
   { id: "ai-dj", label: "AI DJ", icon: Sparkles },
   { id: "radio", label: "Radio", icon: Radio },
   { id: "lyrics", label: "Lyrics", icon: Mic2 },
+  { id: "recognize", label: "Recognize", icon: ScanSearch },
   { id: "stats", label: "Statistics", icon: BarChart3 },
   { id: "devices", label: "Devices", icon: Headphones },
 ];
@@ -27,12 +42,15 @@ const libraryItems = [
   { id: "queue", label: "Queue", icon: ListMusic },
 ];
 
-export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
+export default function Sidebar({
+  activeSection,
+  onSectionChange,
+}: SidebarProps) {
   const { data: playlistsData, isLoading } = useUserPlaylists();
   const playlists = playlistsData?.items || [];
 
   return (
-    <aside className="w-64 h-full flex flex-col bg-sidebar border-r border-sidebar-border shrink-0">
+    <aside className="hidden md:flex w-64 h-full flex-col bg-sidebar border-r border-sidebar-border shrink-0">
       <div className="px-6 py-5 flex-shrink-0">
         <h1 className="text-xl font-bold tracking-tight">
           <span className="text-gradient-primary">Music</span>
@@ -87,7 +105,10 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
           <div className="space-y-0.5">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2 animate-pulse">
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-3 py-2 animate-pulse"
+                >
                   <div className="w-8 h-8 rounded bg-muted" />
                   <div className="h-4 bg-muted rounded flex-1" />
                 </div>
@@ -106,10 +127,10 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors duration-200"
                 >
                   {pl.images && pl.images[0]?.url ? (
-                    <img 
-                      src={pl.images[0].url} 
-                      alt="" 
-                      className="w-8 h-8 rounded object-cover flex-shrink-0" 
+                    <img
+                      src={pl.images[0].url}
+                      alt=""
+                      className="w-8 h-8 rounded object-cover flex-shrink-0"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center flex-shrink-0">
