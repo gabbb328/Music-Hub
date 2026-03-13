@@ -11,8 +11,7 @@ import {
 import { formatTime } from "@/lib/mock-data";
 import { 
   fetchSyncedLyrics, 
-  getCurrentLineIndex, 
-  getDisplayLines,
+  getCurrentLineIndex,
   type LyricLine 
 } from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
@@ -34,6 +33,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const [loadingLyrics, setLoadingLyrics] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const [centerMode, setCenterMode] = useState(true); // Modalità centrata come Spotify
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const currentLineRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
@@ -80,18 +80,25 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   }, [currentTime, lyrics, isPlaying]);
 
   useEffect(() => {
-    if (currentLineRef.current && lyricsContainerRef.current && !isUserScrolling) {
-      currentLineRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
+    if (centerMode && currentLineRef.current) {
+      // Piccolo delay per assicurarsi che il layout sia pronto (specialmente dopo toggle o ripresa)
+      const timeoutId = setTimeout(() => {
+        currentLineRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 50);
+      return () => clearTimeout(timeoutId);
     }
-  }, [currentLineIndex, isUserScrolling]);
+  }, [currentLineIndex, centerMode, lyrics.length]);
 
   const handleScroll = () => {
-    setIsUserScrolling(true);
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 3000);
+    // Solo in modalità scroll libero monitora lo scroll manuale
+    if (!centerMode) {
+      setIsUserScrolling(true);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 3000);
+    }
   };
 
   const handleLineClick = async (line: LyricLine) => {
@@ -167,7 +174,14 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   }
 
   const spotifyTrack = playbackState?.item;
-  const displayLines = getDisplayLines(lyrics, currentLineIndex, 2, 3);
+  // Mostra tutti i testi, non solo 5 righe
+  const displayLines = lyrics.map((line, index) => ({
+    line,
+    index,
+    isCurrent: index === currentLineIndex,
+    isPast: index < currentLineIndex,
+    isFuture: index > currentLineIndex
+  }));
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col p-4 md:p-8">
@@ -197,10 +211,21 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
             {mode === "lyrics" && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {isSynced && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-500">Time-synced</span>
-                  </div>
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-green-500" />
+                      <span className="text-xs text-green-500">Time-synced</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={centerMode ? "default" : "outline"}
+                      onClick={() => setCenterMode(!centerMode)}
+                      className="h-6 text-xs"
+                    >
+                      <Disc className="w-3 h-3 mr-1" />
+                      {centerMode ? "Centered" : "Scroll"}
+                    </Button>
+                  </>
                 )}
                 {lyrics.length > 0 && !isTranslating && (
                   <Button
@@ -265,7 +290,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
               </div>
             ) : (
               <div className="space-y-2 py-8">
-                {isUserScrolling && (
+                {!centerMode && isUserScrolling && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -277,20 +302,26 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   </motion.div>
                 )}
 
-                <AnimatePresence mode="sync">
-                  {displayLines.map(({ line, index, isCurrent, isPast }) => {
-                    const translation = translatedLyrics.get(index);
-                    return (
-                      <motion.div
-                        key={index}
-                        ref={isCurrent ? currentLineRef : null}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ 
-                          opacity: 1, 
-                          x: 0
-                        }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ duration: 0.3 }}
+                {displayLines.map(({ line, index, isCurrent, isPast }) => {
+                  const translation = translatedLyrics.get(index);
+                  
+                  // Rileva pause musicali (righe vuote o strumentali)
+                  const isMusicalBreak = !line.text.trim() || 
+                    line.text.match(/^[\[\(].*[\]\)]$/) || // [Instrumental] o (Music)
+                    line.text.toLowerCase().includes('instrumental') ||
+                    line.text.toLowerCase().includes('music');
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      ref={isCurrent ? currentLineRef : null}
+                      initial={{ opacity: 0.3 }}
+                      animate={{ 
+                        opacity: 1,
+                        scale: isCurrent ? 1.05 : 1,
+                        y: isCurrent ? -5 : 0
+                      }}
+                      transition={{ duration: 0.3 }}
                         onClick={() => handleLineClick(line)}
                         className={`
                           px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer
@@ -318,39 +349,52 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                             </span>
                           )}
                           <div className="flex-1 space-y-1">
-                            {showTranslation && translation && (
-                              <p className={`
-                                leading-relaxed transition-all duration-300
-                                ${isCurrent 
-                                  ? 'text-primary text-xl md:text-2xl font-bold' 
-                                  : isPast 
-                                    ? 'text-muted-foreground/60 text-base md:text-lg'
-                                    : 'text-foreground/80 text-base md:text-lg'
-                                }
-                              `}>
-                                {translation}
-                              </p>
+                            {isMusicalBreak ? (
+                              <div className="flex items-center justify-center gap-3 py-2">
+                                <Music className={`w-5 h-5 ${
+                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
+                                }`} />
+                                <span className={`text-sm italic ${
+                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
+                                }`}>
+                                  {line.text.trim() || 'Instrumental'}
+                                </span>
+                                <Music className={`w-5 h-5 ${
+                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
+                                }`} />
+                              </div>
+                            ) : (
+                              <>
+                                {showTranslation && translation && (
+                                  <p className={`
+                                    leading-relaxed transition-all duration-300
+                                    ${isCurrent 
+                                      ? 'text-primary text-xl md:text-2xl font-bold' 
+                                      : 'text-muted-foreground/60 text-lg md:text-xl'
+                                    }
+                                  `}>
+                                    {translation}
+                                  </p>
+                                )}
+                                
+                                <p className={`
+                                  leading-relaxed transition-all duration-300
+                                    ${showTranslation && translation
+                                      ? 'text-muted-foreground/50 text-sm'
+                                      : isCurrent 
+                                        ? 'text-primary text-xl md:text-2xl font-bold' 
+                                        : 'text-foreground/80 text-lg md:text-xl'
+                                    }
+                                `}>
+                                  {line.text}
+                                </p>
+                              </>
                             )}
-                            
-                            <p className={`
-                              leading-relaxed transition-all duration-300
-                              ${showTranslation && translation
-                                ? 'text-muted-foreground/50 text-sm'
-                                : isCurrent 
-                                  ? 'text-primary text-xl md:text-2xl font-bold' 
-                                  : isPast 
-                                    ? 'text-muted-foreground/60 text-base md:text-lg'
-                                    : 'text-foreground/80 text-base md:text-lg'
-                              }
-                            `}>
-                              {line.text}
-                            </p>
                           </div>
                         </div>
                       </motion.div>
                     );
                   })}
-                </AnimatePresence>
 
                 <div className="h-48" />
               </div>

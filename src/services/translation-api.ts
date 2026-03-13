@@ -1,4 +1,4 @@
-const MYMEMORY_API = "https://api.mymemory.translated.net/get";
+const LIBRETRANSLATE_API = "https://libretranslate.com/translate";
 
 export interface TranslationResult {
   translatedText: string;
@@ -14,34 +14,33 @@ export const translateText = async (
     return null;
   }
 
-  return { translatedText: text, targetLanguage: targetLang };
-
-
-  /* try {
+  try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const params = new URLSearchParams({
-      q: text,
-      langpair: `en|${targetLang}`
-    });
-
-    const response = await fetch(`${MYMEMORY_API}?${params.toString()}`, {
+    const response = await fetch(LIBRETRANSLATE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: 'en',
+        target: targetLang,
+        format: 'text'
+      }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error('MyMemory API error:', response.status);
       return fallbackTranslate(text, targetLang);
     }
 
     const data = await response.json();
 
-    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+    if (data.translatedText) {
       return {
-        translatedText: data.responseData.translatedText,
+        translatedText: data.translatedText,
         detectedLanguage: 'en',
         targetLanguage: targetLang
       };
@@ -51,12 +50,9 @@ export const translateText = async (
   } catch (error: any) {
     if (error.name === 'AbortError') {
       console.warn('Translation timeout');
-    } else {
-      console.error('Translation error:', error);
     }
     return fallbackTranslate(text, targetLang);
   }
- */
 };
 
 async function fallbackTranslate(text: string, targetLang: string): Promise<TranslationResult | null> {

@@ -13,7 +13,15 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: true,
-    useLegacyBridge: false
+    useLegacyBridge: false,
+    backgroundColor: '#0a0e27',
+    // Ottimizzazioni per performance
+    overrideUserAgent: undefined,
+    appendUserAgent: 'MusicHub/1.0',
+    // Gestione errori network
+    errorUrl: undefined,
+    // Abilita hardware acceleration
+    hardwareAccelerated: true
   },
   plugins: {
     SplashScreen: {

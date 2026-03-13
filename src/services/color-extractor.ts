@@ -57,7 +57,7 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
         const imageData = ctx.getImageData(0, 0, size, size);
         const pixels = imageData.data;
 
-        // Conta frequenza colori
+        // Conta frequenza colori con clustering migliore
         const colorCounts = new Map<string, number>();
         
         for (let i = 0; i < pixels.length; i += 4) {
@@ -66,27 +66,33 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
           const b = pixels[i + 2];
           const a = pixels[i + 3];
 
-          // Ignora pixel trasparenti e troppo scuri/chiari
+          // Ignora pixel trasparenti
           if (a < 128) continue;
-          const [, , l] = rgbToHsl(r, g, b);
-          if (l < 10 || l > 90) continue;
+          const [h, s, l] = rgbToHsl(r, g, b);
+          
+          // Ignora colori troppo scuri, troppo chiari o desaturati
+          if (l < 15 || l > 85 || s < 20) continue;
 
-          // Quantizza colori per raggruppare simili
-          const qr = Math.round(r / 32) * 32;
-          const qg = Math.round(g / 32) * 32;
-          const qb = Math.round(b / 32) * 32;
+          // Quantizza con granularità diversa per colori più saturi
+          const quantize = s > 50 ? 24 : 40; // Colori vivaci: più precisione
+          const qr = Math.round(r / quantize) * quantize;
+          const qg = Math.round(g / quantize) * quantize;
+          const qb = Math.round(b / quantize) * quantize;
           const key = `${qr},${qg},${qb}`;
 
-          colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+          // Pesa di più i colori saturi
+          const weight = s > 50 ? 2 : 1;
+          colorCounts.set(key, (colorCounts.get(key) || 0) + weight);
         }
 
-        // Ordina per frequenza
+        // Ordina per frequenza e ottieni più colori
         const sortedColors = Array.from(colorCounts.entries())
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
+          .slice(0, 10)
           .map(([rgb]) => {
             const [r, g, b] = rgb.split(',').map(Number);
-            return { r, g, b };
+            const [h, s, l] = rgbToHsl(r, g, b);
+            return { r, g, b, h, s, l };
           });
 
         if (sortedColors.length === 0) {
@@ -101,20 +107,29 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
           return;
         }
 
-        // Colore primario (più frequente e saturato)
-        const primary = sortedColors[0];
-        const primaryHsl = rgbToHsl(primary.r, primary.g, primary.b);
+        // Colore primario: il più saturo e frequente
+        const primary = sortedColors.reduce((prev, curr) => 
+          curr.s > prev.s ? curr : prev
+        );
         
-        // Colore secondario (contrasto con primary)
-        const secondary = sortedColors.find(c => {
-          const hsl = rgbToHsl(c.r, c.g, c.b);
-          const hueDiff = Math.abs(hsl[0] - primaryHsl[0]);
-          return hueDiff > 30 && hueDiff < 180;
-        }) || sortedColors[1] || primary;
+        // Colore secondario: massimo contrasto cromatico
+        let secondary = sortedColors.find(c => {
+          const hueDiff = Math.abs(c.h - primary.h);
+          const chromaContrast = hueDiff > 60 && hueDiff < 300;
+          const saturationOk = c.s > 30;
+          return chromaContrast && saturationOk && c !== primary;
+        });
+        
+        // Se non trovi contrasto, usa complementare
+        if (!secondary) {
+          const compHue = (primary.h + 180) % 360;
+          secondary = sortedColors.find(c => 
+            Math.abs(c.h - compHue) < 40 && c !== primary
+          ) || sortedColors[1] || primary;
+        }
 
-        // Background: versione molto scura del primary
-        const bgHsl = rgbToHsl(primary.r, primary.g, primary.b);
-        const background = `hsl(${bgHsl[0]}, ${Math.min(bgHsl[1], 30)}%, 8%)`;
+        // Background: scuro con hint del primary
+        const background = `hsl(${primary.h}, ${Math.min(primary.s, 25)}%, 8%)`;
 
         // Determina se l'immagine è prevalentemente chiara o scura per auto-switch
         const avgLightness = sortedColors.reduce((sum, c) => {
@@ -128,7 +143,7 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
           primary: `rgb(${primary.r}, ${primary.g}, ${primary.b})`,
           secondary: `rgb(${secondary.r}, ${secondary.g}, ${secondary.b})`,
           background,
-          text: primaryHsl[2] > 50 ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)',
+          text: primary.l > 50 ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)',
           detectedTheme,
         });
       } catch (error) {
@@ -156,8 +171,12 @@ export function applyColorPalette(palette: ColorPalette) {
     const [, r, g, b] = primaryMatch.map(Number);
     const [h, s, l] = rgbToHsl(r, g, b);
     
-    root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
-    root.style.setProperty('--primary-foreground', palette.text);
+    // Boost saturazione per primary più vivido
+    const boostedS = Math.min(s * 1.2, 100);
+    const boostedL = l < 50 ? Math.max(l, 55) : Math.min(l, 65); // Migliora leggibilità
+    
+    root.style.setProperty('--primary', `${h} ${boostedS}% ${boostedL}%`);
+    root.style.setProperty('--primary-foreground', '0 0% 100%'); // Sempre bianco per contrasto
   }
 
   const secondaryMatch = palette.secondary.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
@@ -165,7 +184,11 @@ export function applyColorPalette(palette: ColorPalette) {
     const [, r, g, b] = secondaryMatch.map(Number);
     const [h, s, l] = rgbToHsl(r, g, b);
     
-    root.style.setProperty('--accent', `${h} ${s}% ${l}%`);
+    // Accent leggermente meno saturo per non competere con primary
+    const accentL = l < 40 ? Math.max(l, 45) : l;
+    
+    root.style.setProperty('--accent', `${h} ${s}% ${accentL}%`);
+    root.style.setProperty('--accent-foreground', '0 0% 100%');
   }
 
   const bgMatch = palette.background.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) ||
