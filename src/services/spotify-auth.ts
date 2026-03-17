@@ -59,6 +59,7 @@ export async function redirectToSpotifyAuth() {
     scope: scope,
     code_challenge_method: 'S256',
     code_challenge: codeChallenge,
+    show_dialog: 'true', // Forza sempre il prompt di autorizzazione
   });
 
   const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
