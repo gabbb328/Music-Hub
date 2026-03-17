@@ -10,7 +10,7 @@ import {
 import { usePlaybackState } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
 
-// ── Bande EQ (10 bande professionali) ─────────────────────────────────────────
+// ── Bande EQ ──────────────────────────────────────────────────────────────────
 const EQ_BANDS = [
   { freq: 32,    label: "32",  type: "lowshelf"  as BiquadFilterType },
   { freq: 64,    label: "64",  type: "peaking"   as BiquadFilterType },
@@ -24,21 +24,12 @@ const EQ_BANDS = [
   { freq: 16000, label: "16k", type: "highshelf" as BiquadFilterType },
 ];
 
-// ── Preset professionali ───────────────────────────────────────────────────────
-// mappa diretta preset → icona Lucide
+// ── Preset ────────────────────────────────────────────────────────────────────
 const PRESET_ICONS: Record<string, LucideIcon> = {
-  flat:       Minus,
-  bass:       Volume2,
-  treble:     TrendingUp,
-  vocal:      Mic,
-  rock:       Zap,
-  jazz:       Music,
-  electronic: Radio,
-  classical:  Music2,
-  hiphop:     Headphones,
-  lounge:     Coffee,
-  nightclub:  Sparkles,
-  acoustic:   Guitar,
+  flat: Minus, bass: Volume2, treble: TrendingUp,
+  vocal: Mic, rock: Zap, jazz: Music,
+  electronic: Radio, classical: Music2, hiphop: Headphones,
+  lounge: Coffee, nightclub: Sparkles, acoustic: Guitar,
 };
 
 const PRESETS: Record<string, { name: string; gains: number[] }> = {
@@ -61,35 +52,49 @@ const BAND_COLORS = [
   "#22c55e","#14b8a6","#06b6d4","#3b82f6","#8b5cf6"
 ];
 
-// ── Audio Engine ───────────────────────────────────────────────────────────────
+// ── Audio Engine — si aggancia all'elemento audio del Spotify SDK ──────────────
+// Il Spotify Web Playback SDK crea internamente un HTMLAudioElement.
+// Usiamo createMediaElementSource per agganciare la Web Audio API direttamente
+// senza mic, senza screen capture, senza nessun permesso aggiuntivo.
 class AudioEngine {
   ctx: AudioContext | null = null;
-  source: MediaStreamAudioSourceNode | null = null;
+  source: MediaElementAudioSourceNode | null = null;
   filters: BiquadFilterNode[] = [];
   analyser: AnalyserNode | null = null;
   preGain: GainNode | null = null;
   compressor: DynamicsCompressorNode | null = null;
   gainNode: GainNode | null = null;
-  inputStream: MediaStream | null = null;
+  audioEl: HTMLAudioElement | null = null;
 
-  async init() {
-    if (this.ctx) return;
+  // Cerca l'elemento audio creato dal Spotify SDK nel DOM
+  private findSpotifyAudioElement(): HTMLAudioElement | null {
+    // Il SDK Spotify inietta un <audio> nel body
+    const all = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
+    // Prendi quello con src spotify o quello in riproduzione
+    return (
+      all.find(a => a.src?.includes("spotify") || (!a.paused && a.duration > 0)) ||
+      all[0] ||
+      null
+    );
+  }
+
+  async init(): Promise<"ok" | "no_audio"> {
+    if (this.ctx) return "ok";
+
+    const audioEl = this.findSpotifyAudioElement();
+    if (!audioEl) return "no_audio";
+
+    this.audioEl = audioEl;
+    this.ctx = new AudioContext({ sampleRate: 44100 });
+
+    // Aggancia l'elemento audio esistente — nessun permesso necessario
     try {
-      const stream = await (navigator.mediaDevices as any).getDisplayMedia({
-        video: { width: 1, height: 1, frameRate: 1 },
-        audio: { systemAudio: "include", echoCancellation: false, noiseSuppression: false },
-      });
-      stream.getVideoTracks().forEach((t: MediaStreamTrack) => t.stop());
-      this.inputStream = stream;
-      this.ctx = new AudioContext({ sampleRate: 44100 });
-      this.source = this.ctx.createMediaStreamSource(stream);
+      this.source = this.ctx.createMediaElementSource(audioEl);
     } catch {
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false },
-      });
-      this.inputStream = mic;
-      this.ctx = new AudioContext({ sampleRate: 44100 });
-      this.source = this.ctx.createMediaStreamSource(mic);
+      // Se l'elemento è già agganciato (es. doppio init), chiudi e riprova
+      await this.ctx.close();
+      this.ctx = null;
+      return "no_audio";
     }
 
     this.preGain = this.ctx.createGain();
@@ -118,6 +123,7 @@ class AudioEngine {
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = 1.0;
 
+    // source → preGain → filters → analyser → compressor → gainNode → speakers
     this.source.connect(this.preGain);
     let prev: AudioNode = this.preGain;
     for (const f of this.filters) { prev.connect(f); prev = f; }
@@ -125,35 +131,58 @@ class AudioEngine {
     this.analyser.connect(this.compressor);
     this.compressor.connect(this.gainNode);
     this.gainNode.connect(this.ctx.destination);
+
+    // Risveglia il context se sospeso (autoplay policy)
+    if (this.ctx.state === "suspended") await this.ctx.resume();
+
+    return "ok";
   }
 
   setGain(i: number, v: number) {
-    if (this.filters[i] && this.ctx) this.filters[i].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    if (this.filters[i] && this.ctx)
+      this.filters[i].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
   }
   setPreGain(v: number) {
-    if (this.preGain && this.ctx) this.preGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    if (this.preGain && this.ctx)
+      this.preGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
   }
   setOutputGain(v: number) {
-    if (this.gainNode && this.ctx) this.gainNode.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    if (this.gainNode && this.ctx)
+      this.gainNode.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
   }
   setCompressor(enabled: boolean, threshold: number, ratio: number) {
     if (!this.compressor) return;
     this.compressor.threshold.value = enabled ? threshold : 0;
     this.compressor.ratio.value = enabled ? ratio : 1;
   }
-  getSpectrum() {
+  getSpectrum(): Uint8Array {
     if (!this.analyser) return new Uint8Array(0);
     const d = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(d); return d;
+    this.analyser.getByteFrequencyData(d);
+    return d;
   }
-  getWaveform() {
+  getWaveform(): Uint8Array {
     if (!this.analyser) return new Uint8Array(0);
     const d = new Uint8Array(this.analyser.fftSize);
-    this.analyser.getByteTimeDomainData(d); return d;
+    this.analyser.getByteTimeDomainData(d);
+    return d;
   }
   destroy() {
-    this.inputStream?.getTracks().forEach(t => t.stop());
-    this.ctx?.close(); this.ctx = null;
+    // Stacca il source dal contesto ma riconnetti l'audio direttamente
+    // così Spotify continua a suonare anche dopo aver disattivato l'EQ
+    if (this.source && this.ctx) {
+      try {
+        this.source.connect(this.ctx.destination);
+      } catch {}
+    }
+    this.ctx?.close();
+    this.ctx = null;
+    this.source = null;
+    this.filters = [];
+    this.analyser = null;
+    this.preGain = null;
+    this.compressor = null;
+    this.gainNode = null;
   }
 }
 
@@ -161,18 +190,19 @@ let engine: AudioEngine | null = null;
 
 // ══════════════════════════════════════════════════════════════════════════════
 export default function EqualizerContent() {
-  const [gains, setGains]             = useState<number[]>(Array(10).fill(0));
-  const [preGain, setPreGain]         = useState(0);
-  const [outputGain, setOutputGain]   = useState(0);
-  const [compEnabled, setCompEnabled] = useState(true);
-  const [compThreshold, setCompThreshold] = useState(-12);
-  const [compRatio, setCompRatio]     = useState(4);
-  const [activePreset, setActivePreset] = useState("flat");
-  const [isActive, setIsActive]       = useState(false);
-  const [showPresets, setShowPresets] = useState(false);
-  const [viewMode, setViewMode]       = useState<"spectrum"|"waveform">("spectrum");
-  const [dragging, setDragging]       = useState<number | null>(null);
-  const [isInit, setIsInit]           = useState(false);
+  const [gains, setGains]                   = useState<number[]>(Array(10).fill(0));
+  const [preGain, setPreGain]               = useState(0);
+  const [outputGain, setOutputGain]         = useState(0);
+  const [compEnabled, setCompEnabled]       = useState(true);
+  const [compThreshold, setCompThreshold]   = useState(-12);
+  const [compRatio, setCompRatio]           = useState(4);
+  const [activePreset, setActivePreset]     = useState("flat");
+  const [isActive, setIsActive]             = useState(false);
+  const [showPresets, setShowPresets]       = useState(false);
+  const [viewMode, setViewMode]             = useState<"spectrum" | "waveform">("spectrum");
+  const [dragging, setDragging]             = useState<number | null>(null);
+  const [isInit, setIsInit]                 = useState(false);
+  const [statusMsg, setStatusMsg]           = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef   = useRef<number>(0);
@@ -180,33 +210,62 @@ export default function EqualizerContent() {
   const { data: pb } = usePlaybackState();
   const currentTrack = pb?.item;
 
-  // ── Toggle engine ──────────────────────────────────────────────────────────
+  // Cleanup all'unmount
+  useEffect(() => {
+    return () => {
+      engine?.destroy();
+      engine = null;
+      cancelAnimationFrame(animRef.current);
+    };
+  }, []);
+
+  // ── Attiva EQ ──────────────────────────────────────────────────────────────
   const toggleActive = useCallback(async () => {
     if (isActive) {
-      engine?.destroy(); engine = null;
+      engine?.destroy();
+      engine = null;
       cancelAnimationFrame(animRef.current);
       setIsActive(false);
+      setStatusMsg("");
       toast({ title: "Equalizzatore disattivato" });
       return;
     }
+
     setIsInit(true);
+    setStatusMsg("Connessione al player…");
+
     try {
       engine = new AudioEngine();
-      await engine.init();
+      const result = await engine.init();
+
+      if (result === "no_audio") {
+        engine = null;
+        setStatusMsg("Avvia una canzone su Spotify, poi premi di nuovo Attiva.");
+        setIsInit(false);
+        return;
+      }
+
+      // Applica i valori correnti
       gains.forEach((g, i) => engine!.setGain(i, g));
       engine.setPreGain(Math.pow(10, preGain / 20));
       engine.setOutputGain(Math.pow(10, outputGain / 20));
       engine.setCompressor(compEnabled, compThreshold, compRatio);
+
       setIsActive(true);
-      toast({ title: "✓ Equalizzatore attivo", description: "Audio elaborato in tempo reale" });
+      setStatusMsg("");
+      toast({ title: "✓ Equalizzatore attivo", description: "EQ collegato al player Spotify" });
     } catch (err: any) {
-      toast({ title: "Errore", description: err.message, variant: "destructive" });
-    } finally { setIsInit(false); }
+      engine = null;
+      setStatusMsg("Errore: " + err.message);
+    } finally {
+      setIsInit(false);
+    }
   }, [isActive, gains, preGain, outputGain, compEnabled, compThreshold, compRatio, toast]);
 
   // ── Preset ────────────────────────────────────────────────────────────────
   const applyPreset = useCallback((key: string) => {
-    const p = PRESETS[key]; if (!p) return;
+    const p = PRESETS[key];
+    if (!p) return;
     setGains([...p.gains]);
     setActivePreset(key);
     setShowPresets(false);
@@ -224,14 +283,17 @@ export default function EqualizerContent() {
   // ── Reset ─────────────────────────────────────────────────────────────────
   const resetAll = useCallback(() => {
     applyPreset("flat");
-    setPreGain(0); setOutputGain(0);
-    setCompEnabled(true); setCompThreshold(-12); setCompRatio(4);
+    setPreGain(0);
+    setOutputGain(0);
+    setCompEnabled(true);
+    setCompThreshold(-12);
+    setCompRatio(4);
     engine?.setPreGain(1);
     engine?.setOutputGain(1);
     engine?.setCompressor(true, -12, 4);
   }, [applyPreset]);
 
-  // ── Canvas visualizzatore ─────────────────────────────────────────────────
+  // ── Canvas ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -251,15 +313,15 @@ export default function EqualizerContent() {
       ctx.clearRect(0, 0, W, H);
 
       if (!isActive || !engine) {
+        // Griglia idle
         ctx.strokeStyle = "rgba(255,255,255,0.04)";
         ctx.lineWidth = 1;
         for (let i = 1; i < 6; i++) {
           const y = (H / 6) * i;
           ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
         }
-        // Idle label
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.font = `${12 * devicePixelRatio}px system-ui`;
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.font = `${11 * devicePixelRatio}px system-ui`;
         ctx.textAlign = "center";
         ctx.fillText("Attiva l'equalizzatore per vedere il segnale", W / 2, H / 2);
         return;
@@ -273,7 +335,6 @@ export default function EqualizerContent() {
           const v = data[i] / 255;
           const bh = v * H;
           const hue = 240 - (i / bars) * 200;
-          // Gradient bar
           const grad = ctx.createLinearGradient(0, H - bh, 0, H);
           grad.addColorStop(0, `hsla(${hue},80%,65%,0.9)`);
           grad.addColorStop(1, `hsla(${hue},80%,40%,0.4)`);
@@ -298,10 +359,13 @@ export default function EqualizerContent() {
     };
 
     draw();
-    return () => { cancelAnimationFrame(animRef.current); window.removeEventListener("resize", resize); };
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener("resize", resize);
+    };
   }, [isActive, viewMode]);
 
-  // ── Drag slider verticale ─────────────────────────────────────────────────
+  // ── Drag slider ───────────────────────────────────────────────────────────
   const startDrag = (index: number, e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -320,6 +384,10 @@ export default function EqualizerContent() {
     setDragging(index);
   };
 
+  const btnColor = isActive
+    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+    : "bg-secondary text-foreground hover:bg-secondary/80";
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 relative">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -336,7 +404,9 @@ export default function EqualizerContent() {
               Equalizzatore
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              {currentTrack ? `${currentTrack.name} — ${currentTrack.artists[0]?.name}` : "Nessuna traccia in riproduzione"}
+              {currentTrack
+                ? `${currentTrack.name} — ${currentTrack.artists[0]?.name}`
+                : "Nessuna traccia in riproduzione"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -345,29 +415,32 @@ export default function EqualizerContent() {
               <RotateCcw className="w-3.5 h-3.5" />Reset
             </button>
             <motion.button whileTap={{ scale: 0.95 }} onClick={toggleActive} disabled={isInit}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-                isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-                         : "bg-secondary text-foreground hover:bg-secondary/80"
-              }`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${btnColor}`}>
               {isInit
-                ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><Waves className="w-4 h-4" /></motion.div>
+                ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                    <Waves className="w-4 h-4" />
+                  </motion.div>
                 : <Power className="w-4 h-4" />
               }
-              {isInit ? "Avvio…" : isActive ? "Attivo" : "Attiva"}
+              {isInit ? "Connessione…" : isActive ? "Attivo" : "Attiva"}
             </motion.button>
           </div>
         </div>
 
-        {/* Info box */}
+        {/* Messaggi di stato */}
         {!isActive && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="glass-surface rounded-xl p-4 flex items-start gap-3 border border-amber-500/20 bg-amber-500/5">
-            <Zap className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Premi <strong className="text-foreground">Attiva</strong> — il browser chiederà di condividere lo schermo.
-              Seleziona qualsiasi finestra e <strong className="text-foreground">spunta "Condividi audio di sistema"</strong>.
-              L'app elabora l'audio in uscita in tempo reale senza registrare il video.
-            </p>
+            className="glass-surface rounded-xl p-4 flex items-start gap-3 border border-primary/20 bg-primary/5">
+            <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
+              {statusMsg
+                ? <p className="text-amber-400">{statusMsg}</p>
+                : <>
+                    <p>Premi <strong className="text-foreground">Attiva</strong> per collegare l'EQ direttamente al player Spotify.</p>
+                    <p className="text-xs opacity-70">Nessun microfono richiesto — l'audio viene processato internamente.</p>
+                  </>
+              }
+            </div>
           </motion.div>
         )}
 
@@ -390,13 +463,12 @@ export default function EqualizerContent() {
           <canvas ref={canvasRef} className="w-full h-28 md:h-36" />
         </div>
 
-        {/* EQ Bande */}
+        {/* EQ 10 Bande */}
         <div className="glass-surface rounded-2xl p-4 md:p-6">
           <div className="flex items-center justify-between mb-5">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Equalizzatore 10 Bande
             </span>
-            {/* Preset picker */}
             <div className="relative">
               <button onClick={() => setShowPresets(v => !v)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-secondary hover:bg-secondary/80 transition-colors">
@@ -415,8 +487,7 @@ export default function EqualizerContent() {
                   >
                     <div className="grid grid-cols-2 gap-0.5 p-1.5">
                       {Object.entries(PRESETS).map(([key, p]) => {
-                        const iconName = PRESET_ICONS[key] ?? "Music";
-                        const Icon = (LucideIcons as any)[iconName] as React.FC<{ className?: string }>;
+                        const Icon = PRESET_ICONS[key] ?? Minus;
                         return (
                           <button key={key} onClick={() => applyPreset(key)}
                             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all text-left ${
@@ -439,34 +510,25 @@ export default function EqualizerContent() {
               const gain = gains[i];
               const pct  = ((gain + 12) / 24) * 100;
               const col  = BAND_COLORS[i];
-
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-                  {/* Valore */}
                   <span className="text-[10px] md:text-xs font-mono font-bold tabular-nums leading-none"
                     style={{ color: gain !== 0 ? col : "var(--muted-foreground)" }}>
                     {gain > 0 ? `+${Math.round(gain)}` : Math.round(gain)}
                   </span>
-
-                  {/* Track */}
                   <div className="relative flex-1 w-full cursor-ns-resize touch-none select-none"
                     onPointerDown={e => startDrag(i, e)}>
-                    {/* Background track */}
                     <div className="absolute inset-0 flex justify-center">
                       <div className="w-1.5 h-full rounded-full bg-secondary/60" />
                     </div>
-                    {/* Centro */}
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-px bg-border/60" />
-                    {/* Fill */}
                     <div className="absolute left-1/2 -translate-x-1/2 w-1.5 rounded-full transition-none"
                       style={{
-                        backgroundColor: col,
-                        opacity: 0.75,
+                        backgroundColor: col, opacity: 0.75,
                         bottom: gain >= 0 ? "50%" : `${pct}%`,
                         top:    gain <  0 ? "50%" : `${100 - pct}%`,
                       }}
                     />
-                    {/* Thumb */}
                     <motion.div
                       className="absolute left-1/2 -translate-x-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full border-2 z-10"
                       style={{
@@ -478,8 +540,6 @@ export default function EqualizerContent() {
                       whileHover={{ scale: 1.25 }}
                     />
                   </div>
-
-                  {/* Freq */}
                   <span className="text-[9px] md:text-[11px] text-muted-foreground font-medium leading-none">
                     {band.label}
                   </span>
@@ -487,7 +547,6 @@ export default function EqualizerContent() {
               );
             })}
           </div>
-
           <div className="flex justify-between text-[9px] text-muted-foreground/40 mt-2 px-0.5">
             <span>-12dB</span><span>-6dB</span><span>0</span><span>+6dB</span><span>+12dB</span>
           </div>
@@ -501,25 +560,24 @@ export default function EqualizerContent() {
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <Volume2 className="w-3.5 h-3.5" />Guadagni
             </span>
-
             {[
               {
                 label: "Pre-Gain", desc: "Amplificazione prima degli EQ",
-                value: preGain, set: (v: number) => { setPreGain(v); engine?.setPreGain(Math.pow(10, v / 20)); },
-                min: -12, max: 12, step: 0.5,
+                value: preGain, min: -12, max: 12, step: 0.5,
+                fmt: (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`,
+                set: (v: number) => { setPreGain(v); engine?.setPreGain(Math.pow(10, v / 20)); },
               },
               {
                 label: "Output Gain", desc: "Volume master post-processing",
-                value: outputGain, set: (v: number) => { setOutputGain(v); engine?.setOutputGain(Math.pow(10, v / 20)); },
-                min: -12, max: 6, step: 0.5,
+                value: outputGain, min: -12, max: 6, step: 0.5,
+                fmt: (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`,
+                set: (v: number) => { setOutputGain(v); engine?.setOutputGain(Math.pow(10, v / 20)); },
               },
-            ].map(({ label, desc, value, set, min, max, step }) => (
+            ].map(({ label, desc, value, min, max, step, fmt, set }) => (
               <div key={label} className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">{label}</label>
-                  <span className="text-xs font-mono text-primary tabular-nums">
-                    {value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1)} dB
-                  </span>
+                  <span className="text-xs font-mono text-primary tabular-nums">{fmt(value)}</span>
                 </div>
                 <input type="range" min={min} max={max} step={step} value={value}
                   onChange={e => set(Number(e.target.value))}
@@ -537,40 +595,39 @@ export default function EqualizerContent() {
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                 <Gauge className="w-3.5 h-3.5" />Compressore / Limiter
               </span>
-              {/* Toggle switch */}
-              <button onClick={() => setCompEnabled(v => { const n = !v; engine?.setCompressor(n, compThreshold, compRatio); return n; })}
+              <button
+                onClick={() => setCompEnabled(v => {
+                  const n = !v;
+                  engine?.setCompressor(n, compThreshold, compRatio);
+                  return n;
+                })}
                 className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${compEnabled ? "bg-primary" : "bg-secondary"}`}>
                 <motion.div className="w-5 h-5 rounded-full bg-white shadow"
                   animate={{ x: compEnabled ? 20 : 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 25 }} />
               </button>
             </div>
-
             {[
               {
                 label: "Threshold", desc: "Livello sopra cui inizia la compressione",
-                value: compThreshold, set: (v: number) => { setCompThreshold(v); engine?.setCompressor(compEnabled, v, compRatio); },
-                min: -40, max: 0, step: 1, fmt: (v: number) => `${v} dB`,
+                value: compThreshold, min: -40, max: 0, step: 1,
+                fmt: (v: number) => `${v} dB`,
+                set: (v: number) => { setCompThreshold(v); engine?.setCompressor(compEnabled, v, compRatio); },
               },
               {
                 label: "Ratio", desc: "Intensità della compressione",
-                value: compRatio, set: (v: number) => { setCompRatio(v); engine?.setCompressor(compEnabled, compThreshold, v); },
-                min: 1, max: 20, step: 0.5, fmt: (v: number) => `${v}:1`,
+                value: compRatio, min: 1, max: 20, step: 0.5,
+                fmt: (v: number) => `${v}:1`,
+                set: (v: number) => { setCompRatio(v); engine?.setCompressor(compEnabled, compThreshold, v); },
               },
-              {
-                label: "Knee", desc: "Zona di transizione",
-                value: 6, set: () => {},
-                min: 0, max: 30, step: 1, fmt: (v: number) => `${v} dB`,
-                disabled: true,
-              },
-            ].map(({ label, desc, value, set, min, max, step, fmt, disabled }) => (
-              <div key={label} className={`space-y-1.5 ${(!compEnabled || disabled) ? "opacity-40" : ""}`}>
+            ].map(({ label, desc, value, min, max, step, fmt, set }) => (
+              <div key={label} className={`space-y-1.5 ${!compEnabled ? "opacity-40" : ""}`}>
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">{label}</label>
                   <span className="text-xs font-mono text-primary tabular-nums">{fmt(value)}</span>
                 </div>
                 <input type="range" min={min} max={max} step={step} value={value}
-                  disabled={!compEnabled || disabled}
+                  disabled={!compEnabled}
                   onChange={e => set(Number(e.target.value))}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary disabled:cursor-default"
                   style={{ background: `linear-gradient(to right, hsl(var(--primary)) ${((value - min) / (max - min)) * 100}%, hsl(var(--secondary)) ${((value - min) / (max - min)) * 100}%)` }}
@@ -596,7 +653,7 @@ export default function EqualizerContent() {
               { icon: Target,       label: "Mid −2dB",    fn: () => [4,5,6].forEach(i => setBand(i, gains[i] - 2)) },
               { icon: ArrowUp,      label: "All +2dB",    fn: () => gains.forEach((g, i) => setBand(i, g + 2)) },
               { icon: ArrowDown,    label: "All −2dB",    fn: () => gains.forEach((g, i) => setBand(i, g - 2)) },
-            ] as { icon: React.FC<{className?:string}>; label: string; fn: () => void }[]).map(({ icon: Icon, label, fn }) => (
+            ] as { icon: LucideIcon; label: string; fn: () => void }[]).map(({ icon: Icon, label, fn }) => (
               <button key={label} onClick={fn}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-xs font-medium text-foreground transition-colors">
                 <Icon className="w-3.5 h-3.5 shrink-0" />{label}
