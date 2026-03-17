@@ -25,6 +25,15 @@ import MoreContent from "@/components/MoreContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
+import { useMediaSession } from "@/hooks/useMediaSession";
+import { 
+  usePlaybackState, 
+  usePlayMutation, 
+  usePauseMutation,
+  useNextMutation,
+  usePreviousMutation,
+  useSeekMutation
+} from "@/hooks/useSpotify";
 
 const Index = () => {
   const player = usePlayerStore();
@@ -34,6 +43,43 @@ const Index = () => {
   
   useLyricsPreloader();
   useDynamicTheme();
+
+  // Spotify integration for Media Session
+  const { data: playbackState } = usePlaybackState();
+  const playMutation = usePlayMutation();
+  const pauseMutation = usePauseMutation();
+  const nextMutation = useNextMutation();
+  const previousMutation = usePreviousMutation();
+  const seekMutation = useSeekMutation();
+
+  const spotifyTrack = playbackState?.item;
+  const isPlaying = playbackState?.is_playing ?? player.isPlaying;
+  
+  const currentTrack = spotifyTrack ? {
+    id: spotifyTrack.id,
+    title: spotifyTrack.name,
+    artist: spotifyTrack.artists[0]?.name || "Unknown Artist",
+    album: spotifyTrack.album.name,
+    cover: spotifyTrack.album.images[0]?.url || "",
+    duration: Math.floor(spotifyTrack.duration_ms / 1000),
+  } : player.currentTrack;
+
+  const mediaActions = {
+    play: () => spotifyTrack ? playMutation.mutate({}) : player.play(),
+    pause: () => spotifyTrack ? pauseMutation.mutate() : player.pause(),
+    nextTrack: () => spotifyTrack ? nextMutation.mutate() : player.nextTrack(),
+    prevTrack: () => spotifyTrack ? previousMutation.mutate() : player.prevTrack(),
+    seekTo: (time: number) => {
+      if (spotifyTrack) {
+        seekMutation.mutate(Math.floor(time * 1000));
+      } else {
+        // Local seek logic if available, otherwise just update progress
+        player.setProgress((time / (currentTrack?.duration || 1)) * 100);
+      }
+    }
+  };
+
+  useMediaSession(currentTrack, isPlaying, mediaActions);
 
   const handleOpenPlaylist = (playlistId: string) => {
     setActiveSection(`playlist-${playlistId}`);
@@ -53,7 +99,7 @@ const Index = () => {
     switch (activeSection) {
       case "search":        return <SearchContent onPlayTrack={player.playTrack} />;
       case "library":       return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={handleOpenPlaylist} />;
-      case "ai-dj":         return <AIDJContent onPlayTrack={player.playTrack} />;
+      case "ai-dj":         return <AIDJContent />;
       case "lyrics":        return <LyricsContent currentTrack={player.currentTrack} />;
       case "stats":         return <StatsContent />;
       case "devices":       return <DevicesContent />;
