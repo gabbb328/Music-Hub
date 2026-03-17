@@ -3,24 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/mock-data";
-import { 
-  usePlaybackState, 
-  useAudioFeatures,
-  useSeekMutation 
-} from "@/hooks/useSpotify";
+import { usePlaybackState, useAudioFeatures, useSeekMutation } from "@/hooks/useSpotify";
 import { formatTime } from "@/lib/mock-data";
-import { 
-  fetchSyncedLyrics, 
-  getCurrentLineIndex,
-  type LyricLine 
-} from "@/services/lyrics-api";
+import { fetchSyncedLyrics, getCurrentLineIndex, type LyricLine } from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
 import { useToast } from "@/hooks/use-toast";
 
-interface LyricsContentProps {
-  currentTrack: Track | null;
-}
-
+interface LyricsContentProps { currentTrack: Track | null; }
 type Mode = "lyrics" | "info" | "analysis";
 
 export default function LyricsContent({ currentTrack: localTrack }: LyricsContentProps) {
@@ -35,18 +24,18 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const [centerMode, setCenterMode]             = useState(true);
   const [userScrolling, setUserScrolling]       = useState(false);
 
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const lineRefs      = useRef<(HTMLDivElement | null)[]>([]);
-  const userScrollRef = useRef(false);
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const lineRefs       = useRef<(HTMLDivElement | null)[]>([]);
+  const userScrollRef  = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: playbackState }                         = usePlaybackState();
-  const currentTrack                                    = playbackState?.item || localTrack;
-  const { data: audioFeatures, isLoading: loadingFeat } = useAudioFeatures(currentTrack?.id || "");
-  const seekMutation                                    = useSeekMutation();
-  const { toast }                                       = useToast();
+  const { data: playbackState }                          = usePlaybackState();
+  const currentTrack                                     = playbackState?.item || localTrack;
+  const { data: audioFeatures, isLoading: loadingFeat }  = useAudioFeatures((currentTrack as any)?.id || "");
+  const seekMutation = useSeekMutation();
+  const { toast }    = useToast();
 
-  const isPlaying  = playbackState?.is_playing;
+  const isPlaying   = playbackState?.is_playing;
   const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
 
   // ── Carica testo ──────────────────────────────────────────────────────────
@@ -57,13 +46,11 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     const duration = (currentTrack as any).duration_ms
       ? Math.floor((currentTrack as any).duration_ms / 1000)
       : (currentTrack as any).duration || 180;
-
     setLoadingLyrics(true);
     setLyrics([]);
     setTranslatedLyrics(new Map());
     setShowTranslation(false);
     setCurrentLineIndex(0);
-
     fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
       setLyrics(lines);
       setIsSynced(synced);
@@ -79,28 +66,20 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     }
   }, [currentTime, lyrics]);
 
-  // ── Scroll automatico al centro ───────────────────────────────────────────
+  // ── Scroll al centro ──────────────────────────────────────────────────────
   const scrollToCurrentLine = useCallback(() => {
     if (!centerMode || userScrollRef.current) return;
     const container = containerRef.current;
     const line      = lineRefs.current[currentLineIndex];
     if (!container || !line) return;
-
-    const containerH   = container.clientHeight;
-    const lineTop      = line.offsetTop;
-    const lineH        = line.clientHeight;
-    // Vogliamo centrare la riga: scrollTop = lineTop - (containerH/2) + (lineH/2)
-    const targetScroll = lineTop - containerH / 2 + lineH / 2;
-
+    // Calcolo preciso: porta la riga esattamente al centro verticale del container
+    const targetScroll = line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
     container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
   }, [centerMode, currentLineIndex]);
 
-  useEffect(() => {
-    scrollToCurrentLine();
-  }, [currentLineIndex, centerMode, scrollToCurrentLine]);
+  useEffect(() => { scrollToCurrentLine(); }, [currentLineIndex, centerMode, scrollToCurrentLine]);
 
-  // ── Rileva scroll manuale ─────────────────────────────────────────────────
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (!centerMode) return;
     userScrollRef.current = true;
     setUserScrolling(true);
@@ -108,12 +87,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     scrollTimerRef.current = setTimeout(() => {
       userScrollRef.current = false;
       setUserScrolling(false);
-      // ripristina subito la posizione corretta
       scrollToCurrentLine();
     }, 3000);
-  };
+  }, [centerMode, scrollToCurrentLine]);
 
-  // ── Seek al click ────────────────────────────────────────────────────────
   const handleLineClick = async (line: LyricLine) => {
     try {
       await seekMutation.mutateAsync(Math.floor(line.time * 1000));
@@ -124,11 +101,9 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     }
   };
 
-  // ── Traduzione ────────────────────────────────────────────────────────────
   const handleTranslate = async () => {
     if (showTranslation) { setShowTranslation(false); return; }
     if (translatedLyrics.size > 0) { setShowTranslation(true); return; }
-
     setIsTranslating(true);
     toast({ title: "Translating…", description: "This may take a moment" });
     const map = new Map<number, string>();
@@ -146,7 +121,6 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     toast({ title: "✓ Translation complete", description: `${map.size} lines translated` });
   };
 
-  // ── No track ──────────────────────────────────────────────────────────────
   if (!currentTrack) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
@@ -165,14 +139,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 pt-4 pb-3 shrink-0 border-b border-border/30">
-        {/* Track info */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
-            <img
-              src={(currentTrack as any).album?.images?.[0]?.url || (currentTrack as any).cover || ""}
-              alt=""
-              className="w-11 h-11 rounded-lg object-cover shadow-md"
-            />
+            <img src={(currentTrack as any).album?.images?.[0]?.url || (currentTrack as any).cover || ""} alt=""
+              className="w-11 h-11 rounded-lg object-cover shadow-md" />
             {isPlaying && (
               <motion.div className="absolute inset-0 rounded-lg ring-2 ring-primary/50"
                 animate={{ opacity: [0.4, 0.9, 0.4] }} transition={{ duration: 2, repeat: Infinity }} />
@@ -181,7 +151,6 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
           <div className="min-w-0 flex-1">
             <p className="font-bold truncate text-sm">{(currentTrack as any).name || (currentTrack as any).title}</p>
             <p className="text-xs text-muted-foreground truncate">{(currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist}</p>
-            {/* Badge synced + bottoni */}
             {mode === "lyrics" && (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {isSynced && (
@@ -191,33 +160,22 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   </div>
                 )}
                 {isSynced && (
-                  <Button
-                    size="sm"
-                    variant={centerMode ? "default" : "outline"}
+                  <Button size="sm" variant={centerMode ? "default" : "outline"}
                     onClick={() => {
                       setCenterMode(v => {
                         const next = !v;
-                        // Se si riattiva il center mode, scrolla subito
-                        if (next) {
-                          userScrollRef.current = false;
-                          setTimeout(() => scrollToCurrentLine(), 50);
-                        }
+                        if (next) { userScrollRef.current = false; setTimeout(() => scrollToCurrentLine(), 50); }
                         return next;
                       });
                     }}
-                    className="h-6 px-2 text-[10px] gap-1"
-                  >
+                    className="h-6 px-2 text-[10px] gap-1">
                     {centerMode ? <AlignCenter className="w-2.5 h-2.5" /> : <AlignLeft className="w-2.5 h-2.5" />}
-                    {centerMode ? "Centered" : "Free scroll"}
+                    {centerMode ? "Centered" : "Free"}
                   </Button>
                 )}
                 {lyrics.length > 0 && !isTranslating && (
-                  <Button
-                    size="sm"
-                    variant={showTranslation ? "default" : "outline"}
-                    onClick={handleTranslate}
-                    className="h-6 px-2 text-[10px] gap-1"
-                  >
+                  <Button size="sm" variant={showTranslation ? "default" : "outline"}
+                    onClick={handleTranslate} className="h-6 px-2 text-[10px] gap-1">
                     <Languages className="w-2.5 h-2.5" />
                     {showTranslation ? "Original" : "Translate"}
                   </Button>
@@ -233,20 +191,17 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
           </div>
         </div>
 
-        {/* Tab selector */}
+        {/* Tabs */}
         <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
           {([
-            { id: "lyrics"   as Mode, label: "Lyrics",   icon: Mic2      },
-            { id: "info"     as Mode, label: "Info",      icon: Disc      },
-            { id: "analysis" as Mode, label: "Analysis",  icon: Lightbulb },
+            { id: "lyrics" as Mode, label: "Lyrics",   icon: Mic2      },
+            { id: "info"   as Mode, label: "Info",      icon: Disc      },
+            { id: "analysis" as Mode, label: "Analysis", icon: Lightbulb },
           ]).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setMode(tab.id)}
+            <button key={tab.id} onClick={() => setMode(tab.id)}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                 mode === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
+              }`}>
               <tab.icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
@@ -257,13 +212,9 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       {/* ── Content ── */}
       <div className="flex-1 overflow-hidden relative">
 
-        {/* LYRICS TAB */}
+        {/* ── LYRICS ── */}
         {mode === "lyrics" && (
-          <div
-            ref={containerRef}
-            onScroll={handleScroll}
-            className="absolute inset-0 overflow-y-auto"
-          >
+          <div ref={containerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto">
             {loadingLyrics ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
@@ -277,22 +228,26 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
               </div>
             ) : (
               <>
-                {/* Spacer top — metà schermo — così la prima riga può arrivare al centro */}
-                <div style={{ height: "50vh" }} />
+                {/* Spacer top: porta la prima riga al centro */}
+                <div style={{ height: "50vh" }} aria-hidden />
 
-                {/* Avviso scroll manuale */}
                 <AnimatePresence>
                   {userScrolling && centerMode && (
-                    <motion.div
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="sticky top-2 z-10 mx-4 mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center"
-                    >
-                      <p className="text-[10px] text-muted-foreground">Auto-scroll paused • resumes in 3s</p>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="sticky top-2 z-10 mx-auto mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center w-fit">
+                      <p className="text-[10px] text-muted-foreground">Auto-scroll paused · resumes in 3s</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="px-4 space-y-1">
+                {/*
+                  FIX CENTRAMENTO:
+                  - Il contenitore di tutte le righe è centrato orizzontalmente
+                  - max-w-2xl limita la larghezza su schermi grandi
+                  - text-center centra il testo dentro ogni riga
+                  - mx-auto centra il blocco
+                */}
+                <div className="mx-auto w-full max-w-2xl px-4 space-y-1">
                   {lyrics.map((line, index) => {
                     const isCurrent = index === currentLineIndex;
                     const isPast    = index < currentLineIndex;
@@ -307,9 +262,9 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                         ref={el => { lineRefs.current[index] = el; }}
                         onClick={() => isSynced && handleLineClick(line)}
                         className={`
-                          px-3 py-2.5 rounded-xl transition-all duration-300
-                          ${isSynced ? "cursor-pointer hover:bg-secondary/40" : "cursor-default"}
-                          ${isCurrent ? "bg-primary/15" : ""}
+                          px-4 py-3 rounded-2xl transition-all duration-300 text-center
+                          ${isSynced ? "cursor-pointer hover:bg-secondary/40 active:scale-[0.98]" : "cursor-default"}
+                          ${isCurrent ? "bg-primary/10" : ""}
                         `}
                       >
                         {isBreak ? (
@@ -322,33 +277,35 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                           </div>
                         ) : (
                           <div className="space-y-0.5">
-                            {/* Traduzione sopra (principale) */}
+                            {/* Traduzione (principale se attiva) */}
                             {showTranslation && translation && (
-                              <p className={`leading-snug transition-all duration-300 ${
+                              <p className={`leading-snug transition-all duration-300 font-medium ${
                                 isCurrent
-                                  ? "text-primary font-bold text-xl md:text-2xl"
+                                  ? "text-primary font-bold text-xl md:text-3xl scale-105"
                                   : isPast
-                                    ? "text-muted-foreground/40 text-base md:text-lg"
-                                    : "text-muted-foreground/60 text-base md:text-lg"
+                                    ? "text-muted-foreground/35 text-base md:text-xl"
+                                    : "text-muted-foreground/55 text-base md:text-xl"
                               }`}>
                                 {translation}
                               </p>
                             )}
                             {/* Testo originale */}
-                            <p className={`leading-snug transition-all duration-300 ${
+                            <p className={`leading-snug transition-all duration-300 font-medium ${
                               showTranslation && translation
-                                ? "text-muted-foreground/40 text-xs"
+                                ? "text-muted-foreground/35 text-xs"
                                 : isCurrent
-                                  ? "text-primary font-bold text-xl md:text-2xl"
+                                  ? "text-primary font-bold text-2xl md:text-3xl"
                                   : isPast
-                                    ? "text-muted-foreground/40 text-base md:text-lg"
-                                    : "text-foreground/70 text-base md:text-lg"
+                                    ? "text-muted-foreground/35 text-lg md:text-xl"
+                                    : "text-foreground/65 text-lg md:text-xl"
                             }`}>
                               {line.text}
                             </p>
-                            {/* Timestamp */}
+                            {/* Timestamp solo sulla riga corrente */}
                             {isSynced && isCurrent && (
-                              <p className="text-[10px] text-primary/60 font-mono">{formatTime(Math.floor(line.time))}</p>
+                              <p className="text-[10px] text-primary/50 font-mono mt-1">
+                                {formatTime(Math.floor(line.time))}
+                              </p>
                             )}
                           </div>
                         )}
@@ -358,30 +315,28 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 </div>
 
                 {/* Spacer bottom */}
-                <div style={{ height: "50vh" }} />
+                <div style={{ height: "50vh" }} aria-hidden />
               </>
             )}
           </div>
         )}
 
-        {/* INFO TAB */}
+        {/* ── INFO ── */}
         {mode === "info" && spotifyTrack && (
           <div className="absolute inset-0 overflow-y-auto p-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl mx-auto">
               <div className="flex flex-col sm:flex-row items-start gap-4">
-                <img
-                  src={spotifyTrack.album.images[0]?.url} alt={spotifyTrack.album.name}
-                  className="w-full sm:w-44 aspect-square rounded-xl object-cover shadow-xl"
-                />
+                <img src={spotifyTrack.album.images[0]?.url} alt={spotifyTrack.album.name}
+                  className="w-full sm:w-44 aspect-square rounded-xl object-cover shadow-xl" />
                 <div className="flex-1 space-y-3 w-full">
                   <div>
                     <h2 className="text-xl font-bold break-words">{spotifyTrack.name}</h2>
-                    <p className="text-muted-foreground break-words">{spotifyTrack.artists.map(a => a.name).join(", ")}</p>
+                    <p className="text-muted-foreground break-words">{spotifyTrack.artists.map((a: any) => a.name).join(", ")}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Album", value: spotifyTrack.album.name },
-                      { label: "Release", value: spotifyTrack.album.release_date },
+                      { label: "Album",    value: spotifyTrack.album.name },
+                      { label: "Release",  value: spotifyTrack.album.release_date },
                       { label: "Duration", value: formatTime(Math.floor(spotifyTrack.duration_ms / 1000)) },
                     ].map(({ label, value }) => (
                       <div key={label} className="space-y-0.5">
@@ -405,10 +360,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
           </div>
         )}
 
-        {/* ANALYSIS TAB */}
+        {/* ── ANALYSIS ── */}
         {mode === "analysis" && (
           <div className="absolute inset-0 overflow-y-auto p-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-2xl mx-auto">
               {loadingFeat ? (
                 <div className="flex flex-col items-center justify-center h-40">
                   <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
@@ -418,22 +373,19 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { label: "Energy",           value: audioFeatures.energy,           color: "bg-red-500" },
-                      { label: "Danceability",      value: audioFeatures.danceability,      color: "bg-blue-500" },
-                      { label: "Valence",           value: audioFeatures.valence,           color: "bg-green-500" },
-                      { label: "Acousticness",      value: audioFeatures.acousticness,      color: "bg-yellow-500" },
-                      { label: "Instrumentalness",  value: audioFeatures.instrumentalness,  color: "bg-purple-500" },
-                      { label: "Speechiness",       value: audioFeatures.speechiness,       color: "bg-pink-500" },
+                      { label: "Energy",          value: audioFeatures.energy,          color: "bg-red-500" },
+                      { label: "Danceability",     value: audioFeatures.danceability,     color: "bg-blue-500" },
+                      { label: "Valence",          value: audioFeatures.valence,          color: "bg-green-500" },
+                      { label: "Acousticness",     value: audioFeatures.acousticness,     color: "bg-yellow-500" },
+                      { label: "Instrumentalness", value: audioFeatures.instrumentalness, color: "bg-purple-500" },
+                      { label: "Speechiness",      value: audioFeatures.speechiness,      color: "bg-pink-500" },
                     ].map(f => (
                       <div key={f.label} className="p-3 rounded-xl bg-secondary/50">
                         <p className="text-xs text-muted-foreground mb-1.5">{f.label}</p>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }} animate={{ width: `${f.value * 100}%` }}
-                              transition={{ duration: 1, delay: 0.1 }}
-                              className={`h-full ${f.color} rounded-full`}
-                            />
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${f.value * 100}%` }}
+                              transition={{ duration: 1, delay: 0.1 }} className={`h-full ${f.color} rounded-full`} />
                           </div>
                           <span className="text-xs font-bold w-8 text-right">{Math.round(f.value * 100)}%</span>
                         </div>
@@ -442,10 +394,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Tempo",           value: `${Math.round(audioFeatures.tempo)} BPM` },
-                      { label: "Key",             value: `${["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key]} ${audioFeatures.mode === 1 ? "Major" : "Minor"}` },
-                      { label: "Time Signature",  value: `${audioFeatures.time_signature}/4` },
-                      { label: "Loudness",        value: `${Math.round(audioFeatures.loudness)} dB` },
+                      { label: "Tempo",          value: `${Math.round(audioFeatures.tempo)} BPM` },
+                      { label: "Key",            value: `${["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key]} ${audioFeatures.mode === 1 ? "Major" : "Minor"}` },
+                      { label: "Time Signature", value: `${audioFeatures.time_signature}/4` },
+                      { label: "Loudness",       value: `${Math.round(audioFeatures.loudness)} dB` },
                     ].map(({ label, value }) => (
                       <div key={label} className="p-3 rounded-xl bg-secondary/50">
                         <p className="text-xs text-muted-foreground mb-1">{label}</p>
