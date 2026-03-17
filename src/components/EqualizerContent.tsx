@@ -5,8 +5,8 @@ import {
   ChevronDown, Waves, Activity, Volume2, VolumeX, Gauge,
   Minus, TrendingUp, TrendingDown, Mic, Music, Radio, Headphones,
   Coffee, Sparkles, Guitar, ArrowUp, ArrowDown, Target,
+  type LucideIcon,
 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { usePlaybackState } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,12 +25,20 @@ const EQ_BANDS = [
 ];
 
 // ── Preset professionali ───────────────────────────────────────────────────────
-// icone Lucide per i preset (stringa = nome componente)
-const PRESET_ICONS: Record<string, string> = {
-  flat: "Minus", bass: "Volume2", treble: "TrendingUp",
-  vocal: "Mic", rock: "Zap", jazz: "Music",
-  electronic: "Radio", classical: "Music2", hiphop: "Headphones",
-  lounge: "Coffee", nightclub: "Sparkles", acoustic: "Guitar",
+// mappa diretta preset → icona Lucide
+const PRESET_ICONS: Record<string, LucideIcon> = {
+  flat:       Minus,
+  bass:       Volume2,
+  treble:     TrendingUp,
+  vocal:      Mic,
+  rock:       Zap,
+  jazz:       Music,
+  electronic: Radio,
+  classical:  Music2,
+  hiphop:     Headphones,
+  lounge:     Coffee,
+  nightclub:  Sparkles,
+  acoustic:   Guitar,
 };
 
 const PRESETS: Record<string, { name: string; gains: number[] }> = {

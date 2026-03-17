@@ -9,6 +9,7 @@ import {
   Clock,
   ListMusic,
   ScanSearch,
+  SlidersHorizontal,
   Settings,
   User
 } from "lucide-react";
@@ -23,8 +24,9 @@ const features = [
   { id: "ai-dj", label: "AI DJ", icon: Sparkles, color: "text-purple-500", bg: "bg-purple-500/10" },
   { id: "radio", label: "Radio", icon: Radio, color: "text-blue-500", bg: "bg-blue-500/10" },
   { id: "lyrics", label: "Lyrics", icon: Mic2, color: "text-pink-500", bg: "bg-pink-500/10" },
-  { id: "recognize", label: "Recognize", icon: ScanSearch, color: "text-orange-500", bg: "bg-orange-500/10" },
-  { id: "stats", label: "Statistics", icon: BarChart3, color: "text-green-500", bg: "bg-green-500/10" },
+  { id: "recognize",  label: "Riconosci",     icon: ScanSearch,         color: "text-orange-500", bg: "bg-orange-500/10" },
+  { id: "equalizer",  label: "Equalizzatore", icon: SlidersHorizontal,  color: "text-cyan-500",   bg: "bg-cyan-500/10" },
+  { id: "stats",      label: "Statistics",    icon: BarChart3,          color: "text-green-500",  bg: "bg-green-500/10" },
   { id: "devices", label: "Devices", icon: Headphones, color: "text-yellow-500", bg: "bg-yellow-500/10" },
 ];
 
