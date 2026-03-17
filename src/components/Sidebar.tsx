@@ -13,6 +13,7 @@ import {
   ListMusic,
   Music,
   ScanSearch,
+  Layers,
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -29,6 +30,7 @@ const mainNav = [
 
 const features = [
   { id: "ai-dj", label: "AI DJ", icon: Sparkles },
+  { id: "neural-mixer", label: "Neural Mixer", icon: Layers },
   { id: "radio", label: "Radio", icon: Radio },
   { id: "lyrics", label: "Lyrics", icon: Mic2 },
   { id: "recognize", label: "Recognize", icon: ScanSearch },

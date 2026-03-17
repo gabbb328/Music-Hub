@@ -24,6 +24,7 @@ import SettingsPanel from "@/components/SettingsPanel";
 import MoreContent from "@/components/MoreContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
+import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
 
 const Index = () => {
   const player = usePlayerStore();
@@ -74,6 +75,8 @@ const Index = () => {
         return <RecentlyPlayedContent />;
       case "more":
         return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
+      case "neural-mixer":
+        return <NeuralSpaceMixerContent />;
       default:
         return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
     }
@@ -89,7 +92,7 @@ const Index = () => {
     <SpotifyProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
         <SpotifyStatus />
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 pb-14 md:pb-0">
           <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
           <main className="flex-1 flex flex-col min-w-0">
             {renderContent()}
