@@ -20,6 +20,7 @@ import LikedSongsContent from "@/components/LikedSongsContent";
 import RecentlyPlayedContent from "@/components/RecentlyPlayedContent";
 import PlaylistDetail from "@/components/PlaylistDetail";
 import RecognizeContent from "@/components/RecognizeContent";
+import EqualizerContent from "@/components/EqualizerContent";
 import SettingsPanel from "@/components/SettingsPanel";
 import MoreContent from "@/components/MoreContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
@@ -106,6 +107,7 @@ const Index = () => {
       case "queue":         return <QueueContent queue={player.queue} currentTrack={player.currentTrack} onPlayTrack={player.playTrack} />;
       case "radio":         return <RadioContent />;
       case "recognize":     return <RecognizeContent />;
+      case "equalizer":     return <EqualizerContent />;
       case "liked":         return <LikedSongsContent />;
       case "recent":        return <RecentlyPlayedContent />;
       case "neural-mixer":  return <NeuralSpaceMixerContent />;
