@@ -14,6 +14,7 @@ import {
   Music,
   ScanSearch,
   Layers,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -33,7 +34,8 @@ const features = [
   { id: "neural-mixer", label: "Neural Mixer", icon: Layers },
   { id: "radio", label: "Radio", icon: Radio },
   { id: "lyrics", label: "Lyrics", icon: Mic2 },
-  { id: "recognize", label: "Recognize", icon: ScanSearch },
+  { id: "recognize", label: "Riconosci", icon: ScanSearch },
+  { id: "equalizer", label: "Equalizzatore", icon: SlidersHorizontal },
   { id: "stats", label: "Statistics", icon: BarChart3 },
   { id: "devices", label: "Devices", icon: Headphones },
 ];
