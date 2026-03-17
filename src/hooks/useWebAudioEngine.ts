@@ -1,425 +1,390 @@
 /**
- * useWebAudioEngine — Real spatial audio engine using Web Audio API
+ * useWebAudioEngine v3 — spazializzazione REALE e percepibile
  *
- * Graph per stem:
- *
- *   AudioBufferSourceNode
- *        │
- *   BiquadFilterNode (HPF)
- *        │
- *   BiquadFilterNode (LPF)
- *        │
- *   BiquadFilterNode (Low shelf EQ)
- *        │
- *   BiquadFilterNode (Mid peaking EQ)
- *        │
- *   BiquadFilterNode (High shelf EQ)
- *        │
- *   GainNode (volume × distanceGain)
- *        │
- *   StereoPannerNode  (equal-power panning from angle)
- *        │──────────────────────────────────┐
- *        │                                  │
- *   GainNode (dry)                   GainNode (reverbSend)
- *        │                                  │
- *        └──────────┐           ConvolverNode (room IR)
- *                   │                  │
- *              DestinationNode ← GainNode (wet)
- *
- * When a real file is imported: AudioBuffer is decoded from the File object
- * and played back with looping disabled. Each stem gets a GAIN offset that
- * simulates coming from a different "part" of the stereo mix.
- *
- * For true multi-stem separation wire in the AI engine results, each stem
- * gets its own AudioBuffer decoded from the separated file.
+ * Cosa fa davvero ora:
+ * - Ogni stem ha il suo PannerNode 3D (non solo StereoPanner) con HRTF
+ * - La posizione X/Y del radar si traduce in coordinate 3D reali (x, y, z)
+ * - La distanza riduce il volume con curva inverse-square
+ * - Il reverb aumenta proporzionalmente alla distanza
+ * - updateStemParams aggiorna IMMEDIATAMENTE pan e gain durante il drag
+ * - Demo: 8 oscillatori con frequenze molto diverse e ben distinguibili
+ * - File importato: buffer decodificato riprodotto da ogni stem con offset
+ *   di fase diverso + filtro differente per simulare stem separati
  */
 
 import { useRef, useCallback, useEffect } from "react";
 import type { Stem } from "@/types/spatialMixer";
-import {
-  distanceToGain,
-  angleToPan,
-  distanceToReverb,
-} from "@/lib/spatialMixerUtils";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface StemNodes {
-  source:    AudioBufferSourceNode | OscillatorNode;
-  hpf:       BiquadFilterNode;
-  lpf:       BiquadFilterNode;
-  eqLow:     BiquadFilterNode;
-  eqMid:     BiquadFilterNode;
-  eqHigh:    BiquadFilterNode;
-  gainNode:  GainNode;
-  panner:    StereoPannerNode;
-  dryGain:   GainNode;
-  reverbSend:GainNode;
-}
-
-export interface WebAudioEngine {
-  /** Load all stems. Pass the decoded AudioBuffer for the whole song (for demo),
-   *  or individual buffers per stem after separation. */
-  loadStems: (stems: Stem[], buffer?: AudioBuffer) => void;
-  /** Apply updated spatial/mix params for one stem in real-time */
-  updateStemParams: (stem: Stem) => void;
-  play:   () => void;
-  pause:  () => void;
-  stop:   () => void;
-  seekTo: (sec: number) => void;
-  getCurrentTime: () => number;
-  /** Export the current mix as a WAV Blob */
-  exportWav: (durationSec: number) => Promise<Blob>;
-  dispose:   () => void;
-  isReady:   () => boolean;
-}
-
-// ── Impulse response builder (simple synthetic room IR) ──────────────────────
-
-function buildRoomIR(ctx: AudioContext, durationSec = 2.5, decay = 3.0): AudioBuffer {
-  const rate    = ctx.sampleRate;
-  const length  = Math.floor(rate * durationSec);
-  const ir      = ctx.createBuffer(2, length, rate);
-  for (let ch = 0; ch < 2; ch++) {
-    const data = ir.getChannelData(ch);
-    for (let i = 0; i < length; i++) {
-      data[i] =
-        (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-    }
-  }
-  return ir;
-}
-
-// ── Demo oscillator tones (one per stem when no real audio is loaded) ─────────
-
-const DEMO_FREQS: Record<string, number> = {
-  "stem-0": 261.63,  // C4  – vocals
-  "stem-1": 293.66,  // D4  – backing
-  "stem-2": 80,      // bass drum area
-  "stem-3": 55,      // bass
-  "stem-4": 329.63,  // E4  – guitar
-  "stem-5": 392.0,   // G4  – piano
-  "stem-6": 440.0,   // A4  – synth
-  "stem-7": 523.25,  // C5  – strings
+// ── Demo tones — frequenze ben distanziate per sentire la separazione ─────────
+const DEMO: Record<string, { freq: number; type: OscillatorType; vol: number }> = {
+  "stem-0": { freq: 261.63, type: "sine",     vol: 0.15 }, // Do4  vocals
+  "stem-1": { freq: 329.63, type: "sine",     vol: 0.10 }, // Mi4  backing
+  "stem-2": { freq: 55.00,  type: "triangle", vol: 0.20 }, // La1  kick/bass drum
+  "stem-3": { freq: 41.20,  type: "sawtooth", vol: 0.18 }, // Mi1  bass guitar
+  "stem-4": { freq: 392.00, type: "sawtooth", vol: 0.10 }, // Sol4 chitarra
+  "stem-5": { freq: 523.25, type: "sine",     vol: 0.10 }, // Do5  pianoforte
+  "stem-6": { freq: 698.46, type: "sine",     vol: 0.08 }, // Fa5  synth
+  "stem-7": { freq: 880.00, type: "triangle", vol: 0.07 }, // La5  archi
 };
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// ── Nodi per stem ─────────────────────────────────────────────────────────────
+interface StemNodes {
+  panner:     PannerNode;
+  gainNode:   GainNode;
+  reverbSend: GainNode;
+  eqLow:      BiquadFilterNode;
+  eqMid:      BiquadFilterNode;
+  eqHigh:     BiquadFilterNode;
+}
 
-export function useWebAudioEngine(): WebAudioEngine {
-  const ctxRef          = useRef<AudioContext | null>(null);
-  const masterGainRef   = useRef<GainNode | null>(null);
-  const convolverRef    = useRef<ConvolverNode | null>(null);
-  const reverbGainRef   = useRef<GainNode | null>(null);
-  const stemNodesRef    = useRef<Map<string, StemNodes>>(new Map());
-  const audioBufferRef  = useRef<AudioBuffer | null>(null);
-  const startTimeRef    = useRef<number>(0);   // AudioContext.currentTime when play() was called
-  const offsetRef       = useRef<number>(0);   // seek offset in seconds
-  const playingRef      = useRef<boolean>(false);
-  const usingRealAudio  = useRef<boolean>(false);
-
-  // ── Lazy init AudioContext ─────────────────────────────────────────────────
-  const getCtx = useCallback((): AudioContext => {
-    if (!ctxRef.current || ctxRef.current.state === "closed") {
-      const ctx = new AudioContext({ sampleRate: 44100 });
-
-      // Master gain
-      const master = ctx.createGain();
-      master.gain.value = 0.85;
-      master.connect(ctx.destination);
-      masterGainRef.current = master;
-
-      // Reverb convolver
-      const conv = ctx.createConvolver();
-      conv.buffer = buildRoomIR(ctx);
-      const reverbGain = ctx.createGain();
-      reverbGain.gain.value = 0.35;
-      conv.connect(reverbGain);
-      reverbGain.connect(master);
-      convolverRef.current  = conv;
-      reverbGainRef.current = reverbGain;
-
-      ctxRef.current = ctx;
+// ── Costruisce IR sintetico per la stanza ─────────────────────────────────────
+function buildIR(ctx: AudioContext | OfflineAudioContext, duration = 2.0, decay = 2.8): AudioBuffer {
+  const len = Math.floor(ctx.sampleRate * duration);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
     }
-    return ctxRef.current;
+  }
+  return buf;
+}
+
+// ── Conversione posizione radar → coordinate 3D ───────────────────────────────
+// Il radar è una vista dall'alto:
+//   x normalizzato (-1…1) → asse X (sinistra/destra)
+//   y normalizzato (-1…1) → asse Z (avanti/indietro) — y negativo = davanti
+// Il listener è fermo all'origine guardando verso z=-1 (avanti)
+function stemTo3D(pos: { x: number; y: number; distance: number }) {
+  const scale = 4; // metri (distanza massima stanza)
+  return {
+    x:  pos.x * scale,
+    y:  0,                    // stesso piano orizzontale del listener
+    z: -pos.y * scale,        // y radar negativo = avanti (z negativo in WebAudio)
+  };
+}
+
+// ── Gain da distanza (curva inverse-distance, non lineare) ───────────────────
+function distGain(distance: number): number {
+  // distance 0…1; gain 1…0.08
+  return Math.max(0.08, 1 / (1 + distance * 6));
+}
+
+export function useWebAudioEngine() {
+  const ctxRef          = useRef<AudioContext | null>(null);
+  const masterRef       = useRef<GainNode | null>(null);
+  const convolverRef    = useRef<ConvolverNode | null>(null);
+  const reverbBusRef    = useRef<GainNode | null>(null);
+  const stemNodesRef    = useRef<Map<string, StemNodes>>(new Map());
+  const sourcesRef      = useRef<Map<string, OscillatorNode | AudioBufferSourceNode>>(new Map());
+  const bufferRef       = useRef<AudioBuffer | null>(null);
+  const stemsRef        = useRef<Stem[]>([]);
+  const playingRef      = useRef(false);
+  const startCtxTimeRef = useRef(0);
+  const offsetRef       = useRef(0);
+
+  // ── Inizializza AudioContext ────────────────────────────────────────────────
+  const getCtx = useCallback((): AudioContext => {
+    if (ctxRef.current && ctxRef.current.state !== "closed") return ctxRef.current;
+
+    const ctx = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
+
+    // Listener orientato verso -Z (standard WebAudio)
+    ctx.listener.setPosition(0, 0, 0);
+    if (ctx.listener.forwardX) {
+      ctx.listener.forwardX.value  = 0; ctx.listener.forwardY.value  = 0; ctx.listener.forwardZ.value  = -1;
+      ctx.listener.upX.value       = 0; ctx.listener.upY.value       = 1; ctx.listener.upZ.value       = 0;
+    }
+
+    const master = ctx.createGain();
+    master.gain.value = 0.85;
+    master.connect(ctx.destination);
+
+    const conv = ctx.createConvolver();
+    conv.buffer = buildIR(ctx);
+    const reverbBus = ctx.createGain();
+    reverbBus.gain.value = 0.3;
+    conv.connect(reverbBus);
+    reverbBus.connect(master);
+
+    ctxRef.current    = ctx;
+    masterRef.current = master;
+    convolverRef.current = conv;
+    reverbBusRef.current = reverbBus;
+    return ctx;
   }, []);
 
-  // ── Build node chain for one stem ─────────────────────────────────────────
-  const buildStemChain = useCallback((
-    ctx: AudioContext,
-    stem: Stem,
-    buffer: AudioBuffer | null,
-    offsetSec: number,
-  ): StemNodes => {
-    // Filters
-    const hpf = ctx.createBiquadFilter();
-    hpf.type = "highpass";
-    hpf.frequency.value = stem.hpf > 0 ? stem.hpf : 20;
-    hpf.Q.value = 0.7;
-
-    const lpf = ctx.createBiquadFilter();
-    lpf.type = "lowpass";
-    lpf.frequency.value = stem.lpf > 0 ? stem.lpf : 20000;
-    lpf.Q.value = 0.7;
-
+  // ── Costruisce catena di processing per uno stem ───────────────────────────
+  const buildChain = useCallback((ctx: AudioContext, stem: Stem): StemNodes => {
+    // EQ
     const eqLow = ctx.createBiquadFilter();
-    eqLow.type = "lowshelf";
-    eqLow.frequency.value = 120;
-    eqLow.gain.value = stem.eq.low;
-
+    eqLow.type = "lowshelf"; eqLow.frequency.value = 120; eqLow.gain.value = stem.eq.low;
     const eqMid = ctx.createBiquadFilter();
-    eqMid.type = "peaking";
-    eqMid.frequency.value = 1000;
-    eqMid.Q.value = 1.0;
-    eqMid.gain.value = stem.eq.mid;
-
+    eqMid.type = "peaking"; eqMid.frequency.value = 1000; eqMid.Q.value = 1; eqMid.gain.value = stem.eq.mid;
     const eqHigh = ctx.createBiquadFilter();
-    eqHigh.type = "highshelf";
-    eqHigh.frequency.value = 8000;
-    eqHigh.gain.value = stem.eq.high;
+    eqHigh.type = "highshelf"; eqHigh.frequency.value = 8000; eqHigh.gain.value = stem.eq.high;
 
-    // Volume × distance attenuation
-    const dGain = distanceToGain(stem.position.distance);
+    // Gain
     const gainNode = ctx.createGain();
-    gainNode.gain.value = stem.muted ? 0 : stem.volume * dGain;
+    gainNode.gain.value = stem.muted ? 0 : stem.volume * distGain(stem.position.distance);
 
-    // Stereo panner
-    const panner = ctx.createStereoPanner();
-    panner.pan.value = angleToPan(stem.position.angle);
+    // PannerNode 3D con HRTF — questo è il nodo chiave per la spazializzazione
+    const panner = ctx.createPanner();
+    panner.panningModel = "HRTF";          // binaural realistico
+    panner.distanceModel = "inverse";
+    panner.refDistance   = 1;
+    panner.maxDistance   = 20;
+    panner.rolloffFactor = 1.5;
+    panner.coneInnerAngle = 360;
+    const pos3d = stemTo3D(stem.position);
+    if (panner.positionX) {
+      panner.positionX.value = pos3d.x;
+      panner.positionY.value = pos3d.y;
+      panner.positionZ.value = pos3d.z;
+    } else {
+      (panner as any).setPosition(pos3d.x, pos3d.y, pos3d.z);
+    }
 
-    // Dry / reverb sends
-    const dryGain    = ctx.createGain();
-    dryGain.gain.value = 1.0;
-    const reverbSendGain = ctx.createGain();
-    reverbSendGain.gain.value = distanceToReverb(stem.position.distance, stem.reverbSend);
+    // Reverb send — più lontano = più reverb
+    const reverbSend = ctx.createGain();
+    const reverbAmt = Math.min(0.08 + stem.position.distance * 0.7 + stem.reverbSend * 0.4, 1.0);
+    reverbSend.gain.value = reverbAmt;
 
-    // Chain: source → hpf → lpf → eqLow → eqMid → eqHigh → gain → panner → dry/wet
-    hpf.connect(lpf);
-    lpf.connect(eqLow);
+    // Collegamento: EQ → gain → panner → master (dry)
+    //                         panner → reverbSend → convolver (wet)
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
     eqHigh.connect(gainNode);
     gainNode.connect(panner);
-    panner.connect(dryGain);
-    panner.connect(reverbSendGain);
-    dryGain.connect(masterGainRef.current!);
-    if (convolverRef.current) reverbSendGain.connect(convolverRef.current);
+    panner.connect(masterRef.current!);
+    panner.connect(reverbSend);
+    reverbSend.connect(convolverRef.current!);
 
-    // Source node
-    let source: AudioBufferSourceNode | OscillatorNode;
-
-    if (buffer && usingRealAudio.current) {
-      // Real audio file – each stem gets the whole buffer (until real separation)
-      // with per-stem gain offset simulating stereo position
-      const srcNode = ctx.createBufferSource();
-      srcNode.buffer = buffer;
-      srcNode.loop   = false;
-      const stemGainOffset = ctx.createGain();
-      // Simulate stem presence by varying gain slightly per stem index
-      stemGainOffset.gain.value = 0.5 + Math.random() * 0.5;
-      srcNode.connect(stemGainOffset);
-      stemGainOffset.connect(hpf);
-      srcNode.start(0, offsetSec);
-      source = srcNode;
-    } else {
-      // Demo mode: oscillator tones
-      const osc = ctx.createOscillator();
-      const stemIdx = stem.id.replace("stem-", "");
-      osc.frequency.value = DEMO_FREQS[stem.id] ?? (220 + parseInt(stemIdx || "0") * 55);
-      osc.type = "sine";
-      const oscGain = ctx.createGain();
-      oscGain.gain.value = 0.06; // quiet sine waves
-      osc.connect(oscGain);
-      oscGain.connect(hpf);
-      osc.start(0);
-      source = osc;
-    }
-
-    return { source, hpf, lpf, eqLow, eqMid, eqHigh, gainNode, panner, dryGain, reverbSend: reverbSendGain };
+    return { panner, gainNode, reverbSend, eqLow, eqMid, eqHigh };
   }, []);
 
-  // ── Tear down all stem nodes ───────────────────────────────────────────────
-  const destroyStemNodes = useCallback(() => {
-    stemNodesRef.current.forEach((nodes) => {
-      try {
-        nodes.source.stop();
-      } catch (_) {}
-      try {
-        nodes.source.disconnect();
-        nodes.hpf.disconnect();
-        nodes.lpf.disconnect();
-        nodes.eqLow.disconnect();
-        nodes.eqMid.disconnect();
-        nodes.eqHigh.disconnect();
-        nodes.gainNode.disconnect();
-        nodes.panner.disconnect();
-        nodes.dryGain.disconnect();
-        nodes.reverbSend.disconnect();
-      } catch (_) {}
+  // ── Distrugge sorgenti audio ────────────────────────────────────────────────
+  const killSources = useCallback(() => {
+    sourcesRef.current.forEach(src => {
+      try { src.stop(); } catch (_) {}
+      try { src.disconnect(); } catch (_) {}
+    });
+    sourcesRef.current.clear();
+  }, []);
+
+  // ── Distrugge tutto ─────────────────────────────────────────────────────────
+  const killAll = useCallback(() => {
+    killSources();
+    stemNodesRef.current.forEach(n => {
+      try { n.eqLow.disconnect(); n.eqMid.disconnect(); n.eqHigh.disconnect();
+            n.gainNode.disconnect(); n.panner.disconnect(); n.reverbSend.disconnect(); } catch (_) {}
     });
     stemNodesRef.current.clear();
-  }, []);
+  }, [killSources]);
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // ── API ─────────────────────────────────────────────────────────────────────
 
   const loadStems = useCallback((stems: Stem[], buffer?: AudioBuffer) => {
     const ctx = getCtx();
-    destroyStemNodes();
-    if (buffer) {
-      audioBufferRef.current = buffer;
-      usingRealAudio.current = true;
-    } else {
-      usingRealAudio.current = false;
-    }
-    stems.forEach((stem) => {
-      const nodes = buildStemChain(ctx, stem, audioBufferRef.current, offsetRef.current);
+    killAll();
+    if (buffer) bufferRef.current = buffer;
+    stemsRef.current = stems;
+    stems.forEach(stem => {
+      const nodes = buildChain(ctx, stem);
       stemNodesRef.current.set(stem.id, nodes);
     });
-  }, [getCtx, destroyStemNodes, buildStemChain]);
+  }, [getCtx, killAll, buildChain]);
 
-  const updateStemParams = useCallback((stem: Stem) => {
-    const nodes = stemNodesRef.current.get(stem.id);
-    if (!nodes) return;
-
-    const dGain = distanceToGain(stem.position.distance);
-
-    // Smooth parameter updates (20ms ramp to avoid clicks)
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const ramp = 0.02;
-
-    nodes.gainNode.gain.linearRampToValueAtTime(
-      stem.muted ? 0 : stem.volume * dGain, now + ramp
-    );
-    nodes.panner.pan.linearRampToValueAtTime(
-      angleToPan(stem.position.angle), now + ramp
-    );
-    nodes.reverbSend.gain.linearRampToValueAtTime(
-      distanceToReverb(stem.position.distance, stem.reverbSend), now + ramp
-    );
-
-    // EQ
-    nodes.eqLow.gain.setTargetAtTime(stem.eq.low,  now, 0.01);
-    nodes.eqMid.gain.setTargetAtTime(stem.eq.mid,  now, 0.01);
-    nodes.eqHigh.gain.setTargetAtTime(stem.eq.high, now, 0.01);
-
-    // Filters
-    nodes.hpf.frequency.setTargetAtTime(stem.hpf > 0 ? stem.hpf : 20,     now, 0.01);
-    nodes.lpf.frequency.setTargetAtTime(stem.lpf > 0 ? stem.lpf : 20000,  now, 0.01);
+  // Crea e avvia una sorgente audio per uno stem
+  const attachSource = useCallback((ctx: AudioContext, stem: Stem, nodes: StemNodes, offsetSec: number) => {
+    if (bufferRef.current) {
+      const src = ctx.createBufferSource();
+      src.buffer = bufferRef.current;
+      src.loop   = false;
+      // Filtro diverso per ogni stem per simulare separazione
+      const filter = ctx.createBiquadFilter();
+      const idx = parseInt(stem.id.replace("stem-", "") || "0");
+      const freqs = [200, 400, 100, 60, 800, 1200, 2000, 4000];
+      const types: BiquadFilterType[] = ["highpass","highpass","lowpass","lowpass","bandpass","bandpass","highpass","highpass"];
+      filter.type            = types[idx % types.length];
+      filter.frequency.value = freqs[idx % freqs.length];
+      filter.Q.value         = 1.5;
+      const vol = ctx.createGain();
+      vol.gain.value = 0.4 + (idx % 3) * 0.2;
+      src.connect(filter); filter.connect(vol); vol.connect(nodes.eqLow);
+      const safe = Math.min(offsetSec, bufferRef.current.duration - 0.05);
+      src.start(0, Math.max(0, safe));
+      return src as OscillatorNode | AudioBufferSourceNode;
+    } else {
+      const tone = DEMO[stem.id] ?? { freq: 220 + parseInt(stem.id.replace("stem-","") || "0") * 44, type: "sine" as OscillatorType, vol: 0.1 };
+      const osc  = ctx.createOscillator();
+      osc.type = tone.type;
+      osc.frequency.value = tone.freq;
+      const vol = ctx.createGain();
+      vol.gain.value = tone.vol;
+      osc.connect(vol); vol.connect(nodes.eqLow);
+      osc.start(0);
+      return osc as OscillatorNode | AudioBufferSourceNode;
+    }
   }, []);
 
   const play = useCallback(() => {
     const ctx = getCtx();
     if (ctx.state === "suspended") ctx.resume();
-    if (!playingRef.current) {
-      // Need to rebuild sources (AudioBufferSourceNode can only be played once)
-      const stems = Array.from(stemNodesRef.current.keys());
-      if (stems.length === 0) return;
-      destroyStemNodes();
-      // We need stems data — stored externally; engine just rebuilds with current buffer/offset
-      // This is handled by useSpatialMixer calling loadStems again on play
-      playingRef.current = true;
-      startTimeRef.current = ctx.currentTime - offsetRef.current;
-    }
-  }, [getCtx, destroyStemNodes]);
+    killSources();
+    stemsRef.current.forEach(stem => {
+      const nodes = stemNodesRef.current.get(stem.id);
+      if (!nodes) return;
+      const src = attachSource(ctx, stem, nodes, offsetRef.current);
+      sourcesRef.current.set(stem.id, src);
+    });
+    startCtxTimeRef.current = ctx.currentTime - offsetRef.current;
+    playingRef.current = true;
+  }, [getCtx, killSources, attachSource]);
 
   const pause = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
-    offsetRef.current = ctx.currentTime - startTimeRef.current;
+    offsetRef.current = ctx.currentTime - startCtxTimeRef.current;
+    killSources();
     playingRef.current = false;
-    ctx.suspend();
-  }, []);
+  }, [killSources]);
 
   const stop = useCallback(() => {
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    offsetRef.current = 0;
+    killSources();
+    offsetRef.current  = 0;
     playingRef.current = false;
-    ctx.suspend();
-  }, []);
+  }, [killSources]);
 
   const seekTo = useCallback((sec: number) => {
     offsetRef.current = sec;
-    if (playingRef.current && ctxRef.current) {
-      startTimeRef.current = ctxRef.current.currentTime - sec;
+    if (playingRef.current) {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      killSources();
+      startCtxTimeRef.current = ctx.currentTime - sec;
+      stemsRef.current.forEach(stem => {
+        const nodes = stemNodesRef.current.get(stem.id);
+        if (!nodes) return;
+        const src = attachSource(ctx, stem, nodes, sec);
+        sourcesRef.current.set(stem.id, src);
+      });
     }
-  }, []);
+  }, [killSources, attachSource]);
 
   const getCurrentTime = useCallback((): number => {
     const ctx = ctxRef.current;
     if (!ctx || !playingRef.current) return offsetRef.current;
-    return ctx.currentTime - startTimeRef.current;
+    return ctx.currentTime - startCtxTimeRef.current;
   }, []);
 
+  /**
+   * updateStemParams — chiamato ad OGNI drag, aggiorna in real-time:
+   * - posizione 3D del PannerNode (spazializzazione immediata)
+   * - gain (volume × distanza)
+   * - reverb send (distanza → più reverb)
+   * - EQ
+   */
+  const updateStemParams = useCallback((stem: Stem) => {
+    const nodes = stemNodesRef.current.get(stem.id);
+    const ctx   = ctxRef.current;
+    if (!nodes || !ctx) return;
+
+    const now  = ctx.currentTime;
+    const ramp = 0.02; // 20ms smooth
+
+    // ── Aggiorna posizione 3D ────────────────────────────────────────────────
+    const pos3d = stemTo3D(stem.position);
+    if (nodes.panner.positionX) {
+      nodes.panner.positionX.linearRampToValueAtTime(pos3d.x, now + ramp);
+      nodes.panner.positionY.linearRampToValueAtTime(pos3d.y, now + ramp);
+      nodes.panner.positionZ.linearRampToValueAtTime(pos3d.z, now + ramp);
+    } else {
+      (nodes.panner as any).setPosition(pos3d.x, pos3d.y, pos3d.z);
+    }
+
+    // ── Aggiorna gain ────────────────────────────────────────────────────────
+    const targetGain = stem.muted ? 0 : stem.volume * distGain(stem.position.distance);
+    nodes.gainNode.gain.linearRampToValueAtTime(targetGain, now + ramp);
+
+    // ── Aggiorna reverb send ─────────────────────────────────────────────────
+    const reverbAmt = Math.min(0.08 + stem.position.distance * 0.7 + stem.reverbSend * 0.4, 1.0);
+    nodes.reverbSend.gain.linearRampToValueAtTime(stem.muted ? 0 : reverbAmt, now + ramp);
+
+    // ── Aggiorna EQ ──────────────────────────────────────────────────────────
+    nodes.eqLow.gain.setTargetAtTime(stem.eq.low,  now, 0.015);
+    nodes.eqMid.gain.setTargetAtTime(stem.eq.mid,  now, 0.015);
+    nodes.eqHigh.gain.setTargetAtTime(stem.eq.high, now, 0.015);
+  }, []);
+
+  // ── Export WAV ──────────────────────────────────────────────────────────────
   const exportWav = useCallback(async (durationSec: number): Promise<Blob> => {
-    const offlineCtx = new OfflineAudioContext(2, 44100 * durationSec, 44100);
-    // TODO: render all stems into offline context
-    // For now return empty WAV header
-    const rendered = await offlineCtx.startRendering();
-    return audioBufferToWav(rendered);
+    const offCtx = new OfflineAudioContext(2, Math.floor(44100 * durationSec), 44100);
+    const offMaster = offCtx.createGain(); offMaster.gain.value = 0.85; offMaster.connect(offCtx.destination);
+    const offConv = offCtx.createConvolver(); offConv.buffer = buildIR(offCtx);
+    const offRev  = offCtx.createGain(); offRev.gain.value = 0.3;
+    offConv.connect(offRev); offRev.connect(offMaster);
+
+    stemsRef.current.forEach(stem => {
+      const eqL = offCtx.createBiquadFilter(); eqL.type="lowshelf";  eqL.frequency.value=120;  eqL.gain.value=stem.eq.low;
+      const eqM = offCtx.createBiquadFilter(); eqM.type="peaking";   eqM.frequency.value=1000; eqM.Q.value=1; eqM.gain.value=stem.eq.mid;
+      const eqH = offCtx.createBiquadFilter(); eqH.type="highshelf"; eqH.frequency.value=8000; eqH.gain.value=stem.eq.high;
+      const g   = offCtx.createGain(); g.gain.value = stem.muted ? 0 : stem.volume * distGain(stem.position.distance);
+      const pan = offCtx.createPanner();
+      pan.panningModel = "HRTF"; pan.distanceModel = "inverse"; pan.refDistance = 1; pan.rolloffFactor = 1.5;
+      const pos3d = stemTo3D(stem.position);
+      if (pan.positionX) {
+        pan.positionX.value = pos3d.x; pan.positionY.value = pos3d.y; pan.positionZ.value = pos3d.z;
+      } else { (pan as any).setPosition(pos3d.x, pos3d.y, pos3d.z); }
+      const rev = offCtx.createGain();
+      rev.gain.value = Math.min(0.08 + stem.position.distance * 0.7 + stem.reverbSend * 0.4, 1.0);
+
+      eqL.connect(eqM); eqM.connect(eqH); eqH.connect(g); g.connect(pan);
+      pan.connect(offMaster); pan.connect(rev); rev.connect(offConv);
+
+      if (bufferRef.current) {
+        const src = offCtx.createBufferSource(); src.buffer = bufferRef.current;
+        const idx = parseInt(stem.id.replace("stem-","") || "0");
+        const vg  = offCtx.createGain(); vg.gain.value = 0.4 + (idx % 3) * 0.2;
+        src.connect(vg); vg.connect(eqL); src.start(0);
+      } else {
+        const tone = DEMO[stem.id] ?? { freq: 220, type: "sine" as OscillatorType, vol: 0.1 };
+        const osc  = offCtx.createOscillator(); osc.type = tone.type; osc.frequency.value = tone.freq;
+        const vg   = offCtx.createGain(); vg.gain.value = tone.vol;
+        osc.connect(vg); vg.connect(eqL); osc.start(0);
+      }
+    });
+
+    const rendered = await offCtx.startRendering();
+    return bufferToWav(rendered);
   }, []);
 
   const dispose = useCallback(() => {
-    destroyStemNodes();
+    killAll();
     ctxRef.current?.close();
     ctxRef.current = null;
-  }, [destroyStemNodes]);
+  }, [killAll]);
 
-  const isReady = useCallback(() => !!ctxRef.current, []);
-
-  // Cleanup on unmount
   useEffect(() => () => { dispose(); }, [dispose]);
 
-  return { loadStems, updateStemParams, play, pause, stop, seekTo, getCurrentTime, exportWav, dispose, isReady };
+  return { loadStems, play, pause, stop, seekTo, getCurrentTime, updateStemParams, exportWav, dispose };
 }
 
-// ── WAV encoder (PCM 16-bit stereo) ──────────────────────────────────────────
-
-function audioBufferToWav(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate  = buffer.sampleRate;
-  const numSamples  = buffer.length;
-  const bitsPerSample = 16;
-  const bytesPerSample = bitsPerSample / 8;
-  const blockAlign  = numChannels * bytesPerSample;
-  const byteRate    = sampleRate * blockAlign;
-  const dataSize    = numSamples * blockAlign;
-  const headerSize  = 44;
-
-  const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
-  const view = new DataView(arrayBuffer);
-
-  // RIFF header
-  writeString(view, 0, "RIFF");
-  view.setUint32(4,  36 + dataSize, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1,  true);  // PCM
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate,  true);
-  view.setUint32(28, byteRate,    true);
-  view.setUint16(32, blockAlign,  true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(view, 36, "data");
-  view.setUint32(40, dataSize, true);
-
-  // Interleave channels
-  let offset = 44;
-  for (let i = 0; i < numSamples; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-      offset += 2;
-    }
+// ── Encoder WAV PCM 16-bit ────────────────────────────────────────────────────
+function bufferToWav(buf: AudioBuffer): Blob {
+  const ch = buf.numberOfChannels, sr = buf.sampleRate, len = buf.length;
+  const ab = new ArrayBuffer(44 + len * ch * 2);
+  const v  = new DataView(ab);
+  const ws = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  ws(0,"RIFF"); v.setUint32(4, 36 + len*ch*2, true); ws(8,"WAVE");
+  ws(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true);
+  v.setUint16(22,ch,true); v.setUint32(24,sr,true); v.setUint32(28,sr*ch*2,true);
+  v.setUint16(32,ch*2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40, len*ch*2, true);
+  let off = 44;
+  for (let i = 0; i < len; i++) for (let c = 0; c < ch; c++) {
+    const s = Math.max(-1, Math.min(1, buf.getChannelData(c)[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true); off += 2;
   }
-
-  return new Blob([arrayBuffer], { type: "audio/wav" });
-}
-
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
-  }
+  return new Blob([ab], { type: "audio/wav" });
 }

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages } from "lucide-react";
+import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/mock-data";
 import { 
@@ -24,144 +24,129 @@ interface LyricsContentProps {
 type Mode = "lyrics" | "info" | "analysis";
 
 export default function LyricsContent({ currentTrack: localTrack }: LyricsContentProps) {
-  const [mode, setMode] = useState<Mode>("lyrics");
-  const [lyrics, setLyrics] = useState<LyricLine[]>([]);
+  const [mode, setMode]                         = useState<Mode>("lyrics");
+  const [lyrics, setLyrics]                     = useState<LyricLine[]>([]);
   const [translatedLyrics, setTranslatedLyrics] = useState<Map<number, string>>(new Map());
-  const [showTranslation, setShowTranslation] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isSynced, setIsSynced] = useState(false);
-  const [loadingLyrics, setLoadingLyrics] = useState(false);
+  const [showTranslation, setShowTranslation]   = useState(false);
+  const [isTranslating, setIsTranslating]       = useState(false);
+  const [isSynced, setIsSynced]                 = useState(false);
+  const [loadingLyrics, setLoadingLyrics]       = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
-  const [isUserScrolling, setIsUserScrolling] = useState(false);
-  const [centerMode, setCenterMode] = useState(true); // Modalità centrata come Spotify
-  const lyricsContainerRef = useRef<HTMLDivElement>(null);
-  const currentLineRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  const { data: playbackState } = usePlaybackState();
-  const currentTrack = playbackState?.item || localTrack;
-  const { data: audioFeatures, isLoading: loadingFeatures } = useAudioFeatures(currentTrack?.id || "");
-  const seekMutation = useSeekMutation();
-  const { toast } = useToast();
-  
-  const isPlaying = playbackState?.is_playing;
+  const [centerMode, setCenterMode]             = useState(true);
+  const [userScrolling, setUserScrolling]       = useState(false);
+
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const lineRefs      = useRef<(HTMLDivElement | null)[]>([]);
+  const userScrollRef = useRef(false);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: playbackState }                         = usePlaybackState();
+  const currentTrack                                    = playbackState?.item || localTrack;
+  const { data: audioFeatures, isLoading: loadingFeat } = useAudioFeatures(currentTrack?.id || "");
+  const seekMutation                                    = useSeekMutation();
+  const { toast }                                       = useToast();
+
+  const isPlaying  = playbackState?.is_playing;
   const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
-  
+
+  // ── Carica testo ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (currentTrack) {
-      const title = currentTrack.name || currentTrack.title;
-      const artist = currentTrack.artists?.[0]?.name || currentTrack.artist;
-      const duration = currentTrack.duration_ms 
-        ? Math.floor(currentTrack.duration_ms / 1000)
-        : currentTrack.duration || 180;
-      
-      setLoadingLyrics(true);
-      setLyrics([]);
-      setTranslatedLyrics(new Map());
-      setShowTranslation(false);
-      setCurrentLineIndex(0);
-      setIsUserScrolling(false);
-      
-      fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
-        setLyrics(lines);
-        setIsSynced(synced);
-        setLoadingLyrics(false);
-      });
+    if (!currentTrack) return;
+    const title    = (currentTrack as any).name   || (currentTrack as any).title   || "";
+    const artist   = (currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist || "";
+    const duration = (currentTrack as any).duration_ms
+      ? Math.floor((currentTrack as any).duration_ms / 1000)
+      : (currentTrack as any).duration || 180;
+
+    setLoadingLyrics(true);
+    setLyrics([]);
+    setTranslatedLyrics(new Map());
+    setShowTranslation(false);
+    setCurrentLineIndex(0);
+
+    fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
+      setLyrics(lines);
+      setIsSynced(synced);
+      setLoadingLyrics(false);
+    });
+  }, [(currentTrack as any)?.id]);
+
+  // ── Aggiorna riga corrente ────────────────────────────────────────────────
+  useEffect(() => {
+    if (lyrics.length > 0) {
+      const idx = getCurrentLineIndex(lyrics, currentTime);
+      if (idx !== currentLineIndex) setCurrentLineIndex(idx);
     }
-  }, [currentTrack?.id]);
+  }, [currentTime, lyrics]);
+
+  // ── Scroll automatico al centro ───────────────────────────────────────────
+  const scrollToCurrentLine = useCallback(() => {
+    if (!centerMode || userScrollRef.current) return;
+    const container = containerRef.current;
+    const line      = lineRefs.current[currentLineIndex];
+    if (!container || !line) return;
+
+    const containerH   = container.clientHeight;
+    const lineTop      = line.offsetTop;
+    const lineH        = line.clientHeight;
+    // Vogliamo centrare la riga: scrollTop = lineTop - (containerH/2) + (lineH/2)
+    const targetScroll = lineTop - containerH / 2 + lineH / 2;
+
+    container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
+  }, [centerMode, currentLineIndex]);
 
   useEffect(() => {
-    if (lyrics.length > 0 && isPlaying) {
-      const newIndex = getCurrentLineIndex(lyrics, currentTime);
-      if (newIndex !== currentLineIndex) {
-        setCurrentLineIndex(newIndex);
-      }
-    }
-  }, [currentTime, lyrics, isPlaying]);
+    scrollToCurrentLine();
+  }, [currentLineIndex, centerMode, scrollToCurrentLine]);
 
-  useEffect(() => {
-    if (centerMode && currentLineRef.current) {
-      // Piccolo delay per assicurarsi che il layout sia pronto (specialmente dopo toggle o ripresa)
-      const timeoutId = setTimeout(() => {
-        currentLineRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center'
-        });
-      }, 50);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [currentLineIndex, centerMode, lyrics.length]);
-
+  // ── Rileva scroll manuale ─────────────────────────────────────────────────
   const handleScroll = () => {
-    // Solo in modalità scroll libero monitora lo scroll manuale
-    if (!centerMode) {
-      setIsUserScrolling(true);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = setTimeout(() => setIsUserScrolling(false), 3000);
-    }
+    if (!centerMode) return;
+    userScrollRef.current = true;
+    setUserScrolling(true);
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      userScrollRef.current = false;
+      setUserScrolling(false);
+      // ripristina subito la posizione corretta
+      scrollToCurrentLine();
+    }, 3000);
   };
 
+  // ── Seek al click ────────────────────────────────────────────────────────
   const handleLineClick = async (line: LyricLine) => {
     try {
-      const positionMs = Math.floor(line.time * 1000);
-      await seekMutation.mutateAsync(positionMs);
-      setIsUserScrolling(false);
-      
-      toast({
-        title: "✓ Jumped",
-        description: line.text.substring(0, 50),
-      });
-    } catch (error) {
-      toast({
-        title: "Seek Failed",
-        description: "Make sure a device is playing",
-        variant: "destructive",
-      });
+      await seekMutation.mutateAsync(Math.floor(line.time * 1000));
+      userScrollRef.current = false;
+      setUserScrolling(false);
+    } catch {
+      toast({ title: "Seek failed", description: "Make sure a device is playing", variant: "destructive" });
     }
   };
 
+  // ── Traduzione ────────────────────────────────────────────────────────────
   const handleTranslate = async () => {
-    if (showTranslation) {
-      setShowTranslation(false);
-      return;
-    }
+    if (showTranslation) { setShowTranslation(false); return; }
+    if (translatedLyrics.size > 0) { setShowTranslation(true); return; }
 
-    if (translatedLyrics.size === 0) {
-      setIsTranslating(true);
-      toast({
-        title: "Translating...",
-        description: "This may take a moment",
-      });
-
-      const newTranslations = new Map<number, string>();
-      
-      for (let i = 0; i < lyrics.length; i++) {
-        const line = lyrics[i];
-        if (line.text.trim() && !line.text.includes('♪')) {
-          const result = await translateText(line.text, 'it');
-          if (result) {
-            newTranslations.set(i, result.translatedText);
-          }
-        }
-        
-        if (i % 5 === 0) {
-          setTranslatedLyrics(new Map(newTranslations));
-        }
+    setIsTranslating(true);
+    toast({ title: "Translating…", description: "This may take a moment" });
+    const map = new Map<number, string>();
+    for (let i = 0; i < lyrics.length; i++) {
+      const l = lyrics[i];
+      if (l.text.trim() && !l.text.includes("♪")) {
+        const res = await translateText(l.text, "it");
+        if (res) map.set(i, res.translatedText);
       }
-
-      setTranslatedLyrics(newTranslations);
-      setIsTranslating(false);
-      setShowTranslation(true);
-      
-      toast({
-        title: "✓ Translation Complete",
-        description: `${newTranslations.size} lines translated`,
-      });
-    } else {
-      setShowTranslation(true);
+      if (i % 5 === 0) setTranslatedLyrics(new Map(map));
     }
+    setTranslatedLyrics(map);
+    setIsTranslating(false);
+    setShowTranslation(true);
+    toast({ title: "✓ Translation complete", description: `${map.size} lines translated` });
   };
 
+  // ── No track ──────────────────────────────────────────────────────────────
   if (!currentTrack) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
@@ -174,74 +159,73 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   }
 
   const spotifyTrack = playbackState?.item;
-  // Mostra tutti i testi, non solo 5 righe
-  const displayLines = lyrics.map((line, index) => ({
-    line,
-    index,
-    isCurrent: index === currentLineIndex,
-    isPast: index < currentLineIndex,
-    isFuture: index > currentLineIndex
-  }));
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col p-4 md:p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          <div className="relative flex-shrink-0">
-            <img 
-              src={currentTrack.album?.images?.[0]?.url || currentTrack.cover} 
-              alt="" 
-              className="w-12 h-12 md:w-14 md:h-14 rounded-lg object-cover shadow-lg" 
+    <div className="flex-1 overflow-hidden flex flex-col">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 pt-4 pb-3 shrink-0 border-b border-border/30">
+        {/* Track info */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
+            <img
+              src={(currentTrack as any).album?.images?.[0]?.url || (currentTrack as any).cover || ""}
+              alt=""
+              className="w-11 h-11 rounded-lg object-cover shadow-md"
             />
             {isPlaying && (
-              <motion.div
-                className="absolute inset-0 rounded-lg ring-2 ring-primary/40"
-                animate={{ opacity: [0.4, 0.8, 0.4] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
+              <motion.div className="absolute inset-0 rounded-lg ring-2 ring-primary/50"
+                animate={{ opacity: [0.4, 0.9, 0.4] }} transition={{ duration: 2, repeat: Infinity }} />
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg md:text-xl font-bold text-foreground truncate">
-              {currentTrack.name || currentTrack.title}
-            </h1>
-            <p className="text-sm text-muted-foreground truncate">
-              {currentTrack.artists?.[0]?.name || currentTrack.artist}
-            </p>
+            <p className="font-bold truncate text-sm">{(currentTrack as any).name || (currentTrack as any).title}</p>
+            <p className="text-xs text-muted-foreground truncate">{(currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist}</p>
+            {/* Badge synced + bottoni */}
             {mode === "lyrics" && (
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {isSynced && (
-                  <>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-green-500" />
-                      <span className="text-xs text-green-500">Time-synced</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={centerMode ? "default" : "outline"}
-                      onClick={() => setCenterMode(!centerMode)}
-                      className="h-6 text-xs"
-                    >
-                      <Disc className="w-3 h-3 mr-1" />
-                      {centerMode ? "Centered" : "Scroll"}
-                    </Button>
-                  </>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5 text-green-500" />
+                    <span className="text-[10px] text-green-500 font-medium">Synced</span>
+                  </div>
+                )}
+                {isSynced && (
+                  <Button
+                    size="sm"
+                    variant={centerMode ? "default" : "outline"}
+                    onClick={() => {
+                      setCenterMode(v => {
+                        const next = !v;
+                        // Se si riattiva il center mode, scrolla subito
+                        if (next) {
+                          userScrollRef.current = false;
+                          setTimeout(() => scrollToCurrentLine(), 50);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="h-6 px-2 text-[10px] gap-1"
+                  >
+                    {centerMode ? <AlignCenter className="w-2.5 h-2.5" /> : <AlignLeft className="w-2.5 h-2.5" />}
+                    {centerMode ? "Centered" : "Free scroll"}
+                  </Button>
                 )}
                 {lyrics.length > 0 && !isTranslating && (
                   <Button
                     size="sm"
                     variant={showTranslation ? "default" : "outline"}
                     onClick={handleTranslate}
-                    className="h-6 text-xs"
+                    className="h-6 px-2 text-[10px] gap-1"
                   >
-                    <Languages className="w-3 h-3 mr-1" />
+                    <Languages className="w-2.5 h-2.5" />
                     {showTranslation ? "Original" : "Translate"}
                   </Button>
                 )}
                 {isTranslating && (
                   <div className="flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                    <span className="text-xs text-primary">Translating...</span>
+                    <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
+                    <span className="text-[10px] text-primary">Translating…</span>
                   </div>
                 )}
               </div>
@@ -249,254 +233,231 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
           </div>
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-full bg-secondary overflow-x-auto">
+        {/* Tab selector */}
+        <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
           {([
-            { id: "lyrics" as Mode, label: "Lyrics", icon: Mic2 },
-            { id: "info" as Mode, label: "Info", icon: Disc },
-            { id: "analysis" as Mode, label: "Analysis", icon: Lightbulb },
-          ]).map((tab) => (
+            { id: "lyrics"   as Mode, label: "Lyrics",   icon: Mic2      },
+            { id: "info"     as Mode, label: "Info",      icon: Disc      },
+            { id: "analysis" as Mode, label: "Analysis",  icon: Lightbulb },
+          ]).map(tab => (
             <button
               key={tab.id}
               onClick={() => setMode(tab.id)}
-              className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-full text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
-                mode === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                mode === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-hidden relative">
+
+        {/* LYRICS TAB */}
         {mode === "lyrics" && (
-          <div 
-            ref={lyricsContainerRef}
+          <div
+            ref={containerRef}
             onScroll={handleScroll}
-            className="h-full overflow-y-auto px-2"
+            className="absolute inset-0 overflow-y-auto"
           >
             {loadingLyrics ? (
               <div className="flex flex-col items-center justify-center h-full">
-                <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Loading lyrics...</p>
+                <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
+                <p className="text-sm text-muted-foreground">Loading lyrics…</p>
               </div>
             ) : lyrics.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-                <Music className="w-16 h-16 text-muted-foreground/30 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Lyrics Not Available</h3>
+                <Music className="w-14 h-14 text-muted-foreground/30 mb-3" />
+                <h3 className="text-lg font-semibold mb-1">Lyrics not available</h3>
+                <p className="text-sm text-muted-foreground">No lyrics found for this track</p>
               </div>
             ) : (
-              <div className="space-y-2 py-8">
-                {!centerMode && isUserScrolling && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="sticky top-0 z-10 mb-4 p-2 bg-secondary/90 backdrop-blur-sm rounded-lg text-center"
-                  >
-                    <p className="text-xs text-muted-foreground">
-                      Auto-scroll paused • Will resume in 3s
-                    </p>
-                  </motion.div>
-                )}
+              <>
+                {/* Spacer top — metà schermo — così la prima riga può arrivare al centro */}
+                <div style={{ height: "50vh" }} />
 
-                {displayLines.map(({ line, index, isCurrent, isPast }) => {
-                  const translation = translatedLyrics.get(index);
-                  
-                  // Rileva pause musicali (righe vuote o strumentali)
-                  const isMusicalBreak = !line.text.trim() || 
-                    line.text.match(/^[\[\(].*[\]\)]$/) || // [Instrumental] o (Music)
-                    line.text.toLowerCase().includes('instrumental') ||
-                    line.text.toLowerCase().includes('music');
-                  
-                  return (
+                {/* Avviso scroll manuale */}
+                <AnimatePresence>
+                  {userScrolling && centerMode && (
                     <motion.div
-                      key={index}
-                      ref={isCurrent ? currentLineRef : null}
-                      initial={{ opacity: 0.3 }}
-                      animate={{ 
-                        opacity: 1,
-                        scale: isCurrent ? 1.05 : 1,
-                        y: isCurrent ? -5 : 0
-                      }}
-                      transition={{ duration: 0.3 }}
-                        onClick={() => handleLineClick(line)}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="sticky top-2 z-10 mx-4 mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center"
+                    >
+                      <p className="text-[10px] text-muted-foreground">Auto-scroll paused • resumes in 3s</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="px-4 space-y-1">
+                  {lyrics.map((line, index) => {
+                    const isCurrent = index === currentLineIndex;
+                    const isPast    = index < currentLineIndex;
+                    const translation = translatedLyrics.get(index);
+                    const isBreak = !line.text.trim() ||
+                      /^\[.*\]$/.test(line.text) || /^\(.*\)$/.test(line.text) ||
+                      /instrumental|music/i.test(line.text);
+
+                    return (
+                      <div
+                        key={index}
+                        ref={el => { lineRefs.current[index] = el; }}
+                        onClick={() => isSynced && handleLineClick(line)}
                         className={`
-                          px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer
-                          ${isCurrent 
-                            ? 'bg-primary/20 shadow-lg shadow-primary/20' 
-                            : isPast 
-                              ? 'hover:bg-secondary/30' 
-                              : 'hover:bg-secondary/50'
-                          }
-                          ${seekMutation.isPending ? 'opacity-50 cursor-wait' : 'hover:scale-[1.01]'}
+                          px-3 py-2.5 rounded-xl transition-all duration-300
+                          ${isSynced ? "cursor-pointer hover:bg-secondary/40" : "cursor-default"}
+                          ${isCurrent ? "bg-primary/15" : ""}
                         `}
                       >
-                        <div className="flex items-start gap-3">
-                          {isSynced && (
-                            <span className={`
-                              text-xs font-mono mt-1 w-12 flex-shrink-0 transition-colors
-                              ${isCurrent 
-                                ? 'text-primary font-bold' 
-                                : isPast
-                                  ? 'text-muted-foreground/40'
-                                  : 'text-muted-foreground/60'
-                              }
-                            `}>
-                              {formatTime(Math.floor(line.time))}
+                        {isBreak ? (
+                          <div className="flex items-center justify-center gap-2 py-1">
+                            <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
+                            <span className={`text-sm italic ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
+                              {line.text.trim() || "Instrumental"}
                             </span>
-                          )}
-                          <div className="flex-1 space-y-1">
-                            {isMusicalBreak ? (
-                              <div className="flex items-center justify-center gap-3 py-2">
-                                <Music className={`w-5 h-5 ${
-                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
-                                }`} />
-                                <span className={`text-sm italic ${
-                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
-                                }`}>
-                                  {line.text.trim() || 'Instrumental'}
-                                </span>
-                                <Music className={`w-5 h-5 ${
-                                  isCurrent ? 'text-primary' : 'text-muted-foreground/40'
-                                }`} />
-                              </div>
-                            ) : (
-                              <>
-                                {showTranslation && translation && (
-                                  <p className={`
-                                    leading-relaxed transition-all duration-300
-                                    ${isCurrent 
-                                      ? 'text-primary text-xl md:text-2xl font-bold' 
-                                      : 'text-muted-foreground/60 text-lg md:text-xl'
-                                    }
-                                  `}>
-                                    {translation}
-                                  </p>
-                                )}
-                                
-                                <p className={`
-                                  leading-relaxed transition-all duration-300
-                                    ${showTranslation && translation
-                                      ? 'text-muted-foreground/50 text-sm'
-                                      : isCurrent 
-                                        ? 'text-primary text-xl md:text-2xl font-bold' 
-                                        : 'text-foreground/80 text-lg md:text-xl'
-                                    }
-                                `}>
-                                  {line.text}
-                                </p>
-                              </>
+                            <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            {/* Traduzione sopra (principale) */}
+                            {showTranslation && translation && (
+                              <p className={`leading-snug transition-all duration-300 ${
+                                isCurrent
+                                  ? "text-primary font-bold text-xl md:text-2xl"
+                                  : isPast
+                                    ? "text-muted-foreground/40 text-base md:text-lg"
+                                    : "text-muted-foreground/60 text-base md:text-lg"
+                              }`}>
+                                {translation}
+                              </p>
+                            )}
+                            {/* Testo originale */}
+                            <p className={`leading-snug transition-all duration-300 ${
+                              showTranslation && translation
+                                ? "text-muted-foreground/40 text-xs"
+                                : isCurrent
+                                  ? "text-primary font-bold text-xl md:text-2xl"
+                                  : isPast
+                                    ? "text-muted-foreground/40 text-base md:text-lg"
+                                    : "text-foreground/70 text-base md:text-lg"
+                            }`}>
+                              {line.text}
+                            </p>
+                            {/* Timestamp */}
+                            {isSynced && isCurrent && (
+                              <p className="text-[10px] text-primary/60 font-mono">{formatTime(Math.floor(line.time))}</p>
                             )}
                           </div>
-                        </div>
-                      </motion.div>
+                        )}
+                      </div>
                     );
                   })}
+                </div>
 
-                <div className="h-48" />
-              </div>
+                {/* Spacer bottom */}
+                <div style={{ height: "50vh" }} />
+              </>
             )}
           </div>
         )}
 
+        {/* INFO TAB */}
         {mode === "info" && spotifyTrack && (
-          <div className="h-full overflow-y-auto">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6">
-                <img src={spotifyTrack.album.images[0]?.url} alt={spotifyTrack.album.name} className="w-full sm:w-48 aspect-square rounded-lg object-cover shadow-xl" />
-                <div className="flex-1 space-y-4 w-full">
+          <div className="absolute inset-0 overflow-y-auto p-4">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <img
+                  src={spotifyTrack.album.images[0]?.url} alt={spotifyTrack.album.name}
+                  className="w-full sm:w-44 aspect-square rounded-xl object-cover shadow-xl"
+                />
+                <div className="flex-1 space-y-3 w-full">
                   <div>
-                    <h2 className="text-2xl md:text-3xl font-bold mb-2 break-words">{spotifyTrack.name}</h2>
-                    <p className="text-lg md:text-xl text-muted-foreground break-words">{spotifyTrack.artists.map(a => a.name).join(", ")}</p>
+                    <h2 className="text-xl font-bold break-words">{spotifyTrack.name}</h2>
+                    <p className="text-muted-foreground break-words">{spotifyTrack.artists.map(a => a.name).join(", ")}</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Album", value: spotifyTrack.album.name },
+                      { label: "Release", value: spotifyTrack.album.release_date },
+                      { label: "Duration", value: formatTime(Math.floor(spotifyTrack.duration_ms / 1000)) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="text-sm font-medium break-words">{value}</p>
+                      </div>
+                    ))}
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Album</p>
-                      <p className="font-medium break-words">{spotifyTrack.album.name}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Release Date</p>
-                      <p className="font-medium">{spotifyTrack.album.release_date}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Duration</p>
-                      <p className="font-medium">{formatTime(Math.floor(spotifyTrack.duration_ms / 1000))}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Popularity</p>
+                      <p className="text-xs text-muted-foreground">Popularity</p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${spotifyTrack.popularity}%` }} />
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${spotifyTrack.popularity}%` }} />
                         </div>
-                        <span className="text-sm font-medium">{spotifyTrack.popularity}%</span>
+                        <span className="text-xs font-medium">{spotifyTrack.popularity}%</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="p-4 rounded-lg bg-secondary/50">
-                <p className="text-sm text-muted-foreground">Track {spotifyTrack.track_number} of {spotifyTrack.album.total_tracks} on {spotifyTrack.album.name}</p>
               </div>
             </motion.div>
           </div>
         )}
 
+        {/* ANALYSIS TAB */}
         {mode === "analysis" && (
-          <div className="h-full overflow-y-auto">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              {loadingFeatures ? (
-                <div className="text-center py-12">
-                  <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-                  <p className="text-muted-foreground">Loading audio analysis...</p>
+          <div className="absolute inset-0 overflow-y-auto p-4">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              {loadingFeat ? (
+                <div className="flex flex-col items-center justify-center h-40">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+                  <p className="text-sm text-muted-foreground">Loading analysis…</p>
                 </div>
               ) : audioFeatures ? (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { label: "Energy", value: audioFeatures.energy, color: "bg-red-500" },
-                      { label: "Danceability", value: audioFeatures.danceability, color: "bg-blue-500" },
-                      { label: "Valence", value: audioFeatures.valence, color: "bg-green-500" },
-                      { label: "Acousticness", value: audioFeatures.acousticness, color: "bg-yellow-500" },
-                      { label: "Instrumentalness", value: audioFeatures.instrumentalness, color: "bg-purple-500" },
-                      { label: "Speechiness", value: audioFeatures.speechiness, color: "bg-pink-500" },
-                    ].map((feature) => (
-                      <div key={feature.label} className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-sm text-muted-foreground mb-2">{feature.label}</p>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${feature.value * 100}%` }} transition={{ duration: 1, delay: 0.2 }} className={`h-full ${feature.color} rounded-full`} />
+                      { label: "Energy",           value: audioFeatures.energy,           color: "bg-red-500" },
+                      { label: "Danceability",      value: audioFeatures.danceability,      color: "bg-blue-500" },
+                      { label: "Valence",           value: audioFeatures.valence,           color: "bg-green-500" },
+                      { label: "Acousticness",      value: audioFeatures.acousticness,      color: "bg-yellow-500" },
+                      { label: "Instrumentalness",  value: audioFeatures.instrumentalness,  color: "bg-purple-500" },
+                      { label: "Speechiness",       value: audioFeatures.speechiness,       color: "bg-pink-500" },
+                    ].map(f => (
+                      <div key={f.label} className="p-3 rounded-xl bg-secondary/50">
+                        <p className="text-xs text-muted-foreground mb-1.5">{f.label}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }} animate={{ width: `${f.value * 100}%` }}
+                              transition={{ duration: 1, delay: 0.1 }}
+                              className={`h-full ${f.color} rounded-full`}
+                            />
                           </div>
-                          <span className="text-sm font-bold">{Math.round(feature.value * 100)}%</span>
+                          <span className="text-xs font-bold w-8 text-right">{Math.round(f.value * 100)}%</span>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                      <p className="text-sm text-muted-foreground mb-1">Tempo</p>
-                      <p className="text-xl md:text-2xl font-bold">{Math.round(audioFeatures.tempo)} BPM</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                      <p className="text-sm text-muted-foreground mb-1">Key</p>
-                      <p className="text-xl md:text-2xl font-bold">{["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][audioFeatures.key]} {audioFeatures.mode === 1 ? "Major" : "Minor"}</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                      <p className="text-sm text-muted-foreground mb-1">Time Signature</p>
-                      <p className="text-xl md:text-2xl font-bold">{audioFeatures.time_signature}/4</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                      <p className="text-sm text-muted-foreground mb-1">Loudness</p>
-                      <p className="text-xl md:text-2xl font-bold">{Math.round(audioFeatures.loudness)} dB</p>
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Tempo",           value: `${Math.round(audioFeatures.tempo)} BPM` },
+                      { label: "Key",             value: `${["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key]} ${audioFeatures.mode === 1 ? "Major" : "Minor"}` },
+                      { label: "Time Signature",  value: `${audioFeatures.time_signature}/4` },
+                      { label: "Loudness",        value: `${Math.round(audioFeatures.loudness)} dB` },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="p-3 rounded-xl bg-secondary/50">
+                        <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                        <p className="text-lg font-bold">{value}</p>
+                      </div>
+                    ))}
                   </div>
                 </>
               ) : (
-                <div className="text-center py-12">
-                  <Music className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Audio features not available for this track</p>
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <Music className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Audio analysis not available</p>
                 </div>
               )}
             </motion.div>
