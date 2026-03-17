@@ -1,4 +1,4 @@
-import { Home, Search, Library, Sparkles, Layers, MoreHorizontal } from "lucide-react";
+import { Home, Search, Library, Sparkles, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface MobileNavProps {
@@ -11,7 +11,7 @@ const navItems = [
   { id: "home",          label: "Home",    icon: Home },
   { id: "search",        label: "Search",  icon: Search },
   { id: "library",       label: "Library", icon: Library },
-  { id: "neural-mixer",  label: "Mixer",   icon: Layers },
+  { id: "ai-dj",         label: "AI DJ",   icon: Sparkles },
   { id: "more",          label: "More",    icon: MoreHorizontal },
 ];
 
