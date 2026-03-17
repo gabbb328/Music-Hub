@@ -51,58 +51,58 @@ const Index = () => {
     }
 
     switch (activeSection) {
-      case "search":
-        return <SearchContent onPlayTrack={player.playTrack} />;
-      case "library":
-        return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={handleOpenPlaylist} />;
-      case "ai-dj":
-        return <AIDJContent onPlayTrack={player.playTrack} />;
-      case "lyrics":
-        return <LyricsContent currentTrack={player.currentTrack} />;
-      case "stats":
-        return <StatsContent />;
-      case "devices":
-        return <DevicesContent />;
-      case "queue":
-        return <QueueContent queue={player.queue} currentTrack={player.currentTrack} onPlayTrack={player.playTrack} />;
-      case "radio":
-        return <RadioContent />;
-      case "recognize":
-        return <RecognizeContent />;
-      case "liked":
-        return <LikedSongsContent />;
-      case "recent":
-        return <RecentlyPlayedContent />;
-      case "more":
-        return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
-      case "neural-mixer":
-        return <NeuralSpaceMixerContent />;
-      default:
-        return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
+      case "search":        return <SearchContent onPlayTrack={player.playTrack} />;
+      case "library":       return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={handleOpenPlaylist} />;
+      case "ai-dj":         return <AIDJContent onPlayTrack={player.playTrack} />;
+      case "lyrics":        return <LyricsContent currentTrack={player.currentTrack} />;
+      case "stats":         return <StatsContent />;
+      case "devices":       return <DevicesContent />;
+      case "queue":         return <QueueContent queue={player.queue} currentTrack={player.currentTrack} onPlayTrack={player.playTrack} />;
+      case "radio":         return <RadioContent />;
+      case "recognize":     return <RecognizeContent />;
+      case "liked":         return <LikedSongsContent />;
+      case "recent":        return <RecentlyPlayedContent />;
+      case "neural-mixer":  return <NeuralSpaceMixerContent />;
+      case "more":          return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
+      default:              return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
     }
   };
 
   const handleExpandClick = () => {
-    console.log('🔍 Index: setShowNowPlaying(true) called');
-    console.log('🔍 Index: currentTrack =', player.currentTrack);
     setShowNowPlaying(true);
   };
+
+  const hasTrack = !!player.currentTrack;
 
   return (
     <SpotifyProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-background">
         <SpotifyStatus />
-        <div className="flex flex-1 min-h-0 pb-14 md:pb-0">
+
+        {/* Main content — su mobile lascia spazio in fondo per PlayerBar + MobileNav */}
+        <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
           <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-          <main className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {renderContent()}
           </main>
         </div>
-        <PlayerBar 
-          {...player} 
-          onExpandClick={handleExpandClick}
-          onNavigate={setActiveSection}
-        />
+
+        {/* PlayerBar: su desktop è in flow normale; su mobile è fixed sopra la navbar */}
+        <div className={`
+          md:relative md:z-auto md:bottom-auto md:left-auto md:right-auto
+          fixed bottom-14 left-0 right-0 z-40
+          md:static
+        `}
+          style={{ paddingBottom: 0 }}
+        >
+          <PlayerBar 
+            {...player} 
+            onExpandClick={handleExpandClick}
+            onNavigate={setActiveSection}
+          />
+        </div>
+
+        {/* MobileNav: fixed in basso */}
         <MobileNav 
           activeSection={activeSection} 
           onSectionChange={setActiveSection} 

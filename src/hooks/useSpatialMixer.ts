@@ -1,182 +1,166 @@
-/**
- * useSpatialMixer — orchestrates the Neural Space Mixer state
- *
- * Audio pipeline:
- *  - Demo mode  → oscillator tones through the full spatial graph
- *  - Import mode → decoded AudioBuffer → spatial graph per stem
- *  - All spatial changes (drag, volume, EQ, reverb) update the live Web Audio
- *    nodes in real-time with smooth parameter ramping (no clicks/pops)
- */
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Stem, SpatialMixerProject, ExportSettings } from "@/types/spatialMixer";
 import { createDemoProject, xyToAngleDist } from "@/lib/spatialMixerUtils";
 import { useWebAudioEngine } from "@/hooks/useWebAudioEngine";
 
-export type MixerStatus =
-  | "idle"
-  | "importing"
-  | "analyzing"
-  | "ready"
-  | "playing"
-  | "paused"
-  | "exporting";
+export type MixerStatus = "idle" | "importing" | "analyzing" | "ready" | "playing" | "paused" | "exporting";
 
 export function useSpatialMixer() {
-  const [project, setProject]                   = useState<SpatialMixerProject | null>(null);
-  const [status, setStatus]                     = useState<MixerStatus>("idle");
-  const [selectedStemId, setSelectedStemId]     = useState<string | null>(null);
-  const [playbackTime, setPlaybackTime]         = useState(0);
-  const [isPlaying, setIsPlaying]               = useState(false);
+  const [project, setProject]           = useState<SpatialMixerProject | null>(null);
+  const [status, setStatus]             = useState<MixerStatus>("idle");
+  const [selectedStemId, setSelectedStemId] = useState<string | null>(null);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [isPlaying, setIsPlaying]       = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStep, setAnalysisStep]         = useState("");
+  const [analysisStep, setAnalysisStep] = useState("");
 
-  // Real-time playback tick
-  const rafRef    = useRef<number | null>(null);
-  const engine    = useWebAudioEngine();
+  const rafRef      = useRef<number | null>(null);
+  const durationRef = useRef(0);
+  const engine      = useWebAudioEngine();
 
-  // Cancel animation frame on unmount
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      engine.dispose();
-    };
-  }, [engine]);
+  const delay = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-  const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    engine.dispose();
+  }, []); // eslint-disable-line
 
-  // ── Playback loop (requestAnimationFrame for smooth seekbar) ────────────────
-  const startPlaybackLoop = useCallback((duration: number) => {
+  // ── Tick ─────────────────────────────────────────────────────────────────
+  const startTick = useCallback(() => {
     const tick = () => {
-      const t = engine.getCurrentTime();
-      setPlaybackTime(Math.min(t, duration));
-      if (t < duration) {
+      const t   = engine.getCurrentTime();
+      const dur = durationRef.current;
+      setPlaybackTime(Math.min(t, dur));
+      if (t < dur) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
+        engine.stop();
         setIsPlaying(false);
         setStatus("ready");
         setPlaybackTime(0);
       }
     };
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
   }, [engine]);
 
-  const stopPlaybackLoop = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
+  const stopTick = useCallback(() => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
   }, []);
 
-  // ── Load demo (oscillator tones through spatial graph) ─────────────────────
+  // ── loadDemo ──────────────────────────────────────────────────────────────
   const loadDemo = useCallback(() => {
+    stopTick();
+    engine.stop();
     const demo = createDemoProject();
+    durationRef.current = demo.songDuration;
     setProject(demo);
-    // Load stems into engine – no AudioBuffer → demo oscillator mode
+    // Carica gli stem nell'engine — oscillatori demo
     engine.loadStems(demo.stems, undefined);
     setStatus("ready");
     setPlaybackTime(0);
     setIsPlaying(false);
-  }, [engine]);
+    setSelectedStemId(null);
+  }, [engine, stopTick]);
 
-  // ── Import real file ────────────────────────────────────────────────────────
+  // ── importFile ────────────────────────────────────────────────────────────
   const importFile = useCallback(async (file: File) => {
+    stopTick();
+    engine.stop();
     setStatus("importing");
     setAnalysisProgress(0);
 
     const steps = [
-      { step: "Loading file…",             pct: 15 },
-      { step: "Decoding audio…",           pct: 35 },
-      { step: "Analysing waveform…",       pct: 50 },
-      { step: "Separating stems (AI)…",    pct: 70 },
-      { step: "Classifying instruments…",  pct: 85 },
-      { step: "Building spatial objects…", pct: 95 },
+      { step: "Caricamento file…",      pct: 15 },
+      { step: "Decodifica audio…",       pct: 35 },
+      { step: "Analisi waveform…",       pct: 55 },
+      { step: "Separazione stem (AI)…",  pct: 75 },
+      { step: "Classificazione…",        pct: 90 },
+      { step: "Costruzione mappa 3D…",   pct: 98 },
     ];
 
-    // Run fake analysis steps in parallel with the real decode
     const runSteps = async () => {
       for (const s of steps) {
         setStatus("analyzing");
         setAnalysisStep(s.step);
         setAnalysisProgress(s.pct);
-        await delay(600);
+        await delay(550);
       }
     };
 
-    // Decode the audio file in parallel
     const decodeAudio = async (): Promise<AudioBuffer | null> => {
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        const tmpCtx = new AudioCtx();
-        const decoded = await tmpCtx.decodeAudioData(arrayBuffer);
-        tmpCtx.close();
-        return decoded;
+        const ab  = await file.arrayBuffer();
+        const tmp = new AudioContext();
+        const buf = await tmp.decodeAudioData(ab);
+        tmp.close();
+        return buf;
       } catch (e) {
-        console.warn("[SpatialMixer] Audio decode failed:", e);
+        console.warn("[Mixer] decode failed", e);
         return null;
       }
     };
 
-    const [, audioBuffer] = await Promise.all([runSteps(), decodeAudio()]);
+    const [, audioBuf] = await Promise.all([runSteps(), decodeAudio()]);
 
-    // Build demo project with the imported file's metadata
     const demo = createDemoProject();
     demo.songTitle  = file.name.replace(/\.[^.]+$/, "");
-    demo.songArtist = "Imported";
-    if (audioBuffer) {
-      demo.songDuration = Math.floor(audioBuffer.duration);
-    }
+    demo.songArtist = "Importato";
+    if (audioBuf) demo.songDuration = Math.floor(audioBuf.duration);
 
+    durationRef.current = demo.songDuration;
     setProject(demo);
+    engine.loadStems(demo.stems, audioBuf ?? undefined);
     setAnalysisProgress(100);
-    setAnalysisStep("Done!");
-
-    // Load stems into engine WITH the real AudioBuffer
-    engine.loadStems(demo.stems, audioBuffer ?? undefined);
-
+    setAnalysisStep("Fatto!");
     setStatus("ready");
-  }, [engine]);
+    setPlaybackTime(0);
+    setIsPlaying(false);
+  }, [engine, stopTick]);
 
-  // ── Transport ───────────────────────────────────────────────────────────────
+  // ── Transport ─────────────────────────────────────────────────────────────
   const play = useCallback(() => {
     if (!project) return;
-    // Re-load stems so AudioBufferSourceNodes are fresh (they are one-shot)
-    engine.loadStems(project.stems, undefined); // oscillator mode rebuild
+    // Aggiorna snapshot degli stem nell'engine con i valori correnti di posizione
+    engine.loadStems(project.stems, undefined);
     engine.play();
     setIsPlaying(true);
     setStatus("playing");
-    startPlaybackLoop(project.songDuration);
-  }, [project, engine, startPlaybackLoop]);
+    startTick();
+  }, [project, engine, startTick]);
 
   const pause = useCallback(() => {
-    stopPlaybackLoop();
+    stopTick();
     engine.pause();
     setIsPlaying(false);
     setStatus("paused");
-  }, [engine, stopPlaybackLoop]);
+  }, [engine, stopTick]);
 
   const stop = useCallback(() => {
-    stopPlaybackLoop();
+    stopTick();
     engine.stop();
     setIsPlaying(false);
     setPlaybackTime(0);
     setStatus(project ? "ready" : "idle");
-  }, [project, engine, stopPlaybackLoop]);
+  }, [project, engine, stopTick]);
 
   const seek = useCallback((sec: number) => {
     engine.seekTo(sec);
     setPlaybackTime(sec);
   }, [engine]);
 
-  // ── Stem mutations — also update live audio nodes ──────────────────────────
+  // ── Stem mutations ────────────────────────────────────────────────────────
+  /**
+   * updateStem — aggiorna lo stato React E i parametri audio in real-time.
+   * Viene chiamato ad ogni drag del nodo nel radar.
+   */
   const updateStem = useCallback((id: string, patch: Partial<Stem>) => {
-    setProject((p) => {
+    setProject(p => {
       if (!p) return p;
-      const updated = p.stems.map((s) => (s.id === id ? { ...s, ...patch } : s));
-      const newStem = updated.find((s) => s.id === id);
-      if (newStem) engine.updateStemParams(newStem);   // ← live audio update
-      return { ...p, updatedAt: Date.now(), stems: updated };
+      const stems   = p.stems.map(s => s.id === id ? { ...s, ...patch } : s);
+      const updated = stems.find(s => s.id === id);
+      if (updated) engine.updateStemParams(updated); // ← aggiornamento audio immediato
+      return { ...p, updatedAt: Date.now(), stems };
     });
   }, [engine]);
 
@@ -186,32 +170,28 @@ export function useSpatialMixer() {
   }, [updateStem]);
 
   const toggleMute = useCallback((id: string) => {
-    setProject((p) => {
+    setProject(p => {
       if (!p) return p;
-      const updated = p.stems.map((s) =>
-        s.id === id ? { ...s, muted: !s.muted } : s
-      );
-      const newStem = updated.find((s) => s.id === id);
-      if (newStem) engine.updateStemParams(newStem);
-      return { ...p, stems: updated };
+      const stems   = p.stems.map(s => s.id === id ? { ...s, muted: !s.muted } : s);
+      const updated = stems.find(s => s.id === id);
+      if (updated) engine.updateStemParams(updated);
+      return { ...p, stems };
     });
   }, [engine]);
 
   const toggleSolo = useCallback((id: string) => {
-    setProject((p) => {
+    setProject(p => {
       if (!p) return p;
-      const target = p.stems.find((s) => s.id === id);
-      if (!target) return p;
-      const anyOtherSoloed = p.stems.some((s) => s.id !== id && s.soloed);
-      const wasAlone = target.soloed && !anyOtherSoloed;
-      const updated = p.stems.map((s) => ({
+      const t = p.stems.find(s => s.id === id);
+      if (!t) return p;
+      const wasAlone = t.soloed && !p.stems.some(s => s.id !== id && s.soloed);
+      const stems = p.stems.map(s => ({
         ...s,
         soloed: wasAlone ? false : s.id === id,
         muted:  wasAlone ? false : s.id !== id,
       }));
-      // Sync all stems to engine
-      updated.forEach((s) => engine.updateStemParams(s));
-      return { ...p, stems: updated };
+      stems.forEach(s => engine.updateStemParams(s));
+      return { ...p, stems };
     });
   }, [engine]);
 
@@ -219,7 +199,7 @@ export function useSpatialMixer() {
     updateStem(id, { position: { x: 0, y: 0, angle: 0, distance: 0 } });
   }, [updateStem]);
 
-  // ── Export ──────────────────────────────────────────────────────────────────
+  // ── Export ────────────────────────────────────────────────────────────────
   const exportMix = useCallback(async (settings: ExportSettings) => {
     if (!project) return;
     setStatus("exporting");
@@ -228,42 +208,25 @@ export function useSpatialMixer() {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href     = url;
-      a.download = `${project.songTitle}_spatial_mix.${settings.format}`;
+      a.download = `${project.songTitle}_spatial.${settings.format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("[SpatialMixer] Export failed:", e);
+      console.error("[Mixer] export error", e);
     } finally {
       setStatus("ready");
     }
   }, [project, engine]);
 
-  // ── Derived ─────────────────────────────────────────────────────────────────
-  const selectedStem = project?.stems.find((s) => s.id === selectedStemId) ?? null;
+  const selectedStem = project?.stems.find(s => s.id === selectedStemId) ?? null;
   const progressPct  = project ? (playbackTime / project.songDuration) * 100 : 0;
 
   return {
-    project,
-    status,
-    isPlaying,
-    playbackTime,
-    progressPct,
-    analysisProgress,
-    analysisStep,
-    selectedStemId,
-    selectedStem,
-    loadDemo,
-    importFile,
-    play,
-    pause,
-    stop,
-    seek,
-    updateStem,
-    moveStem,
-    toggleMute,
-    toggleSolo,
-    resetStemPosition,
-    exportMix,
+    project, status, isPlaying, playbackTime, progressPct,
+    analysisProgress, analysisStep, selectedStemId, selectedStem,
+    loadDemo, importFile,
+    play, pause, stop, seek,
+    updateStem, moveStem, toggleMute, toggleSolo, resetStemPosition, exportMix,
     selectStem: setSelectedStemId,
   };
 }
