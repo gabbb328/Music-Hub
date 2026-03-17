@@ -105,9 +105,16 @@ export const useCheckSavedTracks = (trackIds: string[]) => useQuery({
 export const usePlayMutation = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ deviceId, contextUri, uris }: { deviceId?: string; contextUri?: string; uris?: string[] }) =>
-      spotifyApi.play(deviceId, contextUri, uris),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); qc.invalidateQueries({ queryKey: ["currentlyPlaying"] }); },
+    mutationFn: (params: {
+      deviceId?: string;
+      contextUri?: string;
+      uris?: string[];
+      offset?: { position: number } | { uri: string };
+    }) => spotifyApi.play(params.deviceId, params.contextUri, params.uris, params.offset),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["playbackState"] });
+      qc.invalidateQueries({ queryKey: ["currentlyPlaying"] });
+    },
     retry: 1,
   });
 };
@@ -167,9 +174,6 @@ export const useTransferPlaybackMutation = () => {
   });
 };
 
-// ── Nuove mutation: Playlist & Like ──────────────────────────────────────────
-
-/** Crea una playlist Spotify e opzionalmente aggiunge tracce */
 export const useCreatePlaylistMutation = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -184,7 +188,6 @@ export const useCreatePlaylistMutation = () => {
   });
 };
 
-/** Aggiunge tracce a una playlist esistente */
 export const useAddTracksToPlaylistMutation = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -194,13 +197,11 @@ export const useAddTracksToPlaylistMutation = () => {
   });
 };
 
-/** Cerca una traccia su Spotify per titolo + artista */
 export const useSearchTrackMutation = () => useMutation({
   mutationFn: ({ title, artist }: { title: string; artist: string }) =>
     spotifyApi.searchTrackByTitleArtist(title, artist),
 });
 
-/** Like / Unlike traccia */
 export const useLikeTrackMutation = () => {
   const qc = useQueryClient();
   return useMutation({

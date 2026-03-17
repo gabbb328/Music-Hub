@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from "react";
-import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
-import { Play, Music, GripVertical, ChevronUp, ChevronDown, X, ListMusic } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { motion, Reorder, useDragControls } from "framer-motion";
+import { Play, Music, GripVertical, ChevronUp, ChevronDown, X, ListMusic, Loader2 } from "lucide-react";
 import { Track, formatTime } from "@/lib/mock-data";
-import { useQueue, usePlayMutation, useAddToQueueMutation } from "@/hooks/useSpotify";
+import { useQueue, usePlayMutation } from "@/hooks/useSpotify";
 import { SpotifyTrack } from "@/types/spotify";
 
 interface QueueContentProps {
@@ -11,128 +11,109 @@ interface QueueContentProps {
   onPlayTrack: (track: Track) => void;
 }
 
-const convertSpotifyTrack = (t: SpotifyTrack): Track => ({
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const img    = (t: any) => t?.album?.images?.[0]?.url || t?.cover || "";
+const name   = (t: any) => t?.name || t?.title || "Unknown";
+const artist = (t: any) => t?.artists?.[0]?.name || t?.artist || "";
+const dur    = (t: any) => Math.floor((t?.duration_ms ?? (t?.duration ?? 0) * 1000) / 1000);
+
+const toLocalTrack = (t: SpotifyTrack): Track => ({
   id: t.id,
   title: t.name,
   artist: t.artists[0]?.name || "Unknown Artist",
   album: t.album.name,
   cover: t.album.images[0]?.url || "",
   duration: Math.floor(t.duration_ms / 1000),
-  bpm: undefined,
 });
 
-const getTrackImg  = (t: any) => t?.album?.images?.[0]?.url || t?.cover || "";
-const getTrackName = (t: any) => t?.name || t?.title || "Unknown";
-const getTrackArtist = (t: any) => t?.artists?.[0]?.name || t?.artist || "";
-const getTrackDur  = (t: any) => Math.floor((t?.duration_ms || (t?.duration ?? 0) * 1000) / 1000);
-
-// ─── Riga coda riordinabile ───────────────────────────────────────────────────
+// ─── QueueItem ────────────────────────────────────────────────────────────────
 function QueueItem({
-  track,
-  index,
-  total,
-  isActive,
-  onPlay,
-  onMoveUp,
-  onMoveDown,
-  onRemove,
+  track, index, total,
+  onPlay, onMoveUp, onMoveDown, onRemove,
 }: {
-  track: any;
-  index: number;
-  total: number;
-  isActive?: boolean;
-  onPlay: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onRemove: () => void;
+  track: any; index: number; total: number;
+  onPlay: () => void; onMoveUp: () => void;
+  onMoveDown: () => void; onRemove: () => void;
 }) {
-  const dragControls = useDragControls();
-  const [showActions, setShowActions] = useState(false);
+  const controls = useDragControls();
 
   return (
     <Reorder.Item
       value={track}
       dragListener={false}
-      dragControls={dragControls}
+      dragControls={controls}
       as="div"
-      className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors select-none
-        ${isActive ? "bg-primary/10 border border-primary/20" : "hover:bg-secondary/40"}`}
+      whileDrag={{ scale: 1.02, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", zIndex: 50 }}
+      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-secondary/40 select-none bg-transparent"
     >
-      {/* Numero / drag handle */}
-      <div className="flex items-center w-8 shrink-0">
-        {/* Desktop: numero che diventa handle on hover */}
-        <span className="text-sm text-muted-foreground font-medium group-hover:hidden">{index + 1}</span>
-        <button
-          className="hidden group-hover:flex touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-          onPointerDown={e => { e.preventDefault(); dragControls.start(e); }}
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-        {/* Mobile: handle sempre visibile */}
-        <button
-          className="md:hidden touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60"
-          onPointerDown={e => { e.preventDefault(); dragControls.start(e); }}
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-      </div>
+      {/* Handle drag — SEMPRE visibile, colore diverso su mobile */}
+      <button
+        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 p-1 -ml-1"
+        onPointerDown={e => { e.preventDefault(); e.stopPropagation(); controls.start(e); }}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      {/* Numero posizione */}
+      <span className="text-sm text-muted-foreground font-medium w-5 shrink-0 text-center tabular-nums">
+        {index + 1}
+      </span>
 
       {/* Cover */}
-      <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
-        {getTrackImg(track) && (
-          <img src={getTrackImg(track)} alt="" className="object-cover w-full h-full" />
-        )}
+      <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+        {img(track) && <img src={img(track)} alt="" className="object-cover w-full h-full" />}
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className={`font-medium text-sm truncate ${isActive ? "text-primary" : ""}`}>
-          {getTrackName(track)}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">{getTrackArtist(track)}</p>
+        <p className="font-medium text-sm truncate">{name(track)}</p>
+        <p className="text-xs text-muted-foreground truncate">{artist(track)}</p>
       </div>
 
       {/* Durata */}
-      <span className="text-xs text-muted-foreground tabular-nums shrink-0 hidden sm:block">
-        {formatTime(getTrackDur(track))}
+      <span className="text-xs text-muted-foreground tabular-nums hidden sm:block shrink-0">
+        {formatTime(dur(track))}
       </span>
 
-      {/* Azioni */}
+      {/* Azioni — su/giù sempre visibili, play/x on-hover */}
       <div className="flex items-center gap-0.5 shrink-0">
-        {/* Su / Giù — sempre visibili su mobile, on-hover su desktop */}
-        <div className="flex flex-col md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+
+        {/* ↑↓ sempre visibili */}
+        <div className="flex flex-col">
           <button
-            onClick={onMoveUp}
+            onClick={e => { e.stopPropagation(); onMoveUp(); }}
             disabled={index === 0}
-            className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none"
             title="Sposta su"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onMoveDown}
-            disabled={index === total - 1}
-            className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+            onClick={e => { e.stopPropagation(); onMoveDown(); }}
+            disabled={index >= total - 1}
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none"
             title="Sposta giù"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Play */}
+        {/* Play — on hover */}
         <button
-          onClick={onPlay}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+          onClick={e => { e.stopPropagation(); onPlay(); }}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60
+                     opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
           title="Riproduci"
         >
-          <Play className="w-3.5 h-3.5" />
+          <Play className="w-3.5 h-3.5 fill-current" />
         </button>
 
-        {/* Rimuovi */}
+        {/* Rimuovi — on hover */}
         <button
-          onClick={onRemove}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Rimuovi dalla coda"
+          onClick={e => { e.stopPropagation(); onRemove(); }}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10
+                     opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Rimuovi"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -141,166 +122,168 @@ function QueueItem({
   );
 }
 
-// ─── Componente principale ────────────────────────────────────────────────────
-const QueueContent = ({ queue: localQueue, currentTrack: localCurrentTrack, onPlayTrack }: QueueContentProps) => {
+// ─── QueueContent ─────────────────────────────────────────────────────────────
+const QueueContent = ({ queue: localQueue, currentTrack: localCurrent, onPlayTrack }: QueueContentProps) => {
   const { data: queueData, isLoading } = useQueue();
   const playMutation = usePlayMutation();
 
-  const currentTrack  = queueData?.currently_playing || localCurrentTrack;
-  const spotifyQueue  = queueData?.queue as any[] | undefined;
+  const spotifyCurrent = queueData?.currently_playing;
+  const spotifyItems   = queueData?.queue as any[] | undefined;
 
-  // Coda locale modificabile (copia iniziale dalla coda Spotify o locale)
-  const [localItems, setLocalItems] = useState<any[]>(() =>
-    spotifyQueue ?? localQueue
-  );
+  const currentTrack = spotifyCurrent || localCurrent;
 
-  // Aggiorna se arriva nuova coda da Spotify (solo se non ha ancora dati)
-  const initializedRef = useRef(false);
-  if (!initializedRef.current && spotifyQueue && spotifyQueue.length > 0) {
-    initializedRef.current = true;
-    // Non chiamiamo setLocalItems qui — usiamo un useEffect
-  }
+  // ── Unica sorgente di verità per la coda ──────────────────────────────────
+  // Inizializzata con i dati locali; sostituita con Spotify appena disponibile
+  const [items, setItems] = useState<any[]>(localQueue);
 
+  useEffect(() => {
+    if (spotifyItems && spotifyItems.length > 0) {
+      setItems(spotifyItems);
+    }
+  }, [spotifyItems]);
+
+  // Se la coda locale cambia e Spotify non è ancora disponibile
+  useEffect(() => {
+    if (!spotifyItems || spotifyItems.length === 0) {
+      setItems(localQueue);
+    }
+  }, [localQueue, spotifyItems]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handlePlay = useCallback((track: any) => {
+    // Prova a riprodurre via Spotify se ha uri
     if (track?.uri) {
       playMutation.mutate({ uris: [track.uri] });
-      onPlayTrack(convertSpotifyTrack(track));
-    } else if (track?.id) {
-      onPlayTrack(track as Track);
+    }
+    // Aggiorna sempre il player locale
+    if (track?.id) {
+      onPlayTrack(toLocalTrack(track as SpotifyTrack));
     }
   }, [playMutation, onPlayTrack]);
 
-  const moveItem = useCallback((fromIndex: number, direction: "up" | "down") => {
-    setLocalItems(prev => {
-      const arr  = [...prev];
-      const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
-      if (toIndex < 0 || toIndex >= arr.length) return arr;
-      [arr[fromIndex], arr[toIndex]] = [arr[toIndex], arr[fromIndex]];
-      return arr;
+  const moveUp = useCallback((index: number) => {
+    if (index <= 0) return;
+    setItems(prev => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
     });
   }, []);
 
-  const removeItem = useCallback((index: number) => {
-    setLocalItems(prev => prev.filter((_, i) => i !== index));
+  const moveDown = useCallback((index: number) => {
+    setItems(prev => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
   }, []);
 
-  // Usa la coda Spotify appena disponibile per inizializzare
-  const items = (spotifyQueue && spotifyQueue.length > 0 && !initializedRef.current)
-    ? spotifyQueue
-    : localItems.length > 0
-      ? localItems
-      : spotifyQueue ?? [];
+  const remove = useCallback((index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-  // Sincronizza con Spotify se arriva per la prima volta
-  if (spotifyQueue && spotifyQueue.length > 0 && !initializedRef.current) {
-    initializedRef.current = true;
-    Promise.resolve().then(() => setLocalItems(spotifyQueue));
-  }
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
 
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-6 pt-6 pb-4 shrink-0">
-        <ListMusic className="w-6 h-6 text-primary" />
+      {/* Header */}
+      <div className="flex items-center gap-3 px-6 pt-6 pb-4 shrink-0 border-b border-border/30">
+        <ListMusic className="w-5 h-5 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Coda</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Queue</h1>
           <p className="text-sm text-muted-foreground">
-            {isLoading ? "Caricamento…" : `${localItems.length} brani in coda`}
+            {isLoading ? "Loading…" : `${items.length} brani in coda`}
           </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 pb-6">
 
-        {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
-                <div className="w-8 h-8 bg-muted rounded-lg" />
-                <div className="w-10 h-10 bg-muted rounded-lg" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3.5 bg-muted rounded w-1/2" />
-                  <div className="h-3 bg-muted rounded w-1/3" />
-                </div>
-              </div>
-            ))}
+        {isLoading && items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Caricamento coda…</p>
           </div>
         ) : (
-          <>
-            {/* ── Now Playing ── */}
+          <div className="space-y-4 pt-4">
+
+            {/* Now Playing */}
             {currentTrack && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2 px-1">
+              <section>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2 px-2">
                   In riproduzione
                 </p>
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/8 border border-primary/15">
-                  <div className="w-8 shrink-0 flex items-center justify-center">
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                    </motion.div>
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                  style={{ background: "rgba(var(--primary-rgb, 99 102 241) / 0.08)", border: "1px solid rgba(var(--primary-rgb, 99 102 241) / 0.18)" }}>
+                  {/* Indicatore pulsante */}
+                  <div className="w-6 shrink-0 flex items-center justify-center">
+                    <motion.div className="w-2.5 h-2.5 rounded-full bg-primary"
+                      animate={{ scale: [1, 1.35, 1], opacity: [1, 0.6, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
                   </div>
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
-                    {getTrackImg(currentTrack) && (
-                      <img src={getTrackImg(currentTrack)} alt="" className="object-cover w-full h-full" />
-                    )}
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                    {img(currentTrack) && <img src={img(currentTrack)} alt="" className="object-cover w-full h-full" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate text-primary">{getTrackName(currentTrack)}</p>
-                    <p className="text-xs text-muted-foreground truncate">{getTrackArtist(currentTrack)}</p>
+                    <p className="font-semibold text-sm truncate text-primary">{name(currentTrack)}</p>
+                    <p className="text-xs text-muted-foreground truncate">{artist(currentTrack)}</p>
                   </div>
                   <span className="text-xs text-muted-foreground tabular-nums hidden sm:block">
-                    {formatTime(getTrackDur(currentTrack))}
+                    {formatTime(dur(currentTrack))}
                   </span>
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* ── Next in Queue ── */}
-            <div>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                  Prossimi brani
+            {/* Next */}
+            <section>
+              <div className="flex items-center justify-between mb-2 px-2">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                  Prossimi ({items.length})
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Trascina ⠿ o usa ↑↓ per riordinare
+                <p className="text-[10px] text-muted-foreground/50 hidden sm:block">
+                  ⠿ trascina · ↑↓ riordina
                 </p>
               </div>
 
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Music className="w-14 h-14 text-muted-foreground/25 mb-4" />
-                  <h3 className="font-semibold mb-1">Coda vuota</h3>
-                  <p className="text-sm text-muted-foreground">Aggiungi brani per vederli qui</p>
+                  <Music className="w-14 h-14 text-muted-foreground/20 mb-3" />
+                  <p className="font-semibold text-sm mb-1">Coda vuota</p>
+                  <p className="text-xs text-muted-foreground">Aggiungi brani per vederli qui</p>
                 </div>
               ) : (
+                /*
+                  CHIAVE DEL FIX:
+                  - Reorder.Group riceve SEMPRE `items` (la state locale)
+                  - onReorder aggiorna SOLO setItems — nessuna logica ibrida
+                  - La key di ogni item è univoca e stabile: track.id (non index-dipendente)
+                  - Per tracce duplicate aggiungiamo l'indice solo come fallback
+                */
                 <Reorder.Group
                   axis="y"
                   values={items}
-                  onReorder={setLocalItems}
+                  onReorder={setItems}
                   className="space-y-1"
+                  as="div"
                 >
-                  <AnimatePresence initial={false}>
-                    {items.map((track, index) => (
-                      <QueueItem
-                        key={track.id + "-" + index}
-                        track={track}
-                        index={index}
-                        total={items.length}
-                        onPlay={() => handlePlay(track)}
-                        onMoveUp={() => moveItem(index, "up")}
-                        onMoveDown={() => moveItem(index, "down")}
-                        onRemove={() => removeItem(index)}
-                      />
-                    ))}
-                  </AnimatePresence>
+                  {items.map((track, index) => (
+                    <QueueItem
+                      key={`${track.id ?? track.title}-${index}`}
+                      track={track}
+                      index={index}
+                      total={items.length}
+                      onPlay={() => handlePlay(track)}
+                      onMoveUp={() => moveUp(index)}
+                      onMoveDown={() => moveDown(index)}
+                      onRemove={() => remove(index)}
+                    />
+                  ))}
                 </Reorder.Group>
               )}
-            </div>
-          </>
+            </section>
+          </div>
         )}
       </div>
     </div>
