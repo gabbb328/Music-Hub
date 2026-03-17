@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => ({
   base: mode === "production" ? "./" : "/",
@@ -34,7 +35,33 @@ export default defineConfig(({ mode }) => ({
     },
   },
 
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      manifest: {
+        name: 'Harmony Hub',
+        short_name: 'Harmony',
+        description: 'Your Harmony Hub Application',
+        theme_color: '#ffffff',
+        icons: [
+          {
+            src: 'icons/app_blu_scuro.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'icons/app_blu_scuro.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ]
+      }
+    })
+  ].filter(Boolean),
 
   resolve: {
     alias: {
