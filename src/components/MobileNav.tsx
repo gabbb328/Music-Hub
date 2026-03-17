@@ -1,4 +1,4 @@
-import { Home, Search, Library, Sparkles, MoreHorizontal } from "lucide-react";
+import { Home, Search, Library, Sparkles, Layers, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface MobileNavProps {
@@ -8,11 +8,11 @@ interface MobileNavProps {
 }
 
 const navItems = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "search", label: "Search", icon: Search },
-  { id: "library", label: "Library", icon: Library },
-  { id: "ai-dj", label: "AI DJ", icon: Sparkles },
-  { id: "more", label: "More", icon: MoreHorizontal },
+  { id: "home",          label: "Home",    icon: Home },
+  { id: "search",        label: "Search",  icon: Search },
+  { id: "library",       label: "Library", icon: Library },
+  { id: "neural-mixer",  label: "Mixer",   icon: Layers },
+  { id: "more",          label: "More",    icon: MoreHorizontal },
 ];
 
 export default function MobileNav({
@@ -21,18 +21,18 @@ export default function MobileNav({
   onOpenSettings
 }: MobileNavProps) {
   return (
-    <nav className="md:hidden w-full flex-shrink-0 z-40 bg-background/80 backdrop-blur-lg border-t border-border pb-safe">
-      <div className="flex justify-around items-center h-16 px-4">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex justify-around items-center h-14 px-2">
         {navItems.map((item) => {
           const isActive = activeSection === item.id;
           const Icon = item.icon;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSectionChange(item.id)}
-                className="relative flex flex-col items-center justify-center w-full h-full gap-1 text-xs font-medium"
-              >
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSectionChange(item.id)}
+              className="relative flex flex-col items-center justify-center w-full h-full gap-1 text-xs font-medium"
+            >
               {isActive && (
                 <motion.div
                   layoutId="mobile-nav-active"

@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sun, Moon, Palette, Music, Sparkles } from "lucide-react";
+import { X, Sun, Moon, Palette, Music, Sparkles, LogOut } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { clearToken } from "@/services/spotify-auth";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePlaybackState } from "@/hooks/useSpotify";
 import { 
@@ -53,6 +55,13 @@ const iconsList = [
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { theme, colorTheme, setTheme, setColorTheme, autoDarkMode, setAutoDarkMode, activeAppIcon, setActiveAppIcon } = useTheme();
   const { data: playbackState } = usePlaybackState();
+  const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    clearToken();
+    navigate('/login');
+    onClose();
+  };
   
   const currentTrackImage = playbackState?.item?.album?.images?.[0]?.url;
   const currentTrackName = playbackState?.item?.name;
@@ -295,7 +304,15 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               </div>
             </div>
 
-            <div className="p-6 border-t border-border">
+            <div className="p-6 border-t border-border space-y-4">
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+                className="w-full gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout from Spotify
+              </Button>
               <p className="text-sm text-muted-foreground text-center">
                 Changes are saved automatically
               </p>
