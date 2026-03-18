@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
@@ -203,6 +203,8 @@ const Index = () => {
   };
 
   useMediaSession(currentTrack, isPlaying, mediaActions);
+  
+  const handleDismissEgg = useCallback(() => setActiveEgg(null), []);
 
   // ── Attiva/disattiva Super Mode ────────────────────────────────────────────
   const activateSuperMode = () => {
@@ -316,7 +318,7 @@ const Index = () => {
 
         {/* Easter egg sfondo + lista */}
         <AnimatePresence>
-          {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={() => setActiveEgg(null)} />}
+          {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />}
         </AnimatePresence>
         <AnimatePresence>
           {showEggList && (
@@ -351,21 +353,25 @@ const Index = () => {
           </main>
         </div>
 
-        <div className="md:relative md:z-auto fixed bottom-14 left-0 right-0 z-40 md:static">
-          <PlayerBar
-            {...player}
-            onExpandClick={() => setShowNowPlaying(true)}
-            onNavigate={setActiveSection}
-            onOpenEggList={() => setShowEggList(true)}
-            superMode={superMode}
-          />
+        {/* PlayerBar e MobileNav accorpati per evitare gap su mobile */}
+        <div className="md:contents fixed bottom-0 left-0 right-0 z-40 flex flex-col pointer-events-none">
+          <div className="md:relative md:z-auto md:static pointer-events-auto">
+            <PlayerBar
+              {...player}
+              onExpandClick={() => setShowNowPlaying(true)}
+              onNavigate={setActiveSection}
+              onOpenEggList={() => setShowEggList(true)}
+              superMode={superMode}
+            />
+          </div>
+          <div className="pointer-events-auto">
+            <MobileNav
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              onOpenSettings={() => setShowSettings(true)}
+            />
+          </div>
         </div>
-
-        <MobileNav
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onOpenSettings={() => setShowSettings(true)}
-        />
 
         <AnimatePresence>
           {showNowPlaying && (

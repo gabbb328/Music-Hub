@@ -5,6 +5,7 @@ import {
   Disc3, Cat, Sparkles, X, ChevronRight, Code2, HeartHandshake, Rainbow
 } from "lucide-react";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
+import { SPRING_NAV, TWEEN_PAGE, PAGE_VARIANTS, FADE_SCALE_VARIANTS } from "@/lib/animations";
 
 interface Props {
   egg: EasterEggType;
@@ -325,7 +326,9 @@ export function EasterEggList({ onClose, onActivate }: {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function EasterEggOverlay({ egg, onDismiss }: Props) {
+  const [countdown, setCountdown] = useState(15);
   const didSound = useRef(false);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (egg === "duh" && !didSound.current) { didSound.current = true; playDuh(); }
@@ -334,15 +337,32 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
 
   useEffect(() => {
     if (!egg) return;
-    const ms =
-      SFONDO_EGGS.includes(egg)                       ? 15000 :
-      ["party","hack","love","music"].includes(egg)   ? 5000  :
-      // hack ha la sua durata naturale (script ~7s) + margine
-      egg === "hack"                                  ? 9000  :
-      null;
+    
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+
+    const isSfondo = SFONDO_EGGS.includes(egg);
+    const ms = isSfondo ? 15000 : ["party", "love", "music"].includes(egg) ? 5000 : null;
+    
     if (ms === null) return;
-    const t = setTimeout(() => onDismiss?.(), ms);
-    return () => clearTimeout(t);
+    
+    const initialSeconds = Math.floor(ms / 1000);
+    setCountdown(initialSeconds);
+
+    const startTime = Date.now();
+    countdownIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, initialSeconds - elapsed);
+      setCountdown(remaining);
+      
+      if (remaining <= 0) {
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        onDismiss?.();
+      }
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
   }, [egg, onDismiss]);
 
   if (!egg) return null;
@@ -352,8 +372,9 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
     return (
       <AnimatePresence>
         <motion.div key={`bg-${egg}`}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
+          variants={FADE_SCALE_VARIANTS}
+          initial="hidden" animate="visible" exit="exit"
+          transition={TWEEN_PAGE}
           className="fixed inset-0 pointer-events-none"
           style={{ zIndex: 5 }}>
 
@@ -434,16 +455,18 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
 
         {/* Pulsante chiudi sfondo */}
         <motion.div key={`close-${egg}`}
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-          transition={{ delay: 0.7 }}
+          variants={PAGE_VARIANTS}
+          initial="hidden" animate="visible" exit="exit"
+          transition={{ ...SPRING_NAV, delay: 0.5 }}
           className="fixed flex flex-col items-end gap-1.5"
           style={{ zIndex: 49, pointerEvents: "auto", bottom: "5.5rem", right: "1rem" }}>
-          <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
-            <motion.div className="h-1 rounded-full bg-white/60"
+          <div key={egg} className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
+            <motion.div 
+              key={`bar-${egg}`}
+              className="h-1 rounded-full bg-white/60"
               initial={{ width: 52 }} animate={{ width: 0 }}
-              transition={{ duration: 15, ease: "linear" }} />
-            <span className="text-white/60 text-[10px] font-mono whitespace-nowrap">15s</span>
+              transition={{ duration: SFONDO_EGGS.includes(egg) ? 15 : 5, ease: "linear" }} />
+            <span className="text-white/60 text-[10px] font-mono whitespace-nowrap">{countdown}s</span>
           </div>
           <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
             className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/90 px-3 py-1.5 rounded-full text-xs font-medium transition-colors">
@@ -456,13 +479,18 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
 
   // ── OVERLAY (z alto, copre tutto) ─────────────────────────────────────────
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <motion.div 
+      variants={FADE_SCALE_VARIANTS}
+      initial="hidden" animate="visible" exit="exit"
+      transition={SPRING_NAV}
       className="fixed inset-0 z-[9990]" onClick={onDismiss}>
       {children}
-      <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
+      <motion.button 
+        variants={PAGE_VARIANTS}
+        onClick={e => { e.stopPropagation(); onDismiss?.(); }}
         className="fixed top-4 right-4 z-[10000] w-11 h-11 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors">
         <X className="w-5 h-5" />
-      </button>
+      </motion.button>
     </motion.div>
   );
 
@@ -520,20 +548,12 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
     </Wrapper></AnimatePresence>
   );
 
-  // HACK — terminale narrativo completo
   if (egg === "hack") return (
-    <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9990]">
+    <AnimatePresence><Wrapper>
+      <div className="fixed inset-0 z-[9991]">
         <HackTerminal />
-        {/* X in alto a destra */}
-        <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
-          className="fixed top-12 right-4 z-[10000] w-11 h-11 rounded-full flex items-center justify-center text-green-400 hover:text-white hover:bg-white/10 transition-colors"
-          style={{ border: "1px solid rgba(0,255,65,0.3)" }}>
-          <X className="w-5 h-5" />
-        </button>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </Wrapper></AnimatePresence>
   );
 
   // LOVE
