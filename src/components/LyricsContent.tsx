@@ -247,7 +247,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   - text-center centra il testo dentro ogni riga
                   - mx-auto centra il blocco
                 */}
-                <div className="mx-auto w-full max-w-2xl px-4 space-y-1">
+                <div className="mx-auto w-full max-w-2xl px-4 md:px-8 space-y-1 flex flex-col items-center">
                   {lyrics.map((line, index) => {
                     const isCurrent = index === currentLineIndex;
                     const isPast    = index < currentLineIndex;
@@ -262,7 +262,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                         ref={el => { lineRefs.current[index] = el; }}
                         onClick={() => isSynced && handleLineClick(line)}
                         className={`
-                          px-4 py-3 rounded-2xl transition-all duration-300 text-center
+                          w-full px-4 py-3 rounded-2xl transition-all duration-300 text-center
                           ${isSynced ? "cursor-pointer hover:bg-secondary/40 active:scale-[0.98]" : "cursor-default"}
                           ${isCurrent ? "bg-primary/10" : ""}
                         `}

@@ -4,7 +4,7 @@ import {
   SlidersHorizontal, Zap, Music2, RotateCcw, Power,
   ChevronDown, Waves, Activity, Volume2, VolumeX, Gauge,
   Minus, TrendingUp, TrendingDown, Mic, Music, Radio, Headphones,
-  Coffee, Sparkles, Guitar, ArrowUp, ArrowDown, Target,
+  Coffee, Sparkles, Guitar, ArrowUp, ArrowDown, Target, Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import { usePlaybackState } from "@/hooks/useSpotify";
@@ -52,10 +52,15 @@ const BAND_COLORS = [
   "#22c55e","#14b8a6","#06b6d4","#3b82f6","#8b5cf6"
 ];
 
-// ── Audio Engine — si aggancia all'elemento audio del Spotify SDK ──────────────
-// Il Spotify Web Playback SDK crea internamente un HTMLAudioElement.
-// Usiamo createMediaElementSource per agganciare la Web Audio API direttamente
-// senza mic, senza screen capture, senza nessun permesso aggiuntivo.
+// ── Rileva mobile / PWA ───────────────────────────────────────────────────────
+const IS_MOBILE =
+  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /MacIntel/.test(navigator.platform));
+
+// ── Audio Engine (solo desktop) ───────────────────────────────────────────────
+// Agganciato direttamente all'<audio> del Spotify Web Playback SDK tramite
+// createMediaElementSource — nessun microfono, nessun permesso richiesto.
+// Il Web Playback SDK non è supportato su mobile browser / PWA.
 class AudioEngine {
   ctx: AudioContext | null = null;
   source: MediaElementAudioSourceNode | null = null;
@@ -64,52 +69,39 @@ class AudioEngine {
   preGain: GainNode | null = null;
   compressor: DynamicsCompressorNode | null = null;
   gainNode: GainNode | null = null;
-  audioEl: HTMLAudioElement | null = null;
 
-  // Cerca l'elemento audio creato dal Spotify SDK nel DOM
-  private findSpotifyAudioElement(): HTMLAudioElement | null {
-    // Il SDK Spotify inietta un <audio> nel body
+  private findAudioElement(): HTMLAudioElement | null {
     const all = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
-    // Prendi quello con src spotify o quello in riproduzione
     return (
-      all.find(a => a.src?.includes("spotify") || (!a.paused && a.duration > 0)) ||
-      all[0] ||
-      null
+      all.find(a => !a.paused && a.duration > 0) ||
+      all.find(a => a.src?.includes("spotify")) ||
+      all[0] || null
     );
   }
 
   async init(): Promise<"ok" | "no_audio"> {
     if (this.ctx) return "ok";
+    const el = this.findAudioElement();
+    if (!el) return "no_audio";
 
-    const audioEl = this.findSpotifyAudioElement();
-    if (!audioEl) return "no_audio";
-
-    this.audioEl = audioEl;
     this.ctx = new AudioContext({ sampleRate: 44100 });
-
-    // Aggancia l'elemento audio esistente — nessun permesso necessario
     try {
-      this.source = this.ctx.createMediaElementSource(audioEl);
+      this.source = this.ctx.createMediaElementSource(el);
     } catch {
-      // Se l'elemento è già agganciato (es. doppio init), chiudi e riprova
-      await this.ctx.close();
-      this.ctx = null;
+      await this.ctx.close(); this.ctx = null;
       return "no_audio";
     }
 
     this.preGain = this.ctx.createGain();
-    this.preGain.gain.value = 1.0;
+    this.preGain.gain.value = 1;
 
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.8;
 
-    this.filters = EQ_BANDS.map(band => {
+    this.filters = EQ_BANDS.map(b => {
       const f = this.ctx!.createBiquadFilter();
-      f.type = band.type;
-      f.frequency.value = band.freq;
-      f.Q.value = 1.4;
-      f.gain.value = 0;
+      f.type = b.type; f.frequency.value = b.freq; f.Q.value = 1.4; f.gain.value = 0;
       return f;
     });
 
@@ -121,9 +113,8 @@ class AudioEngine {
     this.compressor.release.value = 0.25;
 
     this.gainNode = this.ctx.createGain();
-    this.gainNode.gain.value = 1.0;
+    this.gainNode.gain.value = 1;
 
-    // source → preGain → filters → analyser → compressor → gainNode → speakers
     this.source.connect(this.preGain);
     let prev: AudioNode = this.preGain;
     for (const f of this.filters) { prev.connect(f); prev = f; }
@@ -132,9 +123,7 @@ class AudioEngine {
     this.compressor.connect(this.gainNode);
     this.gainNode.connect(this.ctx.destination);
 
-    // Risveglia il context se sospeso (autoplay policy)
     if (this.ctx.state === "suspended") await this.ctx.resume();
-
     return "ok";
   }
 
@@ -158,31 +147,18 @@ class AudioEngine {
   getSpectrum(): Uint8Array {
     if (!this.analyser) return new Uint8Array(0);
     const d = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(d);
-    return d;
+    this.analyser.getByteFrequencyData(d); return d;
   }
   getWaveform(): Uint8Array {
     if (!this.analyser) return new Uint8Array(0);
     const d = new Uint8Array(this.analyser.fftSize);
-    this.analyser.getByteTimeDomainData(d);
-    return d;
+    this.analyser.getByteTimeDomainData(d); return d;
   }
   destroy() {
-    // Stacca il source dal contesto ma riconnetti l'audio direttamente
-    // così Spotify continua a suonare anche dopo aver disattivato l'EQ
     if (this.source && this.ctx) {
-      try {
-        this.source.connect(this.ctx.destination);
-      } catch {}
+      try { this.source.connect(this.ctx.destination); } catch {}
     }
-    this.ctx?.close();
-    this.ctx = null;
-    this.source = null;
-    this.filters = [];
-    this.analyser = null;
-    this.preGain = null;
-    this.compressor = null;
-    this.gainNode = null;
+    this.ctx?.close(); this.ctx = null;
   }
 }
 
@@ -190,19 +166,19 @@ let engine: AudioEngine | null = null;
 
 // ══════════════════════════════════════════════════════════════════════════════
 export default function EqualizerContent() {
-  const [gains, setGains]                   = useState<number[]>(Array(10).fill(0));
-  const [preGain, setPreGain]               = useState(0);
-  const [outputGain, setOutputGain]         = useState(0);
-  const [compEnabled, setCompEnabled]       = useState(true);
-  const [compThreshold, setCompThreshold]   = useState(-12);
-  const [compRatio, setCompRatio]           = useState(4);
-  const [activePreset, setActivePreset]     = useState("flat");
-  const [isActive, setIsActive]             = useState(false);
-  const [showPresets, setShowPresets]       = useState(false);
-  const [viewMode, setViewMode]             = useState<"spectrum" | "waveform">("spectrum");
-  const [dragging, setDragging]             = useState<number | null>(null);
-  const [isInit, setIsInit]                 = useState(false);
-  const [statusMsg, setStatusMsg]           = useState("");
+  const [gains, setGains]                 = useState<number[]>(Array(10).fill(0));
+  const [preGain, setPreGain]             = useState(0);
+  const [outputGain, setOutputGain]       = useState(0);
+  const [compEnabled, setCompEnabled]     = useState(true);
+  const [compThreshold, setCompThreshold] = useState(-12);
+  const [compRatio, setCompRatio]         = useState(4);
+  const [activePreset, setActivePreset]   = useState("flat");
+  const [isActive, setIsActive]           = useState(false);
+  const [showPresets, setShowPresets]     = useState(false);
+  const [viewMode, setViewMode]           = useState<"spectrum"|"waveform">("spectrum");
+  const [dragging, setDragging]           = useState<number | null>(null);
+  const [isInit, setIsInit]               = useState(false);
+  const [statusMsg, setStatusMsg]         = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef   = useRef<number>(0);
@@ -213,46 +189,51 @@ export default function EqualizerContent() {
   // Cleanup all'unmount
   useEffect(() => {
     return () => {
-      engine?.destroy();
-      engine = null;
+      engine?.destroy(); engine = null;
       cancelAnimationFrame(animRef.current);
     };
   }, []);
 
-  // ── Attiva EQ ──────────────────────────────────────────────────────────────
+  // ── Attiva / disattiva ────────────────────────────────────────────────────
   const toggleActive = useCallback(async () => {
+    // Su mobile: salva solo le preferenze, non processa audio
+    if (IS_MOBILE) {
+      setIsActive(v => {
+        const next = !v;
+        toast({
+          title: next ? "✓ Preferenze salvate" : "EQ disattivato",
+          description: next ? "Impostazioni attive — il processing audio è disponibile su desktop" : undefined,
+        });
+        return next;
+      });
+      return;
+    }
+
+    // Desktop: aggancia Web Audio API al player Spotify
     if (isActive) {
-      engine?.destroy();
-      engine = null;
+      engine?.destroy(); engine = null;
       cancelAnimationFrame(animRef.current);
-      setIsActive(false);
-      setStatusMsg("");
+      setIsActive(false); setStatusMsg("");
       toast({ title: "Equalizzatore disattivato" });
       return;
     }
 
     setIsInit(true);
     setStatusMsg("Connessione al player…");
-
     try {
       engine = new AudioEngine();
       const result = await engine.init();
-
       if (result === "no_audio") {
         engine = null;
         setStatusMsg("Avvia una canzone su Spotify, poi premi di nuovo Attiva.");
         setIsInit(false);
         return;
       }
-
-      // Applica i valori correnti
       gains.forEach((g, i) => engine!.setGain(i, g));
       engine.setPreGain(Math.pow(10, preGain / 20));
       engine.setOutputGain(Math.pow(10, outputGain / 20));
       engine.setCompressor(compEnabled, compThreshold, compRatio);
-
-      setIsActive(true);
-      setStatusMsg("");
+      setIsActive(true); setStatusMsg("");
       toast({ title: "✓ Equalizzatore attivo", description: "EQ collegato al player Spotify" });
     } catch (err: any) {
       engine = null;
@@ -264,15 +245,12 @@ export default function EqualizerContent() {
 
   // ── Preset ────────────────────────────────────────────────────────────────
   const applyPreset = useCallback((key: string) => {
-    const p = PRESETS[key];
-    if (!p) return;
-    setGains([...p.gains]);
-    setActivePreset(key);
-    setShowPresets(false);
+    const p = PRESETS[key]; if (!p) return;
+    setGains([...p.gains]); setActivePreset(key); setShowPresets(false);
     p.gains.forEach((g, i) => engine?.setGain(i, g));
   }, []);
 
-  // ── Banda singola ─────────────────────────────────────────────────────────
+  // ── Banda ─────────────────────────────────────────────────────────────────
   const setBand = useCallback((i: number, v: number) => {
     const c = Math.max(-12, Math.min(12, v));
     setGains(g => { const n = [...g]; n[i] = c; return n; });
@@ -283,13 +261,9 @@ export default function EqualizerContent() {
   // ── Reset ─────────────────────────────────────────────────────────────────
   const resetAll = useCallback(() => {
     applyPreset("flat");
-    setPreGain(0);
-    setOutputGain(0);
-    setCompEnabled(true);
-    setCompThreshold(-12);
-    setCompRatio(4);
-    engine?.setPreGain(1);
-    engine?.setOutputGain(1);
+    setPreGain(0); setOutputGain(0);
+    setCompEnabled(true); setCompThreshold(-12); setCompRatio(4);
+    engine?.setPreGain(1); engine?.setOutputGain(1);
     engine?.setCompressor(true, -12, 4);
   }, [applyPreset]);
 
@@ -299,23 +273,18 @@ export default function EqualizerContent() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     const resize = () => {
       canvas.width  = canvas.offsetWidth  * devicePixelRatio;
       canvas.height = canvas.offsetHeight * devicePixelRatio;
     };
     resize();
     window.addEventListener("resize", resize);
-
     const draw = () => {
       animRef.current = requestAnimationFrame(draw);
       const W = canvas.width, H = canvas.height;
       ctx.clearRect(0, 0, W, H);
-
       if (!isActive || !engine) {
-        // Griglia idle
         ctx.strokeStyle = "rgba(255,255,255,0.04)";
-        ctx.lineWidth = 1;
         for (let i = 1; i < 6; i++) {
           const y = (H / 6) * i;
           ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
@@ -323,10 +292,12 @@ export default function EqualizerContent() {
         ctx.fillStyle = "rgba(255,255,255,0.1)";
         ctx.font = `${11 * devicePixelRatio}px system-ui`;
         ctx.textAlign = "center";
-        ctx.fillText("Attiva l'equalizzatore per vedere il segnale", W / 2, H / 2);
+        ctx.fillText(
+          IS_MOBILE ? "Visualizzatore disponibile su desktop" : "Attiva per vedere il segnale",
+          W / 2, H / 2
+        );
         return;
       }
-
       if (viewMode === "spectrum") {
         const data = engine.getSpectrum();
         const bars = Math.min(data.length / 2, 128);
@@ -353,16 +324,11 @@ export default function EqualizerContent() {
           const y = (data[i] / 255) * H;
           i === 0 ? ctx.moveTo(0, y) : ctx.lineTo(i * step, y);
         }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.stroke(); ctx.shadowBlur = 0;
       }
     };
-
     draw();
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      window.removeEventListener("resize", resize);
-    };
+    return () => { cancelAnimationFrame(animRef.current); window.removeEventListener("resize", resize); };
   }, [isActive, viewMode]);
 
   // ── Drag slider ───────────────────────────────────────────────────────────
@@ -427,19 +393,28 @@ export default function EqualizerContent() {
           </div>
         </div>
 
-        {/* Messaggi di stato */}
+        {/* Info box */}
         {!isActive && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="glass-surface rounded-xl p-4 flex items-start gap-3 border border-primary/20 bg-primary/5">
-            <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            className={`glass-surface rounded-xl p-4 flex items-start gap-3 border ${IS_MOBILE ? "border-amber-500/20 bg-amber-500/5" : "border-primary/20 bg-primary/5"}`}>
+            {IS_MOBILE
+              ? <Smartphone className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              : <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            }
             <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
-              {statusMsg
-                ? <p className="text-amber-400">{statusMsg}</p>
-                : <>
-                    <p>Premi <strong className="text-foreground">Attiva</strong> per collegare l'EQ direttamente al player Spotify.</p>
-                    <p className="text-xs opacity-70">Nessun microfono richiesto — l'audio viene processato internamente.</p>
-                  </>
-              }
+              {IS_MOBILE ? (
+                <>
+                  <p className="text-amber-400 font-medium">Modalità preferenze — su mobile</p>
+                  <p>Gli slider e i preset si salvano normalmente. Il processing audio in tempo reale non è disponibile su mobile (limitazione del browser) — funziona su desktop.</p>
+                </>
+              ) : statusMsg ? (
+                <p className="text-amber-400">{statusMsg}</p>
+              ) : (
+                <>
+                  <p>Premi <strong className="text-foreground">Attiva</strong> per collegare l'EQ direttamente al player Spotify.</p>
+                  <p className="text-xs opacity-70">Nessun microfono — l'audio viene processato internamente tramite Web Audio API.</p>
+                </>
+              )}
             </div>
           </motion.div>
         )}
@@ -451,7 +426,7 @@ export default function EqualizerContent() {
             <div className="flex gap-1">
               {([
                 { id: "spectrum" as const, icon: <Activity className="w-3.5 h-3.5" />, label: "Spettro" },
-                { id: "waveform" as const, icon: <Waves className="w-3.5 h-3.5" />,    label: "Forma d'onda" },
+                { id: "waveform" as const, icon: <Waves className="w-3.5 h-3.5" />,    label: "Onda" },
               ]).map(v => (
                 <button key={v.id} onClick={() => setViewMode(v.id)}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${viewMode === v.id ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
@@ -597,11 +572,9 @@ export default function EqualizerContent() {
               </span>
               <button
                 onClick={() => setCompEnabled(v => {
-                  const n = !v;
-                  engine?.setCompressor(n, compThreshold, compRatio);
-                  return n;
+                  const n = !v; engine?.setCompressor(n, compThreshold, compRatio); return n;
                 })}
-                className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${compEnabled ? "bg-primary" : "bg-secondary"}`}>
+                className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${compEnabled ? "bg-primary" : "bg-secondary"}`}>
                 <motion.div className="w-5 h-5 rounded-full bg-white shadow"
                   animate={{ x: compEnabled ? 20 : 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 25 }} />
