@@ -459,7 +459,7 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
           initial="hidden" animate="visible" exit="exit"
           transition={{ ...SPRING_NAV, delay: 0.5 }}
           className="fixed flex flex-col items-end gap-1.5"
-          style={{ zIndex: 49, pointerEvents: "auto", bottom: "5.5rem", right: "1rem" }}>
+          style={{ zIndex: 9999, pointerEvents: "auto", top: "5rem", right: "1rem", bottom: "auto" }}>
           <div key={egg} className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
             <motion.div 
               key={`bar-${egg}`}
@@ -469,7 +469,7 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
             <span className="text-white/60 text-[10px] font-mono whitespace-nowrap">{countdown}s</span>
           </div>
           <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
-            className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/90 px-3 py-1.5 rounded-full text-xs font-medium transition-colors">
+            className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/90 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-xl">
             <X className="w-3.5 h-3.5" /> Chiudi
           </button>
         </motion.div>

@@ -71,8 +71,9 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
     const exact = EXACT_KEYWORDS.includes(query.trim().toLowerCase());
     if (!exact) return;
     const t = setTimeout(() => {
-      onActivateEgg?.(detectedEgg);
+      setQuery(""); // Clear query BEFORE activating to prevent re-trigger
       setHintVisible(false);
+      onActivateEgg?.(detectedEgg);
     }, 1200);
     return () => clearTimeout(t);
   }, [detectedEgg, query, onActivateEgg]);
@@ -80,8 +81,9 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && detectedEgg) {
       e.preventDefault();
-      onActivateEgg?.(detectedEgg);
+      setQuery(""); // Clear query BEFORE activating to prevent re-trigger
       setHintVisible(false);
+      onActivateEgg?.(detectedEgg);
     }
   };
 
