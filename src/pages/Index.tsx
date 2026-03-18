@@ -354,7 +354,7 @@ const Index = () => {
         </div>
 
         {/* PlayerBar e MobileNav accorpati per evitare gap su mobile */}
-        <div className="md:contents fixed bottom-0 left-0 right-0 z-40 flex flex-col pointer-events-none">
+        <div className="md:contents fixed bottom-0 left-0 right-0 z-50 flex flex-col pointer-events-none bg-background/80 backdrop-blur-xl border-t border-border/40 md:bg-transparent md:backdrop-blur-none md:border-t-0">
           <div className="md:relative md:z-auto md:static pointer-events-auto">
             <PlayerBar
               {...player}

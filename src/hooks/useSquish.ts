@@ -63,7 +63,7 @@ export function useSquish(count: number, options: SquishOptions = {}) {
 
   /** Restituisce le props motion per l'elemento all'indice i */
   const getProps = useCallback(
-    (i: number): Pick<MotionProps, "animate" | "transition" | "onPointerDown" | "onPointerUp" | "onPointerLeave" | "onPointerCancel"> => ({
+    (i: number) => ({
       animate: {
         scale: getScale(i),
         y:     getY(i),
@@ -78,7 +78,7 @@ export function useSquish(count: number, options: SquishOptions = {}) {
       onPointerUp:     () => setPressedIndex(null),
       onPointerLeave:  () => setPressedIndex(null),
       onPointerCancel: () => setPressedIndex(null),
-    }),
+    } as const),
     [getScale, getY, spring]
   );
 
@@ -93,7 +93,7 @@ export function useSquish(count: number, options: SquishOptions = {}) {
 export function useSquishItem() {
   const [pressed, setPressed] = useState(false);
 
-  const pressProps: Pick<MotionProps, "onPointerDown" | "onPointerUp" | "onPointerLeave" | "onPointerCancel"> = {
+  const pressProps: any = {
     onPointerDown:   () => setPressed(true),
     onPointerUp:     () => setPressed(false),
     onPointerLeave:  () => setPressed(false),

@@ -30,13 +30,9 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50"
+      className="md:hidden relative z-50 bg-transparent"
       style={{
         paddingBottom: "env(safe-area-inset-bottom)",
-        background: "hsl(var(--background) / 0.88)",
-        backdropFilter: "blur(24px) saturate(180%)",
-        WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        borderTop: "1px solid hsl(var(--border) / 0.5)",
       }}
     >
       <div className="flex justify-around items-center h-14 px-1">

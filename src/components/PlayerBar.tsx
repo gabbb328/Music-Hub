@@ -214,7 +214,7 @@ export default function PlayerBar(props: PlayerProps) {
 
   return (
     <div
-      className="h-16 md:h-24 border-t flex items-center px-2 md:px-4 gap-2 md:gap-4 z-50 shrink-0 transition-all duration-500"
+      className="h-16 md:h-24 border-transparent md:border-t flex items-center px-2 md:px-4 gap-2 md:gap-4 z-50 shrink-0 transition-all duration-500"
       style={playerBarStyle}
     >
       {/* ── Cover + titolo ──────────────────────────────────────────────────── */}
