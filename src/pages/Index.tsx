@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
@@ -31,19 +31,143 @@ import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
 import { useMediaSession } from "@/hooks/useMediaSession";
 import {
-  usePlaybackState,
-  usePlayMutation,
-  usePauseMutation,
-  useNextMutation,
-  usePreviousMutation,
-  useSeekMutation
+  usePlaybackState, usePlayMutation, usePauseMutation,
+  useNextMutation, usePreviousMutation, useSeekMutation,
 } from "@/hooks/useSpotify";
+import EasterEggOverlay, { EasterEggList } from "@/components/EasterEggOverlay";
+import type { EasterEggType } from "@/hooks/useEasterEgg";
+import { Crown, Zap } from "lucide-react";
 
+// ── Konami sequence: ↑↑↓↓←→←→BA ─────────────────────────────────────────────
+const KONAMI_KEYS = [
+  "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
+  "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
+  "b","a",
+];
+// Sequenza mobile (swipe): ↑↑↓↓←→←→
+const KONAMI_SWIPES = [
+  "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
+  "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
+];
+
+// ── Super Mode Overlay ────────────────────────────────────────────────────────
+function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => void }) {
+  const [remaining, setRemaining] = useState(20);
+
+  useEffect(() => {
+    if (!active) { setRemaining(20); return; }
+    setRemaining(20);
+    const t = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) { clearInterval(t); onEnd(); return 0; }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [active]); // eslint-disable-line
+
+  if (!active) return null;
+
+  return (
+    <>
+      {/* Sfondo dorato — z:5, pointer-events none, sotto tutto */}
+      <motion.div
+        key="super-bg"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 5 }}
+      >
+        {/* Radiale animato */}
+        <motion.div
+          className="absolute inset-0"
+          animate={{
+            background: [
+              "radial-gradient(ellipse at 15% 50%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
+              "radial-gradient(ellipse at 85% 25%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
+              "radial-gradient(ellipse at 50% 85%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
+              "radial-gradient(ellipse at 15% 50%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
+            ]
+          }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+        />
+        {/* Bordo pulsante */}
+        <motion.div
+          className="absolute inset-0"
+          style={{ border: "1.5px solid rgba(255,215,0,0.25)" }}
+          animate={{ opacity: [0.3, 0.7, 0.3] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+        />
+        {/* Particelle dorate */}
+        {Array.from({ length: 10 }, (_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: `${5 + i * 9.5}%`,
+              bottom: "4rem",
+              width:  4 + (i % 3) * 2,
+              height: 4 + (i % 3) * 2,
+              background: `hsla(${42 + (i % 4) * 5},100%,55%,0.85)`,
+              boxShadow: "0 0 6px rgba(255,215,0,0.5)",
+            }}
+            animate={{
+              y: [0, -(window.innerHeight * 0.85)],
+              opacity: [0, 0.9, 0.8, 0],
+            }}
+            transition={{
+              duration: 2.5 + (i % 4) * 0.7,
+              repeat: Infinity,
+              delay: i * 0.28,
+              ease: "easeOut",
+            }}
+          />
+        ))}
+      </motion.div>
+
+      {/* Badge centrato — pointer-events none */}
+      <motion.div
+        key="super-badge"
+        initial={{ opacity: 0, scale: 0.4, y: -24 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.4, y: -24 }}
+        transition={{ type: "spring", stiffness: 450, damping: 22 }}
+        className="fixed top-14 md:top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full select-none"
+        style={{
+          zIndex: 48,
+          pointerEvents: "none",
+          background: "linear-gradient(135deg, #FFD700 0%, #FF8C00 100%)",
+          boxShadow: "0 0 28px rgba(255,215,0,0.55), 0 3px 10px rgba(0,0,0,0.35)",
+        }}
+      >
+        <motion.span animate={{ rotate: [0, 18, -18, 0] }} transition={{ duration: 0.45, repeat: Infinity }}>
+          <Crown size={15} color="#000" strokeWidth={2.5} />
+        </motion.span>
+        <span className="text-black font-black text-xs tracking-widest uppercase">SUPER MODE</span>
+        <motion.span animate={{ scale: [1, 1.35, 1] }} transition={{ duration: 0.5, repeat: Infinity }}>
+          <Zap size={14} color="#000" strokeWidth={2.5} />
+        </motion.span>
+        <span className="text-black/60 font-mono text-[10px] font-bold tabular-nums ml-0.5">{remaining}s</span>
+      </motion.div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 const Index = () => {
   const player = usePlayerStore();
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection]   = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings]     = useState(false);
+  const [activeEgg, setActiveEgg]           = useState<EasterEggType>(null);
+  const [showEggList, setShowEggList]       = useState(false);
+  const [superMode, setSuperMode]           = useState(false);
+
+  // Refs per Konami / swipe
+  const konamiRef     = useRef<string[]>([]);
+  const swipeRef      = useRef<string[]>([]);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const superTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const superActiveRef = useRef(false); // ref sincrono per evitare doppia attivazione
 
   useLyricsPreloader();
   useDynamicTheme();
@@ -56,7 +180,7 @@ const Index = () => {
   const seekMutation     = useSeekMutation();
 
   const spotifyTrack = playbackState?.item;
-  const isPlaying = playbackState?.is_playing ?? player.isPlaying;
+  const isPlaying    = playbackState?.is_playing ?? player.isPlaying;
 
   const currentTrack = spotifyTrack ? {
     id: spotifyTrack.id,
@@ -68,8 +192,8 @@ const Index = () => {
   } : player.currentTrack;
 
   const mediaActions = {
-    play: () => spotifyTrack ? playMutation.mutate({}) : player.play(),
-    pause: () => spotifyTrack ? pauseMutation.mutate() : player.pause(),
+    play:      () => spotifyTrack ? playMutation.mutate({}) : player.play(),
+    pause:     () => spotifyTrack ? pauseMutation.mutate() : player.pause(),
     nextTrack: () => spotifyTrack ? nextMutation.mutate() : player.nextTrack(),
     prevTrack: () => spotifyTrack ? previousMutation.mutate() : player.prevTrack(),
     seekTo: (time: number) => {
@@ -80,6 +204,74 @@ const Index = () => {
 
   useMediaSession(currentTrack, isPlaying, mediaActions);
 
+  // ── Attiva/disattiva Super Mode ────────────────────────────────────────────
+  const activateSuperMode = () => {
+    if (superActiveRef.current) return;
+    superActiveRef.current = true;
+    setSuperMode(true);
+    // Velocità 1.5x su tutti gli audio/video HTML locali
+    document.querySelectorAll<HTMLMediaElement>("audio, video")
+      .forEach(el => { try { el.playbackRate = 1.5; } catch {} });
+    if (superTimerRef.current) clearTimeout(superTimerRef.current);
+    superTimerRef.current = setTimeout(() => deactivateSuperMode(), 20000);
+  };
+
+  const deactivateSuperMode = () => {
+    superActiveRef.current = false;
+    setSuperMode(false);
+    document.querySelectorAll<HTMLMediaElement>("audio, video")
+      .forEach(el => { try { el.playbackRate = 1; } catch {} });
+    if (superTimerRef.current) clearTimeout(superTimerRef.current);
+  };
+
+  useEffect(() => () => { if (superTimerRef.current) clearTimeout(superTimerRef.current); }, []);
+
+  // ── Konami Code — keyboard ─────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      konamiRef.current = [...konamiRef.current, e.key].slice(-KONAMI_KEYS.length);
+      if (konamiRef.current.join(",") === KONAMI_KEYS.join(",")) {
+        konamiRef.current = [];
+        activateSuperMode();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []); // eslint-disable-line
+
+  // ── Konami Code — swipe mobile ─────────────────────────────────────────────
+  useEffect(() => {
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      touchStartRef.current = { x: t.clientX, y: t.clientY };
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchStartRef.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartRef.current.x;
+      const dy = t.clientY - touchStartRef.current.y;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      touchStartRef.current = null;
+      // Soglia minima per un swipe intenzionale
+      if (Math.max(adx, ady) < 55) return;
+      const dir = adx > ady
+        ? (dx > 0 ? "ArrowRight" : "ArrowLeft")
+        : (dy > 0 ? "ArrowDown"  : "ArrowUp");
+      swipeRef.current = [...swipeRef.current, dir].slice(-KONAMI_SWIPES.length);
+      if (swipeRef.current.join(",") === KONAMI_SWIPES.join(",")) {
+        swipeRef.current = [];
+        activateSuperMode();
+      }
+    };
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend",   onTouchEnd,   { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend",   onTouchEnd);
+    };
+  }, []); // eslint-disable-line
+
+  // ── Content router ─────────────────────────────────────────────────────────
   const renderContent = () => {
     if (activeSection.startsWith("playlist-")) {
       return (
@@ -89,9 +281,8 @@ const Index = () => {
         />
       );
     }
-
     switch (activeSection) {
-      case "search":         return <SearchContent onPlayTrack={player.playTrack} />;
+      case "search":         return <SearchContent onPlayTrack={player.playTrack} onActivateEgg={setActiveEgg} />;
       case "library":        return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={id => setActiveSection(`playlist-${id}`)} />;
       case "ai-dj":          return <AIDJContent />;
       case "lyrics":         return <LyricsContent currentTrack={player.currentTrack} />;
@@ -116,9 +307,32 @@ const Index = () => {
 
   return (
     <SpotifyProvider>
-      <div className="flex flex-col h-screen overflow-hidden bg-background">
+      {/*
+        .super-mode sul root → sovrascrive CSS variables (--primary diventa oro)
+        e applica stili globali a tutti i componenti figli
+      */}
+      <div className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}>
         <SpotifyStatus />
 
+        {/* Easter egg sfondo + lista */}
+        <AnimatePresence>
+          {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={() => setActiveEgg(null)} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {showEggList && (
+            <EasterEggList
+              onClose={() => setShowEggList(false)}
+              onActivate={(egg) => { setActiveEgg(egg); setShowEggList(false); }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Super Mode overlay */}
+        <AnimatePresence>
+          {superMode && <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />}
+        </AnimatePresence>
+
+        {/* Layout principale */}
         <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
           <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -137,15 +351,21 @@ const Index = () => {
           </main>
         </div>
 
-        <div className="md:relative md:z-auto md:bottom-auto md:left-auto md:right-auto fixed bottom-14 left-0 right-0 z-40 md:static">
+        <div className="md:relative md:z-auto fixed bottom-14 left-0 right-0 z-40 md:static">
           <PlayerBar
             {...player}
             onExpandClick={() => setShowNowPlaying(true)}
             onNavigate={setActiveSection}
+            onOpenEggList={() => setShowEggList(true)}
+            superMode={superMode}
           />
         </div>
 
-        <MobileNav activeSection={activeSection} onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />
+        <MobileNav
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onOpenSettings={() => setShowSettings(true)}
+        />
 
         <AnimatePresence>
           {showNowPlaying && (
