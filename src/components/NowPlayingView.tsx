@@ -157,12 +157,17 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: "100%" }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: "100%" }}
-      transition={{ type: "spring", damping: 30, stiffness: 300 }}
+      initial={{ opacity: 0.6, y: "100%" }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: "100%" }}
+      transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.9 }}
       className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
     >
       {/* Background blur */}
-      <motion.div key={currentTrack.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0">
+      <motion.div key={currentTrack.id}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="absolute inset-0">
         <img src={coverUrl} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-background/82 backdrop-blur-[80px]" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/25" />
@@ -212,13 +217,15 @@ export default function NowPlayingView(props: NowPlayingProps) {
             </div>
           ) : (
             <motion.div key={currentTrack.id}
-              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", damping: 22 }}
+              initial={{ opacity: 0, scale: 0.82 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 26, mass: 0.9 }}
               className="relative cursor-pointer" onClick={handleCoverTap}>
               <img src={coverUrl} alt="" className="w-56 h-56 md:w-64 md:h-64 rounded-2xl object-cover shadow-2xl" />
               {isPlaying && (
                 <motion.div className="absolute -inset-1 rounded-2xl border border-primary/30"
-                  animate={{ opacity: [0.3, 0.7, 0.3] }} transition={{ duration: 2.5, repeat: Infinity }} />
+                  animate={{ opacity: [0.2, 0.6, 0.2] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }} />
               )}
               {/* BPM badge */}
               {bpm && (
@@ -275,7 +282,11 @@ export default function NowPlayingView(props: NowPlayingProps) {
             <button onClick={handlePrevious} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground">
               <SkipBack className="w-6 h-6 fill-current" />
             </button>
-            <motion.button whileTap={{ scale: 0.9 }} onClick={handleTogglePlay}
+            <motion.button
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28, mass: 0.6 }}
+              onClick={handleTogglePlay}
               className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center shadow-xl">
               {isPlaying ? <Pause className="w-7 h-7 text-background" /> : <Play className="w-7 h-7 text-background ml-0.5" />}
             </motion.button>
@@ -307,6 +318,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
           <AnimatePresence mode="wait">
             {activePanel === "lyrics" && (
               <motion.div key="lyrics" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+              transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
                 className="rounded-xl bg-secondary/30 backdrop-blur-sm overflow-hidden">
                 {lyrics.length === 0 ? (
                   <div className="py-6 text-center text-muted-foreground text-sm">Testi non disponibili</div>
@@ -328,6 +340,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
             {activePanel === "queue" && (
               <motion.div key="queue" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+              transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
                 className="rounded-xl bg-secondary/30 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/20">
                   <p className="text-sm font-semibold">Prossimi</p>
@@ -355,6 +368,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
             {activePanel === "analysis" && audioFeatures && (
               <motion.div key="analysis" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
                 className="rounded-xl bg-secondary/30 p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   {[
@@ -394,6 +408,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
             {activePanel === "info" && (
               <motion.div key="info" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
                 className="rounded-xl bg-secondary/30 p-4 space-y-2.5">
                 {[
                   { label: "Album", value: currentTrack.album.name },
@@ -413,6 +428,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
             {activePanel === "timer" && (
               <motion.div key="timer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
                 className="rounded-xl bg-secondary/30 p-4 space-y-3">
                 <p className="text-sm font-semibold">⏱ Sleep Timer</p>
                 {sleepTimer.active ? (

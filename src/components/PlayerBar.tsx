@@ -180,8 +180,9 @@ export default function PlayerBar(props: PlayerProps) {
       <div className="flex items-center gap-2 md:gap-3 w-auto md:w-72 min-w-0 flex-1 md:flex-none">
         <motion.button
           onClick={handleExpandClick}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.93 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30, mass: 0.6 }}
           className="relative shrink-0 cursor-pointer touch-manipulation"
         >
           <AnimatePresence mode="wait">
@@ -190,17 +191,17 @@ export default function PlayerBar(props: PlayerProps) {
               src={currentTrack.cover}
               alt={currentTrack.album}
               className="w-14 h-14 rounded-lg object-cover shadow-lg"
-              initial={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.85 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.8 }}
             />
           </AnimatePresence>
           {isPlaying && (
             <motion.div
               className="absolute inset-0 rounded-lg ring-2 ring-primary/40"
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              animate={{ opacity: [0.3, 0.7, 0.3] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
             />
           )}
         </motion.button>
@@ -239,8 +240,9 @@ export default function PlayerBar(props: PlayerProps) {
 
           <motion.button
             onClick={handleTogglePlay}
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28, mass: 0.6 }}
             className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center"
             title="Play/Pause"
           >
@@ -332,8 +334,9 @@ export default function PlayerBar(props: PlayerProps) {
       <div className="flex md:hidden items-center justify-end gap-1">
         <motion.button
           onClick={handleTogglePlay}
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 500, damping: 28, mass: 0.6 }}
           className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center shrink-0"
         >
           {isPlaying ? (
@@ -365,8 +368,9 @@ function ControlBtn({
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ scale: 1.15 }}
-      whileTap={{ scale: 0.9 }}
+      whileHover={{ scale: 1.12 }}
+      whileTap={{ scale: 0.88 }}
+      transition={{ type: "spring", stiffness: 600, damping: 30, mass: 0.5 }}
       className={`p-1.5 rounded-full transition-colors ${
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       }`}

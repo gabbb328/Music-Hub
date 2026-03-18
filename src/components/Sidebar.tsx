@@ -105,23 +105,47 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   );
 }
 
+const NAV_SPRING = { type: "spring", stiffness: 380, damping: 32, mass: 0.7 };
+
 function NavItem({ label, icon: Icon, isActive, onClick }: {
   id: string; label: string;
   icon: React.ComponentType<{ className?: string }>;
   isActive: boolean; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick}
-      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-        isActive ? "text-foreground bg-secondary" : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40"
-      }`}>
+    <motion.button
+      onClick={onClick}
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
+        isActive ? "text-foreground" : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+      }`}
+      style={{ transition: "color 160ms cubic-bezier(0.16,1,0.3,1)" }}
+    >
+      {/* Background pill */}
       {isActive && (
-        <motion.div layoutId="sidebar-active"
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
-          transition={{ type: "spring", stiffness: 350, damping: 30 }} />
+        <motion.div
+          layoutId="sidebar-active-bg"
+          className="absolute inset-0 rounded-lg bg-secondary"
+          transition={NAV_SPRING}
+        />
       )}
-      <Icon className="w-4 h-4 shrink-0" />
-      <span>{label}</span>
-    </button>
+      {/* Indicatore laterale */}
+      {isActive && (
+        <motion.div
+          layoutId="sidebar-active-bar"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
+          transition={NAV_SPRING}
+        />
+      )}
+      <motion.div
+        className="relative z-10 shrink-0"
+        animate={{ scale: isActive ? 1.05 : 1 }}
+        transition={NAV_SPRING}
+      >
+        <Icon className="w-4 h-4" />
+      </motion.div>
+      <span className="relative z-10">{label}</span>
+    </motion.button>
   );
 }

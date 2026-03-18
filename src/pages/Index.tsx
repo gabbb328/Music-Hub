@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
 import { useDynamicTheme } from "@/hooks/useDynamicTheme";
@@ -122,7 +122,18 @@ const Index = () => {
         <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
           <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {renderContent()}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
           </main>
         </div>
 
