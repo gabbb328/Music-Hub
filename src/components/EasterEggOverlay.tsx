@@ -5,7 +5,6 @@ import {
   Disc3, Cat, Sparkles, X, ChevronRight, Code2, HeartHandshake, Rainbow
 } from "lucide-react";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
-import { SPRING_NAV, TWEEN_PAGE, PAGE_VARIANTS, FADE_SCALE_VARIANTS } from "@/lib/animations";
 
 interface Props {
   egg: EasterEggType;
@@ -101,20 +100,13 @@ function FloatingIcons({ icon: Icon, color, count = 16 }: {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// HACK TERMINAL — narrativa completa con script NASA, access denied, poi accesso
-// ══════════════════════════════════════════════════════════════════════════════
-
-// Ogni entry: { text, color, delay (ms dall'inizio), indent }
+// ── Hack Terminal ─────────────────────────────────────────────────────────────
 type TermLine = { text: string; color: string; delay: number; bold?: boolean };
 
 const HACK_SCRIPT: TermLine[] = [
-  // Avvio sistema
   { text: "root@kali:~# uname -a", color: "#00ff41", delay: 0 },
   { text: "Linux kali 6.1.0-kali5-amd64 #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux", color: "#aaaaaa", delay: 180 },
   { text: "", color: "", delay: 300 },
-
-  // Scansione
   { text: "root@kali:~# nmap -sS -O -p 1-65535 nasa.gov", color: "#00ff41", delay: 350 },
   { text: "Starting Nmap 7.94 ( https://nmap.org )", color: "#888888", delay: 530 },
   { text: "Initiating SYN Stealth Scan at 03:47", color: "#888888", delay: 660 },
@@ -125,8 +117,6 @@ const HACK_SCRIPT: TermLine[] = [
   { text: "Discovered open port 8443/tcp on 192.0.2.101  [CLASSIFIED]", color: "#ffaa00", delay: 1320 },
   { text: "Nmap done: 1 IP address (1 host up) scanned in 2.47 seconds", color: "#888888", delay: 1480 },
   { text: "", color: "", delay: 1550 },
-
-  // Download exploit
   { text: "root@kali:~# wget https://exploit-db.com/raw/nasa_auth_bypass_v4.py", color: "#00ff41", delay: 1600 },
   { text: "--2024-11-13 03:47:33--  https://exploit-db.com/raw/nasa_auth_bypass_v4.py", color: "#888888", delay: 1750 },
   { text: "Resolving exploit-db.com... 192.168.1.1", color: "#888888", delay: 1900 },
@@ -135,8 +125,6 @@ const HACK_SCRIPT: TermLine[] = [
   { text: "Saving to: 'nasa_auth_bypass_v4.py'", color: "#888888", delay: 2250 },
   { text: "nasa_auth_bypass_v4.py    100%[=============================>]  47.16K  --.-KB/s  in 0.08s", color: "#00cc33", delay: 2400 },
   { text: "", color: "", delay: 2520 },
-
-  // Exploit
   { text: "root@kali:~# python3 nasa_auth_bypass_v4.py --target nasa.gov --port 8443", color: "#00ff41", delay: 2570 },
   { text: "[*] Initializing NASA Authentication Bypass v4.0", color: "#888888", delay: 2750 },
   { text: "[*] Target: nasa.gov:8443", color: "#888888", delay: 2870 },
@@ -147,16 +135,12 @@ const HACK_SCRIPT: TermLine[] = [
   { text: "[*] Sending crafted payload to /api/v3/auth...", color: "#888888", delay: 3520 },
   { text: "[*] ████████████████████████ 100%  Exploiting...", color: "#ffaa00", delay: 3700 },
   { text: "", color: "", delay: 3850 },
-
-  // ← ACCESS DENIED (rosso, bold)
   { text: "╔══════════════════════════════════════════╗", color: "#ff3333", delay: 3900, bold: true },
   { text: "║  ⚠  ACCESSO NEGATO — SISTEMA NASA SICURO ⚠  ║", color: "#ff3333", delay: 3940, bold: true },
   { text: "║  Unauthorized access attempt detected.       ║", color: "#ff3333", delay: 3980, bold: true },
   { text: "║  FBI TRACE INITIATED — IP LOGGED             ║", color: "#ff3333", delay: 4020, bold: true },
   { text: "╚══════════════════════════════════════════╝", color: "#ff3333", delay: 4060, bold: true },
   { text: "", color: "", delay: 4140 },
-
-  // Secondo tentativo — con pipe e Billie
   { text: "root@kali:~# python3 nasa_auth_bypass_v4.py --target nasa.gov \\", color: "#00ff41", delay: 4250 },
   { text: "    --port 8443 --bypass-fbi \\", color: "#00ff41", delay: 4310 },
   { text: "    | python3 play_billie.py --song 'bad_guy' --volume 100 \\", color: "#00ff41", delay: 4370 },
@@ -169,8 +153,6 @@ const HACK_SCRIPT: TermLine[] = [
   { text: "[*] Sending override packet with audio fingerprint...", color: "#888888", delay: 5280 },
   { text: "[*] ████████████████████████ 100%  Bypassing security...", color: "#ffaa00", delay: 5460 },
   { text: "", color: "", delay: 5620 },
-
-  // ← ACCESS GRANTED (verde, bold)
   { text: "╔══════════════════════════════════════════╗", color: "#00ff41", delay: 5680, bold: true },
   { text: "║  ✓  ACCESSO GARANTITO — BENVENUTO, HACKER  ║", color: "#00ff41", delay: 5720, bold: true },
   { text: "║  NASA Mainframe v9.1 — ALL SYSTEMS ONLINE   ║", color: "#00ff41", delay: 5760, bold: true },
@@ -184,7 +166,6 @@ const HACK_SCRIPT: TermLine[] = [
   { text: "                                                 — Neil Armstrong, 1969", color: "#888888", delay: 6600 },
 ];
 
-// Terminale con righe che appaiono una per una
 function HackTerminal() {
   const [visibleCount, setVisibleCount] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -198,18 +179,12 @@ function HackTerminal() {
     return () => timers.forEach(t => clearTimeout(t));
   }, []);
 
-  // Auto-scroll al fondo
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [visibleCount]);
 
   return (
-    // Terminale: sfondo nero pieno, padding realistico, scroll interno
-    <div
-      className="fixed inset-0 flex flex-col"
-      style={{ zIndex: 9992, background: "#0a0a0a" }}
-    >
-      {/* Titlebar stile terminale */}
+    <div className="fixed inset-0 flex flex-col" style={{ zIndex: 9992, background: "#0a0a0a" }}>
       <div className="flex items-center gap-2 px-4 py-2 shrink-0"
         style={{ background: "#1a1a1a", borderBottom: "1px solid #2a2a2a" }}>
         <div className="w-3 h-3 rounded-full bg-red-500" />
@@ -217,24 +192,18 @@ function HackTerminal() {
         <div className="w-3 h-3 rounded-full bg-green-500" />
         <span className="ml-3 text-xs text-gray-500 font-mono">root@kali — bash — 120×40</span>
       </div>
-
-      {/* Output terminale con scroll */}
       <div className="flex-1 overflow-y-auto px-4 py-3" style={{ fontFamily: "monospace" }}>
         {HACK_SCRIPT.slice(0, visibleCount).map((line, i) => (
-          <div
-            key={i}
+          <div key={i}
             className="leading-5 text-xs md:text-sm whitespace-pre-wrap break-all"
             style={{
               color: line.color || "transparent",
               fontWeight: line.bold ? "bold" : "normal",
-              // Righe vuote hanno altezza minima per preservare lo spazio
               minHeight: line.text === "" ? "0.75rem" : undefined,
-            }}
-          >
+            }}>
             {line.text}
           </div>
         ))}
-        {/* Cursore lampeggiante */}
         {visibleCount > 0 && visibleCount < HACK_SCRIPT.length && (
           <motion.span
             animate={{ opacity: [1, 0, 1] }}
@@ -325,56 +294,58 @@ export function EasterEggList({ onClose, onActivate }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Componente principale
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function EasterEggOverlay({ egg, onDismiss }: Props) {
   const [countdown, setCountdown] = useState(15);
   const didSound = useRef(false);
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Audio duh — una volta sola
   useEffect(() => {
     if (egg === "duh" && !didSound.current) { didSound.current = true; playDuh(); }
     if (!egg) didSound.current = false;
   }, [egg]);
 
+  // Auto-dismiss SOLO per gli sfondi (15s)
+  // Gli overlay (party, love, music, hack, duh) non si chiudono mai da soli —
+  // l'utente deve toccare/cliccare per uscire.
   useEffect(() => {
-    if (!egg) return;
-    
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
 
-    const isSfondo = SFONDO_EGGS.includes(egg);
-    const ms = isSfondo ? 15000 : ["party", "love", "music"].includes(egg) ? 5000 : null;
-    
-    if (ms === null) return;
-    
-    const initialSeconds = Math.floor(ms / 1000);
-    setCountdown(initialSeconds);
+    // Solo gli sfondi hanno timer automatico
+    if (!egg || !SFONDO_EGGS.includes(egg)) {
+      setCountdown(15);
+      return;
+    }
 
+    setCountdown(15);
     const startTime = Date.now();
-    countdownIntervalRef.current = setInterval(() => {
+
+    timerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const remaining = Math.max(0, initialSeconds - elapsed);
+      const remaining = Math.max(0, 15 - elapsed);
       setCountdown(remaining);
-      
       if (remaining <= 0) {
-        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        if (timerRef.current) clearInterval(timerRef.current);
         onDismiss?.();
       }
     }, 1000);
 
     return () => {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [egg, onDismiss]);
+  }, [egg]); // NON includere onDismiss nelle deps — evita ri-creazione del timer
 
   if (!egg) return null;
 
-  // ── SFONDO (z basso, pointer-events none) ─────────────────────────────────
+  // ── SFONDO ────────────────────────────────────────────────────────────────
   if (SFONDO_EGGS.includes(egg)) {
     return (
       <AnimatePresence>
         <motion.div key={`bg-${egg}`}
-          variants={FADE_SCALE_VARIANTS}
-          initial="hidden" animate="visible" exit="exit"
-          transition={TWEEN_PAGE}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
           className="fixed inset-0 pointer-events-none"
           style={{ zIndex: 5 }}>
 
@@ -453,23 +424,22 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
           </div>
         )}
 
-        {/* Pulsante chiudi sfondo */}
+        {/* Pulsante chiudi sfondo — con countdown 15s */}
         <motion.div key={`close-${egg}`}
-          variants={PAGE_VARIANTS}
-          initial="hidden" animate="visible" exit="exit"
-          transition={{ ...SPRING_NAV, delay: 0.5 }}
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 10 }}
+          transition={{ delay: 0.7 }}
           className="fixed flex flex-col items-end gap-1.5"
-          style={{ zIndex: 9999, pointerEvents: "auto", top: "5rem", right: "1rem", bottom: "auto" }}>
-          <div key={egg} className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
-            <motion.div 
-              key={`bar-${egg}`}
+          style={{ zIndex: 9999, pointerEvents: "auto", bottom: "5.5rem", right: "1rem" }}>
+          <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full">
+            <motion.div
               className="h-1 rounded-full bg-white/60"
               initial={{ width: 52 }} animate={{ width: 0 }}
-              transition={{ duration: SFONDO_EGGS.includes(egg) ? 15 : 5, ease: "linear" }} />
+              transition={{ duration: 15, ease: "linear" }} />
             <span className="text-white/60 text-[10px] font-mono whitespace-nowrap">{countdown}s</span>
           </div>
           <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
-            className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/90 px-3 py-1.5 rounded-full text-xs font-medium transition-colors shadow-xl">
+            className="flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/90 px-3 py-1.5 rounded-full text-xs font-medium transition-colors">
             <X className="w-3.5 h-3.5" /> Chiudi
           </button>
         </motion.div>
@@ -477,20 +447,16 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
     );
   }
 
-  // ── OVERLAY (z alto, copre tutto) ─────────────────────────────────────────
+  // ── OVERLAY — si chiude SOLO manualmente ─────────────────────────────────
+  // Nessun timer, nessun auto-dismiss. L'utente tocca/clicca per uscire.
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <motion.div 
-      variants={FADE_SCALE_VARIANTS}
-      initial="hidden" animate="visible" exit="exit"
-      transition={SPRING_NAV}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[9990]" onClick={onDismiss}>
       {children}
-      <motion.button 
-        variants={PAGE_VARIANTS}
-        onClick={e => { e.stopPropagation(); onDismiss?.(); }}
+      <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
         className="fixed top-4 right-4 z-[10000] w-11 h-11 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors">
         <X className="w-5 h-5" />
-      </motion.button>
+      </button>
     </motion.div>
   );
 
@@ -535,6 +501,7 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
   // PARTY
   if (egg === "party") return (
     <AnimatePresence><Wrapper>
+      <div className="fixed inset-0 bg-black/70 z-[9991]" />
       <Confetti />
       <div className="fixed inset-0 flex flex-col items-center justify-center pointer-events-none gap-6" style={{ zIndex: 9992 }}>
         <motion.div animate={{ scale:[1,1.2,1], rotate:[0,15,-15,0] }} transition={{ duration:0.5, repeat:Infinity }}>
@@ -544,16 +511,24 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
           className="text-4xl font-black text-white drop-shadow-2xl tracking-tight">
           PARTY TIME!!!
         </motion.p>
+        <p className="text-white/50 text-sm">Tocca per chiudere</p>
       </div>
     </Wrapper></AnimatePresence>
   );
 
+  // HACK
   if (egg === "hack") return (
-    <AnimatePresence><Wrapper>
-      <div className="fixed inset-0 z-[9991]">
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[9990]">
         <HackTerminal />
-      </div>
-    </Wrapper></AnimatePresence>
+        <button onClick={e => { e.stopPropagation(); onDismiss?.(); }}
+          className="fixed top-12 right-4 z-[10000] w-11 h-11 rounded-full flex items-center justify-center text-green-400 hover:text-white hover:bg-white/10 transition-colors"
+          style={{ border: "1px solid rgba(0,255,65,0.3)" }}>
+          <X className="w-5 h-5" />
+        </button>
+      </motion.div>
+    </AnimatePresence>
   );
 
   // LOVE
@@ -566,6 +541,7 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
           animate={{ scale:[1,1.08,1] }} transition={{ duration:0.8, repeat:Infinity }}>
           <Heart size={90} className="text-red-400 fill-red-400 drop-shadow-2xl" strokeWidth={1} />
           <p className="text-4xl font-black text-red-300 drop-shadow-2xl">Love</p>
+          <p className="text-white/50 text-sm">Tocca per chiudere</p>
         </motion.div>
       </div>
     </Wrapper></AnimatePresence>
@@ -581,6 +557,7 @@ export default function EasterEggOverlay({ egg, onDismiss }: Props) {
           animate={{ scale:[1,1.1,1], rotate:[-3,3,-3] }} transition={{ duration:1, repeat:Infinity }}>
           <Music2 size={90} className="text-indigo-400 drop-shadow-2xl" strokeWidth={1} />
           <p className="text-4xl font-black text-indigo-300 drop-shadow-2xl">Music is Life</p>
+          <p className="text-white/50 text-sm">Tocca per chiudere</p>
         </motion.div>
       </div>
     </Wrapper></AnimatePresence>
