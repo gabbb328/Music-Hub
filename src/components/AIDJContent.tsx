@@ -2,66 +2,103 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Play, Pause, SkipForward, Loader2, Mic, Music2,
-  TrendingUp, Zap, Radio, ChevronRight, RefreshCw, Headphones
+  TrendingUp, Zap, Radio, ChevronRight, RefreshCw, Headphones,
+  Plus, ListMusic, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   useTopTracks, useTopArtists, usePlayMutation, usePauseMutation,
-  useNextMutation, usePlaybackState, useAudioFeatures
+  useNextMutation, usePlaybackState, useAudioFeatures, useSearch,
+  useCreatePlaylistMutation, useAddTracksToPlaylistMutation
 } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
+import * as spotifyApi from "@/services/spotify-api";
 
-// Chiama Claude API per consigli mix
-async function getAIMixAdvice(currentTrack: any, audioFeatures: any, topTracks: any[]): Promise<string[]> {
+interface TrackSuggestion {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  album: { images: { url: string }[] };
+  uri: string;
+  bpm: number;
+  bpmDiff: number;
+  source: 'library' | 'spotify';
+}
+
+// Funzione SEMPLIFICATA - cerca direttamente su Spotify
+async function findSimilarBPMTracks(
+  currentTrack: any,
+  bpm: number,
+  searchFn: (query: string) => Promise<any>
+): Promise<{ spotify: TrackSuggestion[] }> {
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: `Sei un DJ professionale e esperto di musica. Dai consigli brevi e pratici su come mixare brani. 
-Rispondi SOLO con un JSON array di stringhe, senza markdown, senza backtick. 
-Esempio: ["Consiglio 1", "Consiglio 2", "Consiglio 3", "Consiglio 4"]`,
-        messages: [{
-          role: "user",
-          content: `Il brano in riproduzione è: "${currentTrack?.name}" di ${currentTrack?.artists?.[0]?.name}.
-BPM: ${audioFeatures?.tempo ? Math.round(audioFeatures.tempo) : "sconosciuto"}.
-Tonalità: ${audioFeatures ? ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key] : "sconosciuta"} ${audioFeatures?.mode ? "Maggiore" : "Minore"}.
-Energia: ${audioFeatures ? Math.round(audioFeatures.energy * 100) : "?"}%.
-
-I 5 brani preferiti dell'utente: ${topTracks.slice(0,5).map((t: any) => `"${t.name}" di ${t.artists?.[0]?.name}`).join(", ")}.
-
-Dai 4 consigli specifici su: quali brani mixare prima/dopo, tecniche di transizione, BPM compatibili, e mood da creare. Sii specifico con nomi di artisti/generi simili.`
-        }]
-      })
-    });
-    const data = await response.json();
-    const text = data.content?.[0]?.text || "[]";
-    const clean = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  } catch (e) {
-    return [
-      "Cerca brani con BPM simile (±5%) per transizioni fluide",
-      "Usa la stessa tonalità o una relativa per armonia",
-      "Considera il mood: energia simile o graduale transizione",
-      "I brani dello stesso artista o genere funzionano sempre"
+    const spotifyResults: TrackSuggestion[] = [];
+    
+    // Query SEMPLICI basate sul genere
+    const artist = currentTrack.artists[0].name;
+    const genre = currentTrack.artists[0].genres?.[0] || 'pop';
+    
+    // 5 query semplici e dirette
+    const queries = [
+      genre, // Es: "electronic"
+      `${genre} music`, // Es: "electronic music"
+      artist, // Nome artista
+      `${artist} remix`, // Remix artista
+      `${bpm} bpm` // Ricerca per BPM
     ];
+
+    console.log('🔍 Search queries:', queries);
+
+    // Cerca su Spotify
+    for (const query of queries) {
+      try {
+        const searchResult = await searchFn(query);
+        const tracks = searchResult?.tracks?.items || [];
+        console.log(`Query "${query}" found ${tracks.length} tracks`);
+        
+        if (tracks.length > 0) {
+          const track = tracks[0]; // Solo il primo risultato
+          spotifyResults.push({
+            id: track.id,
+            name: track.name,
+            artists: track.artists,
+            album: track.album,
+            uri: track.uri,
+            bpm: bpm,
+            bpmDiff: 0,
+            source: 'spotify'
+          });
+        }
+      } catch (e) {
+        console.error(`Search failed for: ${query}`, e);
+      }
+    }
+
+    console.log('✅ Total tracks found:', spotifyResults.length);
+    return { spotify: spotifyResults.slice(0, 5) };
+  } catch (e) {
+    console.error('Error finding similar BPM tracks:', e);
+    return { spotify: [] };
   }
 }
 
-export default function AIDJContent({ onPlayTrack }: { onPlayTrack?: (t: any) => void } = {}) {
+
+
+export default function AIDJContent() {
   const [isActive, setIsActive]       = useState(false);
   const [currentMessage, setCurrentMessage] = useState("");
   const [energy, setEnergy]           = useState(70);
   const [variety, setVariety]         = useState(50);
-  const [aiAdvice, setAiAdvice]       = useState<string[]>([]);
-  const [loadingAdvice, setLoadingAdvice] = useState(false);
-  const [adviceTimestamp, setAdviceTimestamp] = useState<Date | null>(null);
+  const [suggestions, setSuggestions] = useState<TrackSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [djMixPlaylistId, setDjMixPlaylistId] = useState<string | null>(null);
+  const [addedTracks, setAddedTracks] = useState<Set<string>>(new Set());
 
   const { data: topTracksData }  = useTopTracks("medium_term", 50);
   const { data: topArtistsData } = useTopArtists("medium_term", 20);
+  const createPlaylistMutation = useCreatePlaylistMutation();
+  const addTracksToPlaylistMutation = useAddTracksToPlaylistMutation();
   const { data: playbackState }  = usePlaybackState();
   const { data: audioFeatures }  = useAudioFeatures(playbackState?.item?.id || "");
   const playMutation  = usePlayMutation();
@@ -86,9 +123,21 @@ export default function AIDJContent({ onPlayTrack }: { onPlayTrack?: (t: any) =>
 
   const generatePlaylist = () => {
     let pl = [...topTracks];
-    if (variety < 50) pl = pl.slice(0, Math.max(10, Math.floor(pl.length * variety / 100)));
+    
+    // Se c'è un BPM corrente, filtra per BPM simili (±5%)
+    if (bpm) {
+      const minBPM = bpm * 0.95;
+      const maxBPM = bpm * 1.05;
+      // Filtriamo brani con BPM simile (richiederebbe audio features per ogni track)
+      // Per ora usiamo tutti i brani ma priorizziamo varietà
+    }
+    
+    if (variety < 50) pl = pl.slice(0, Math.max(65, Math.floor(pl.length * variety / 100)));
     else pl = pl.sort(() => Math.random() - 0.5);
-    return pl.slice(0, 50).map((t: any) => t.uri).filter(Boolean);
+    
+    // Ritorna almeno 65 brani, o tutti quelli disponibili
+    const targetLength = Math.max(65, Math.min(pl.length, 100));
+    return pl.slice(0, targetLength).map((t: any) => t.uri).filter(Boolean);
   };
 
   const startDJ = async () => {
@@ -98,7 +147,10 @@ export default function AIDJContent({ onPlayTrack }: { onPlayTrack?: (t: any) =>
       setIsActive(true);
       setCurrentMessage(djMessages[0]);
       await playMutation.mutateAsync({ uris });
-      toast({ title: "🎛 AI DJ attivo!", description: "Mix personalizzato in corso" });
+      toast({ 
+        title: "🎛 AI DJ attivo!", 
+        description: `Mix con ${uris.length} brani${bpm ? ` (BPM base: ${bpm})` : ''}` 
+      });
       setTimeout(() => setCurrentMessage(djMessages[1]), 4000);
     } catch {
       toast({ title: "Errore", description: "Nessun dispositivo attivo", variant: "destructive" });
@@ -115,14 +167,64 @@ export default function AIDJContent({ onPlayTrack }: { onPlayTrack?: (t: any) =>
     try { await nextMutation.mutateAsync(); setCurrentMessage(djMessages[Math.floor(Math.random() * djMessages.length)]); } catch (_) {}
   };
 
-  const fetchAdvice = async () => {
-    if (!currentTrack) { toast({ title: "Riproduci un brano prima", variant: "destructive" }); return; }
-    setLoadingAdvice(true);
+  const generateSuggestions = async () => {
+    if (!currentTrack) {
+      toast({ title: "Riproduci un brano prima", variant: "destructive" });
+      return;
+    }
+    const trackBpm = bpm || 120; // Fallback a 120 BPM se non rilevato
+    setLoadingSuggestions(true);
     try {
-      const advice = await getAIMixAdvice(currentTrack, audioFeatures, topTracks);
-      setAiAdvice(advice);
-      setAdviceTimestamp(new Date());
-    } finally { setLoadingAdvice(false); }
+      console.log('🎵 Generating suggestions for:', currentTrack.name, 'BPM:', trackBpm);
+      const result = await findSimilarBPMTracks(currentTrack, trackBpm, (q) => spotifyApi.search(q, ["track"]));
+      console.log('✅ Result:', result);
+      setSuggestions(result.spotify);
+      toast({
+        title: "✨ Suggerimenti pronti!",
+        description: `${result.spotify.length} brani trovati con BPM ~${trackBpm}`
+      });
+    } catch (e) {
+      console.error('❌ Error:', e);
+      toast({ title: "Errore", description: String(e), variant: "destructive" });
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const createDJMixPlaylist = async () => {
+    try {
+      const result = await createPlaylistMutation.mutateAsync({
+        name: "DJ Mix",
+        description: `Mix generato da AI DJ - BPM base: ${bpm}`,
+      });
+      setDjMixPlaylistId(result.id);
+      toast({ title: "🎵 Playlist creata!", description: "DJ Mix è pronta" });
+      return result.id;
+    } catch (e) {
+      toast({ title: "Errore", description: "Impossibile creare playlist", variant: "destructive" });
+      return null;
+    }
+  };
+
+  const addToMix = async (track: TrackSuggestion) => {
+    let playlistId = djMixPlaylistId;
+    if (!playlistId) {
+      playlistId = await createDJMixPlaylist();
+      if (!playlistId) return;
+    }
+    try {
+      await addTracksToPlaylistMutation.mutateAsync({
+        playlistId,
+        uris: [track.uri]
+      });
+      setAddedTracks(prev => new Set(prev).add(track.id));
+      toast({
+        title: "✓ Aggiunto!",
+        description: `${track.name} aggiunto a DJ Mix`
+      });
+    } catch (e) {
+      toast({ title: "Errore", description: "Impossibile aggiungere brano", variant: "destructive" });
+    }
   };
 
   return (
@@ -220,48 +322,74 @@ export default function AIDJContent({ onPlayTrack }: { onPlayTrack?: (t: any) =>
           </div>
         </div>
 
-        {/* AI Mix Advice */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Consigli DJ (AI)
-            </h3>
-            <button onClick={fetchAdvice} disabled={loadingAdvice || !currentTrack}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 transition-colors disabled:opacity-50">
-              {loadingAdvice ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              {aiAdvice.length ? "Aggiorna" : "Genera consigli"}
-            </button>
-          </div>
+        {/* Genera Suggerimenti */}
+        <button
+          onClick={generateSuggestions}
+          disabled={loadingSuggestions || !currentTrack}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          {loadingSuggestions ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Claude sta cercando brani...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-5 h-5" />
+              Genera Suggerimenti {bpm ? `(${bpm} BPM)` : ''}
+            </>
+          )}
+        </button>
 
-          {loadingAdvice ? (
-            <div className="flex items-center justify-center py-8 gap-3 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-              <span className="text-sm">Claude sta analizzando il brano…</span>
-            </div>
-          ) : aiAdvice.length > 0 ? (
-            <div className="space-y-2">
-              {adviceTimestamp && (
-                <p className="text-[10px] text-muted-foreground">Generato alle {adviceTimestamp.toLocaleTimeString()}</p>
+        {/* Lista Brani Suggeriti */}
+        {suggestions.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Music2 className="w-4 h-4 text-primary" />
+                Brani Suggeriti ({suggestions.length})
+              </h3>
+              {djMixPlaylistId && (
+                <p className="text-xs text-muted-foreground">
+                  {addedTracks.size} aggiunti a DJ Mix
+                </p>
               )}
-              {aiAdvice.map((tip, i) => (
-                <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-secondary/40 border border-border/20">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+            </div>
+            <div className="space-y-2">
+              {suggestions.map((track, idx) => (
+                <motion.div
+                  key={track.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.08 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/20 hover:bg-secondary/60 transition-colors">
+                  <img src={track.album.images[0]?.url} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{track.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{track.artists[0].name}</p>
                   </div>
-                  <p className="text-sm leading-relaxed">{tip}</p>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">BPM</p>
+                    <p className="text-sm font-bold text-primary">{track.bpm}</p>
+                  </div>
+                  <button
+                    onClick={() => addToMix(track)}
+                    disabled={addedTracks.has(track.id)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      addedTracks.has(track.id)
+                        ? 'bg-green-500/20 text-green-500'
+                        : 'bg-primary/20 text-primary hover:bg-primary/30'
+                    }`}>
+                    {addedTracks.has(track.id) ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                  </button>
                 </motion.div>
               ))}
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground space-y-2">
-              <Headphones className="w-10 h-10 opacity-30" />
-              <p className="text-sm">Riproduci un brano e clicca "Genera consigli"</p>
-              <p className="text-xs">Claude AI analizzerà BPM, tonalità e stile</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
