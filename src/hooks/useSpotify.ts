@@ -210,3 +210,12 @@ export const useLikeTrackMutation = () => {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["savedTracks"] }); qc.invalidateQueries({ queryKey: ["checkSavedTracks"] }); },
   });
 };
+
+// ── New hooks for AI DJ ────────────────────────────────────────────────────────
+
+export const useCurrentUserQuery = () => useQuery({
+  queryKey: ["currentUser"],
+  queryFn: spotifyApi.getUserProfile,
+  enabled: !!getToken(),
+  staleTime: 300000, // 5 minutes
+});

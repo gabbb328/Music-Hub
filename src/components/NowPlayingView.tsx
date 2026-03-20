@@ -54,7 +54,8 @@ function useSleepTimer(onEnd: () => void) {
 export default function NowPlayingView(props: NowPlayingProps) {
   const { onClose, onNavigate } = props;
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const [activePanel, setActivePanel] = useState<PanelType>(null);
+  // Default panel: lyrics su desktop, null su mobile
+  const [activePanel, setActivePanel] = useState<PanelType>(typeof window !== 'undefined' && window.innerWidth >= 768 ? 'lyrics' : null);
   const [isLiked, setIsLiked] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -206,26 +207,41 @@ export default function NowPlayingView(props: NowPlayingProps) {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="relative flex-1 flex flex-col min-h-0 z-10 overflow-hidden">
+      {/* Main content - Different layout for desktop */}
+      <div className="relative flex-1 flex flex-col md:flex-row min-h-0 z-10 overflow-hidden gap-4 md:gap-6 md:px-6">
 
-        {/* Cover / Visualizer */}
-        <div className="flex justify-center px-6 pt-2 pb-4 shrink-0">
+        {/* Cover / Visualizer + Track Info - Apple-style layout */}
+        <div className="flex flex-col lg:flex-row justify-center items-center gap-6 px-6 md:px-0 pt-2 pb-4 md:pb-0 shrink-0 md:flex-1 md:min-h-0">
           {showVisualizer ? (
             <div className="w-56 h-56 flex items-center justify-center">
               <VisualizerCanvas isPlaying={isPlaying} />
             </div>
           ) : (
             <motion.div key={currentTrack.id}
-              initial={{ opacity: 0, scale: 0.82 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 26, mass: 0.9 }}
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ 
+                duration: 0.7,
+                ease: [0.25, 0.1, 0.25, 1], // Apple's ease
+                delay: 0.05
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               className="relative cursor-pointer" onClick={handleCoverTap}>
-              <img src={coverUrl} alt="" className="w-56 h-56 md:w-64 md:h-64 rounded-2xl object-cover shadow-2xl" />
+              {/* Immagine sempre quadrata */}
+              <img src={coverUrl} alt="" className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 rounded-2xl object-cover shadow-2xl" />
+              {/* Bordo animato attaccato all'immagine - Apple style */}
               {isPlaying && (
-                <motion.div className="absolute -inset-1 rounded-2xl border border-primary/30"
-                  animate={{ opacity: [0.2, 0.6, 0.2] }}
-                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }} />
+                <motion.div className="absolute inset-0 rounded-2xl border-2 border-primary/50"
+                  animate={{ 
+                    opacity: [0.3, 0.8, 0.3],
+                    scale: [1, 1.01, 1]
+                  }}
+                  transition={{ 
+                    duration: 2.8, 
+                    repeat: Infinity, 
+                    ease: [0.4, 0, 0.2, 1] // Apple's smooth ease
+                  }} />
               )}
               {/* BPM badge */}
               {bpm && (
@@ -236,13 +252,54 @@ export default function NowPlayingView(props: NowPlayingProps) {
               )}
             </motion.div>
           )}
+          
+          {/* Track info su LG+ schermi - affiancato alla cover con animazioni Apple */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ 
+              duration: 0.6,
+              ease: [0.25, 0.1, 0.25, 1], // Apple's signature ease
+              delay: 0.15
+            }}
+            className="hidden lg:block lg:max-w-md space-y-6">
+            <div>
+              <h2 className="text-3xl lg:text-4xl font-bold leading-tight">{currentTrack.name}</h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground mt-3">{currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
+              <p className="text-base text-muted-foreground/70 mt-2">{currentTrack.album.name}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <motion.button 
+                onClick={handleLike}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                className={`p-4 rounded-full transition-colors ${
+                  isLiked ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-secondary/50"
+                }`}>
+                <motion.div
+                  animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
+                  transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}>
+                  <Heart className={`w-7 h-7 ${isLiked ? "fill-current" : ""}`} />
+                </motion.div>
+              </motion.button>
+              <motion.button 
+                onClick={handleShare}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                className="p-4 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                <Share2 className="w-6 h-6" />
+              </motion.button>
+            </div>
+          </motion.div>
         </div>
 
-        {/* Track info + controls — scrollabile */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+        {/* Track info + controls — Right side on desktop, scrollable */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 md:pb-6 space-y-4 md:max-w-md md:shrink-0">
 
-          {/* Track info */}
-          <div className="flex items-center justify-between">
+          {/* Track info - nascosto su LG+ perché già affiancato alla cover */}
+          <div className="flex items-center justify-between lg:hidden">
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold truncate">{currentTrack.name}</h2>
               <p className="text-base text-muted-foreground truncate">{currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
