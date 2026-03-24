@@ -4,8 +4,9 @@ import {
   X, Heart, Share2, MoreHorizontal, Sparkles, BarChart3, Mic2, ListMusic,
   Info, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Clock, Timer, Volume2, Headphones, Music2, ChevronUp, Radio,
-  Zap, Star, TrendingUp, Eye, EyeOff
+  Zap, Star, TrendingUp, Eye, EyeOff, Disc3
 } from "lucide-react";
+import VinylNowPlayingView from "./VinylNowPlayingView";
 import WaveformProgress from "./WaveformProgress";
 import VisualizerCanvas from "./VisualizerCanvas";
 import { formatTime } from "@/lib/mock-data";
@@ -54,6 +55,7 @@ function useSleepTimer(onEnd: () => void) {
 export default function NowPlayingView(props: NowPlayingProps) {
   const { onClose, onNavigate } = props;
   const [showVisualizer, setShowVisualizer] = useState(false);
+  const [vinylMode, setVinylMode] = useState(false);
   // Default panel: lyrics su desktop, null su mobile
   const [activePanel, setActivePanel] = useState<PanelType>(typeof window !== 'undefined' && window.innerWidth >= 768 ? 'lyrics' : null);
   const [isLiked, setIsLiked] = useState(false);
@@ -129,6 +131,31 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
   const togglePanel = (p: PanelType) => setActivePanel(prev => prev === p ? null : p);
 
+  if (vinylMode) {
+    return (
+      <motion.div
+        initial={{ opacity: 0.6, y: "100%" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }}
+        transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.9 }}
+        className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
+      >
+        {/* Header con toggle (Trasparente senza blur per uniformità) */}
+        <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0">
+          <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+            <X className="w-6 h-6" />
+          </button>
+          <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">Vinyl Mode</p>
+          <button onClick={() => setVinylMode(false)}
+            className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+            <Music2 className="w-5 h-5" />
+          </button>
+        </div>
+        <VinylNowPlayingView />
+      </motion.div>
+    );
+  }
+
   // ── Controls ────────────────────────────────────────────────────────────────
   const handleTogglePlay = async () => {
     try { isPlaying ? await pauseMutation.mutateAsync() : await playMutation.mutateAsync({}); } catch (_) {}
@@ -196,6 +223,10 @@ export default function NowPlayingView(props: NowPlayingProps) {
         </button>
         <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">In riproduzione</p>
         <div className="flex items-center gap-1">
+          <button onClick={() => setVinylMode(true)}
+            className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+            <Disc3 className="w-5 h-5" />
+          </button>
           <button onClick={() => setShowVisualizer(!showVisualizer)}
             className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${showVisualizer ? "text-primary bg-primary/10" : "text-foreground/70 hover:bg-foreground/10"}`}>
             <BarChart3 className="w-5 h-5" />

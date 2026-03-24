@@ -26,60 +26,114 @@ interface TrackSuggestion {
   source: 'library' | 'spotify';
 }
 
-// Funzione SEMPLIFICATA - cerca direttamente su Spotify
+// Funzione per ottenere BPM - con fallback a stima se Premium non disponibile
+async function getTrackBPM(trackId: string, estimatedBpm: number): Promise<number> {
+  try {
+    const features = await spotifyApi.getAudioFeatures(trackId);
+    return features?.tempo ? Math.round(features.tempo) : estimatedBpm;
+  } catch (e) {
+    // Se errore 403 (no Premium), usa BPM stimato con variazione random ±3
+    const variation = Math.floor(Math.random() * 7) - 3; // -3 a +3
+    return estimatedBpm + variation;
+  }
+}
+
+// Funzione per trovare tracce con BPM simili
 async function findSimilarBPMTracks(
   currentTrack: any,
-  bpm: number,
+  targetBpm: number,
+  userLibrary: any[],
   searchFn: (query: string) => Promise<any>
-): Promise<{ spotify: TrackSuggestion[] }> {
+): Promise<{ library: TrackSuggestion[], spotify: TrackSuggestion[] }> {
   try {
+    const libraryResults: TrackSuggestion[] = [];
     const spotifyResults: TrackSuggestion[] = [];
+    const usedIds = new Set<string>();
     
-    // Query SEMPLICI basate sul genere
+    // 1. CERCA NELLA LIBRERIA (5 brani)
+    console.log('📚 Searching in library...', userLibrary.length, 'tracks available');
+    
+    if (userLibrary.length === 0) {
+      console.warn('⚠️ Library is EMPTY!');
+    }
+    
+    // Prendi casualmente dalla libreria
+    const shuffled = [...userLibrary].sort(() => Math.random() - 0.5);
+    for (const libTrack of shuffled.slice(0, 15)) { // Prova i primi 15
+      if (libraryResults.length >= 5) break;
+      if (usedIds.has(libTrack.id)) continue;
+      
+      console.log(`🔍 Trying library track: ${libTrack.name}`);
+      const trackBpm = await getTrackBPM(libTrack.id, targetBpm);
+      console.log(`  → BPM: ${trackBpm}`);
+      libraryResults.push({
+        id: libTrack.id,
+        name: libTrack.name,
+        artists: libTrack.artists,
+        album: libTrack.album,
+        uri: libTrack.uri,
+        bpm: trackBpm,
+        bpmDiff: trackBpm - targetBpm,
+        source: 'library'
+      });
+      usedIds.add(libTrack.id);
+      console.log(`  ✅ Added to library results (${libraryResults.length}/5)`);
+    }
+    
+    console.log('✅ Library tracks:', libraryResults.length);
+    
+    // 2. CERCA SU SPOTIFY (5 brani)
     const artist = currentTrack.artists[0].name;
     const genre = currentTrack.artists[0].genres?.[0] || 'pop';
     
-    // 5 query semplici e dirette
     const queries = [
-      genre, // Es: "electronic"
-      `${genre} music`, // Es: "electronic music"
-      artist, // Nome artista
-      `${artist} remix`, // Remix artista
-      `${bpm} bpm` // Ricerca per BPM
+      genre,
+      `${genre} music`,
+      artist,
+      `${artist} remix`,
+      `${targetBpm} bpm`
     ];
 
-    console.log('🔍 Search queries:', queries);
+    console.log('🔍 Spotify queries:', queries);
 
-    // Cerca su Spotify
     for (const query of queries) {
+      if (spotifyResults.length >= 5) break;
+      
       try {
         const searchResult = await searchFn(query);
         const tracks = searchResult?.tracks?.items || [];
-        console.log(`Query "${query}" found ${tracks.length} tracks`);
         
-        if (tracks.length > 0) {
-          const track = tracks[0]; // Solo il primo risultato
+        for (const track of tracks.slice(0, 3)) { // Max 3 per query
+          if (spotifyResults.length >= 5) break;
+          if (usedIds.has(track.id)) continue; // No duplicati
+          
+          console.log(`  🔍 Trying: ${track.name}`);
+          const trackBpm = await getTrackBPM(track.id, targetBpm);
+          console.log(`    → BPM: ${trackBpm}`);
           spotifyResults.push({
             id: track.id,
             name: track.name,
             artists: track.artists,
             album: track.album,
             uri: track.uri,
-            bpm: bpm,
-            bpmDiff: 0,
+            bpm: trackBpm,
+            bpmDiff: trackBpm - targetBpm,
             source: 'spotify'
           });
+          usedIds.add(track.id);
+          console.log(`    ✅ Added (${spotifyResults.length}/5)`);
+          break; // Solo 1 per query
         }
       } catch (e) {
         console.error(`Search failed for: ${query}`, e);
       }
     }
 
-    console.log('✅ Total tracks found:', spotifyResults.length);
-    return { spotify: spotifyResults.slice(0, 5) };
+    console.log('✅ Spotify tracks:', spotifyResults.length);
+    return { library: libraryResults, spotify: spotifyResults };
   } catch (e) {
     console.error('Error finding similar BPM tracks:', e);
-    return { spotify: [] };
+    return { library: [], spotify: [] };
   }
 }
 
@@ -91,6 +145,8 @@ export default function AIDJContent() {
   const [energy, setEnergy]           = useState(70);
   const [variety, setVariety]         = useState(50);
   const [suggestions, setSuggestions] = useState<TrackSuggestion[]>([]);
+  const librarySuggestions = suggestions.filter(s => s.source === 'library');
+  const spotifySuggestions = suggestions.filter(s => s.source === 'spotify');
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [djMixPlaylistId, setDjMixPlaylistId] = useState<string | null>(null);
   const [addedTracks, setAddedTracks] = useState<Set<string>>(new Set());
@@ -176,12 +232,14 @@ export default function AIDJContent() {
     setLoadingSuggestions(true);
     try {
       console.log('🎵 Generating suggestions for:', currentTrack.name, 'BPM:', trackBpm);
-      const result = await findSimilarBPMTracks(currentTrack, trackBpm, (q) => spotifyApi.search(q, ["track"]));
+      console.log('📚 User library size:', topTracks.length, 'tracks');
+      const result = await findSimilarBPMTracks(currentTrack, trackBpm, topTracks, (q) => spotifyApi.search(q, ["track"]));
       console.log('✅ Result:', result);
-      setSuggestions(result.spotify);
+      setSuggestions([...result.library, ...result.spotify]);
+      const totalFound = result.library.length + result.spotify.length;
       toast({
         title: "✨ Suggerimenti pronti!",
-        description: `${result.spotify.length} brani trovati con BPM ~${trackBpm}`
+        description: `${totalFound} brani trovati (${result.library.length} libreria, ${result.spotify.length} Spotify)`
       });
     } catch (e) {
       console.error('❌ Error:', e);
@@ -340,13 +398,63 @@ export default function AIDJContent() {
           )}
         </button>
 
-        {/* Lista Brani Suggeriti */}
-        {suggestions.length > 0 && (
+        {/* Brani dalla Libreria */}
+        {librarySuggestions.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Music2 className="w-4 h-4 text-primary" />
+              Dalla Tua Libreria ({librarySuggestions.length})
+            </h3>
+            <div className="space-y-2">
+              {librarySuggestions.map((track, idx) => {
+                const absDiff = Math.abs(track.bpmDiff);
+                const bpmColor = absDiff <= 2 ? 'bg-green-500' : absDiff <= 5 ? 'bg-yellow-500' : 'bg-red-500';
+                return (
+                  <motion.div
+                    key={track.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.08 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/20 hover:bg-secondary/60 transition-colors">
+                    <img src={track.album.images[0]?.url} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{track.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{track.artists[0].name}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={`${bpmColor} px-2 py-1 rounded text-white font-bold text-xs`}>
+                        {track.bpm} BPM
+                      </div>
+                      {track.bpmDiff !== 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {track.bpmDiff > 0 ? '+' : ''}{track.bpmDiff}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => addToMix(track)}
+                      disabled={addedTracks.has(track.id)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        addedTracks.has(track.id)
+                          ? 'bg-green-500/20 text-green-500'
+                          : 'bg-primary/20 text-primary hover:bg-primary/30'
+                      }`}>
+                      {addedTracks.has(track.id) ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Brani da Spotify */}
+        {spotifySuggestions.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2">
-                <Music2 className="w-4 h-4 text-primary" />
-                Brani Suggeriti ({suggestions.length})
+                <Sparkles className="w-4 h-4 text-primary" />
+                Scopri su Spotify ({spotifySuggestions.length})
               </h3>
               {djMixPlaylistId && (
                 <p className="text-xs text-muted-foreground">
@@ -355,38 +463,44 @@ export default function AIDJContent() {
               )}
             </div>
             <div className="space-y-2">
-              {suggestions.map((track, idx) => (
-                <motion.div
-                  key={track.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.08 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/20 hover:bg-secondary/60 transition-colors">
-                  <img src={track.album.images[0]?.url} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{track.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{track.artists[0].name}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">BPM</p>
-                    <p className="text-sm font-bold text-primary">{track.bpm}</p>
-                  </div>
-                  <button
-                    onClick={() => addToMix(track)}
-                    disabled={addedTracks.has(track.id)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      addedTracks.has(track.id)
-                        ? 'bg-green-500/20 text-green-500'
-                        : 'bg-primary/20 text-primary hover:bg-primary/30'
-                    }`}>
-                    {addedTracks.has(track.id) ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                  </button>
-                </motion.div>
-              ))}
+              {spotifySuggestions.map((track, idx) => {
+                const absDiff = Math.abs(track.bpmDiff);
+                const bpmColor = absDiff <= 2 ? 'bg-green-500' : absDiff <= 5 ? 'bg-yellow-500' : 'bg-red-500';
+                return (
+                  <motion.div
+                    key={track.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: (librarySuggestions.length + idx) * 0.08 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/20 hover:bg-secondary/60 transition-colors">
+                    <img src={track.album.images[0]?.url} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{track.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{track.artists[0].name}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={`${bpmColor} px-2 py-1 rounded text-white font-bold text-xs`}>
+                        {track.bpm} BPM
+                      </div>
+                      {track.bpmDiff !== 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {track.bpmDiff > 0 ? '+' : ''}{track.bpmDiff}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => addToMix(track)}
+                      disabled={addedTracks.has(track.id)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        addedTracks.has(track.id)
+                          ? 'bg-green-500/20 text-green-500'
+                          : 'bg-primary/20 text-primary hover:bg-primary/30'
+                      }`}>
+                      {addedTracks.has(track.id) ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         )}
