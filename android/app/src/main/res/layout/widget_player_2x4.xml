@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PLAYER WIDGET 2x4 — Rettangolo verticale: copertina + info + controlli -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Sfondo copertina sfocata desaturata -->
+    <ImageView
+        android:id="@+id/widget_bg_cover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/widget_default_cover"
+        android:colorFilter="@color/widget_desaturate" />
+
+    <!-- Overlay gradiente scuro -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_overlay_gradient_dark" />
+
+    <!-- Contenuto verticale -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="12dp">
+
+        <!-- Copertina quadrata in alto -->
+        <ImageView
+            android:id="@+id/widget_cover_small"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/widget_default_cover"
+            android:background="@drawable/widget_cover_shape" />
+
+        <!-- Titolo -->
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Titolo canzone"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- Artista -->
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="Artista"
+            android:textColor="#AAFFFFFF"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Controlli -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <ImageButton
+                android:id="@+id/widget_btn_prev"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/widget_ic_prev"
+                android:tint="#FFFFFF"
+                android:contentDescription="Precedente" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_play"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/widget_play_btn_bg"
+                android:src="@drawable/widget_ic_play"
+                android:tint="#FFFFFF"
+                android:contentDescription="Play/Pausa" />
+
+            <ImageButton
+                android:id="@+id/widget_btn_next"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/widget_ic_next"
+                android:tint="#FFFFFF"
+                android:contentDescription="Successivo" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

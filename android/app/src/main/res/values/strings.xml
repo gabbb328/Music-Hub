@@ -4,4 +4,8 @@
     <string name="title_activity_main">Music Hub</string>
     <string name="package_name">com.musichub.app</string>
     <string name="custom_url_scheme">com.musichub.app</string>
+    <string name="widget_player_name">Music Player</string>
+    <string name="widget_player_description">Control your music directly from the home screen.</string>
+    <string name="widget_vinyl_name">Vinyl Player</string>
+    <string name="widget_vinyl_description">A beautiful vinyl-styled player for your home screen.</string>
 </resources>

@@ -26,13 +26,13 @@ interface SquishOptions {
   spring?: { stiffness: number; damping: number; mass: number };
 }
 
-const DEFAULT_SPRING = { stiffness: 420, damping: 28, mass: 0.7 };
+const DEFAULT_SPRING = { stiffness: 550, damping: 25, mass: 1 };
 
 export function useSquish(count: number, options: SquishOptions = {}) {
   const {
-    activeScale    = 1.18,
-    neighborScale  = 0.88,
-    farScale       = 0.94,
+    activeScale    = 1.22,
+    neighborScale  = 0.85,
+    farScale       = 0.92,
     neighborRadius = 1,
     spring         = DEFAULT_SPRING,
   } = options;
@@ -53,9 +53,9 @@ export function useSquish(count: number, options: SquishOptions = {}) {
   const getY = useCallback(
     (i: number): number => {
       if (pressedIndex === null) return 0;
-      if (i === pressedIndex) return -2;
+      if (i === pressedIndex) return -4;
       const dist = Math.abs(i - pressedIndex);
-      if (dist === 1) return 2;
+      if (dist === 1) return 3;
       return 0;
     },
     [pressedIndex]

@@ -16,16 +16,16 @@ const navItems = [
   { id: "more",         label: "More",    icon: MoreHorizontal },
 ];
 
-const NAV_SPRING = { type: "spring", stiffness: 400, damping: 38, mass: 0.7 } as const;
+const NAV_SPRING = { type: "spring", stiffness: 600, damping: 30, mass: 0.8 } as const;
 
 export default function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
   // Squish: elemento premuto si ingrandisce, adiacenti si rimpiccioliscono
   const squish = useSquish(navItems.length, {
-    activeScale:   1.22,
-    neighborScale: 0.84,
-    farScale:      0.92,
+    activeScale:   1.25,
+    neighborScale: 0.82,
+    farScale:      0.90,
     neighborRadius: 1,
-    spring: { stiffness: 460, damping: 28, mass: 0.65 },
+    spring: { stiffness: 650, damping: 28, mass: 0.8 },
   });
 
   return (
@@ -46,14 +46,14 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
               key={item.id}
               onClick={() => onSectionChange(item.id)}
               className="relative flex flex-col items-center justify-center flex-1 h-full gap-0.5 min-w-0 touch-manipulation"
-              // Squish gestisce scale + y, ma manteniamo il layoutId pill
+              whileTap={{ scale: 0.9, rotate: [0, -1, 1, 0] }}
               {...squishProps}
             >
               {/* Pill background attivo */}
               {isActive && (
                 <motion.div
                   layoutId="mobile-nav-pill"
-                  className="absolute inset-x-1.5 inset-y-1.5 rounded-2xl bg-primary/12"
+                  className="absolute inset-x-1.5 inset-y-1.5 rounded-2xl bg-primary/15"
                   transition={NAV_SPRING}
                 />
               )}
@@ -61,8 +61,9 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
               {/* Icona — scala aggiuntiva se attiva */}
               <motion.div
                 animate={{
-                  scale: isActive ? 1.08 : 1,
-                  y:     isActive ? -1 : 0,
+                  scale: isActive ? 1.15 : 1,
+                  y:     isActive ? -2 : 0,
+                  rotate: isActive ? [0, -5, 5, 0] : 0,
                 }}
                 transition={NAV_SPRING}
                 className="relative z-10"
