@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VINYL WIDGET 2x2 — Solo vinile che gira -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg_cover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/widget_default_cover"
+        android:colorFilter="@color/widget_desaturate" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_overlay_gradient_dark" />
+
+    <!-- Vinile rotante (immagine generata dinamicamente dal codice) -->
+    <ImageView
+        android:id="@+id/widget_vinyl_disc"
+        android:layout_width="90dp"
+        android:layout_height="90dp"
+        android:layout_gravity="center"
+        android:src="@drawable/widget_vinyl_default"
+        android:scaleType="centerCrop" />
+
+    <!-- Play/Pause sovrapposto al vinile -->
+    <ImageButton
+        android:id="@+id/widget_btn_play"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_play_overlay_bg"
+        android:src="@drawable/widget_ic_play"
+        android:tint="#FFFFFF"
+        android:contentDescription="Play/Pausa" />
+
+</FrameLayout>

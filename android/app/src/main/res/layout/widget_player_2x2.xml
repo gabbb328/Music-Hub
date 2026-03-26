@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PLAYER WIDGET 2x2 — Quadrato compatto: copertina + play/pause centrale -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Copertina sfocata/desaturata come sfondo -->
+    <ImageView
+        android:id="@+id/widget_bg_cover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/widget_default_cover"
+        android:colorFilter="@color/widget_desaturate" />
+
+    <!-- Overlay scuro sfumato -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_overlay_gradient" />
+
+    <!-- Copertina piccola in alto a sx -->
+    <ImageView
+        android:id="@+id/widget_cover_small"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="10dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/widget_default_cover"
+        android:background="@drawable/widget_cover_shape" />
+
+    <!-- Titolo -->
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="36dp"
+        android:text="Titolo canzone"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Artista -->
+    <TextView
+        android:id="@+id/widget_artist"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="20dp"
+        android:text="Artista"
+        android:textColor="#AAFFFFFF"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Pulsanti controllo in fondo -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="4dp"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <ImageButton
+            android:id="@+id/widget_btn_prev"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/widget_ic_prev"
+            android:tint="#FFFFFF"
+            android:contentDescription="Precedente" />
+
+        <ImageButton
+            android:id="@+id/widget_btn_play"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/widget_play_btn_bg"
+            android:src="@drawable/widget_ic_play"
+            android:tint="#FFFFFF"
+            android:contentDescription="Play/Pausa" />
+
+        <ImageButton
+            android:id="@+id/widget_btn_next"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/widget_ic_next"
+            android:tint="#FFFFFF"
+            android:contentDescription="Successivo" />
+
+    </LinearLayout>
+
+</FrameLayout>

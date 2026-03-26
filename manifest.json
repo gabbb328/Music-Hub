@@ -1,0 +1,63 @@
+{
+  "name": "Harmony Hub",
+  "short_name": "Harmony Hub",
+  "description": "Stream, discover, and enjoy your favorite music with AI-powered recommendations",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e27",
+  "theme_color": "#0a0e27",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/app_blu_scuro.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Playlists",
+      "url": "/playlists",
+      "description": "View your playlists"
+    },
+    {
+      "name": "Search",
+      "url": "/search",
+      "description": "Search for music"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Player 2x2",
+      "description": "Music Player Widget 2x2",
+      "tag": "player_2x2",
+      "template": "widget_player_2x2",
+      "ms_ac_template": "widget_player_2x2",
+      "data": "widget-player-data",
+      "type": "widget",
+      "screenshot": "/icons/app_blu_scuro.png"
+    },
+    {
+      "name": "Player 4x2",
+      "description": "Music Player Widget 4x2",
+      "tag": "player_4x2",
+      "template": "widget_player_4x2",
+      "ms_ac_template": "widget_player_4x2",
+      "data": "widget-player-data",
+      "type": "widget",
+      "screenshot": "/icons/app_blu_scuro.png"
+    },
+    {
+      "name": "Vinyl 2x2",
+      "description": "Vinyl Player Widget 2x2",
+      "tag": "vinyl_2x2",
+      "template": "widget_vinyl_2x2",
+      "ms_ac_template": "widget_vinyl_2x2",
+      "data": "widget-vinyl-data",
+      "type": "widget",
+      "screenshot": "/icons/app_blu_scuro.png"
+    }
+  ]
+}
