@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => ({
           });
         },
       },
+      "/api/alexa": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
     },
   },
 
