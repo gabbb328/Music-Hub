@@ -1,5 +1,12 @@
 import * as Alexa from 'ask-sdk-core';
-import mainDashboard from '../../alexa/apl/main-dashboard.json';
+import fs from 'fs';
+import path from 'path';
+
+// Load APL template safely for Vercel
+const getMainDashboard = () => {
+    const filePath = path.join(process.cwd(), 'alexa/apl/main-dashboard.json');
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+};
 
 const LaunchRequestHandler = {
   canHandle(handlerInput) {
@@ -15,7 +22,7 @@ const LaunchRequestHandler = {
         .addDirective({
           type: 'Alexa.Presentation.APL.RenderDocument',
           token: 'dashboardToken',
-          document: mainDashboard,
+          document: getMainDashboard(),
           datasources: {
             body: {
               title: "Nessun brano",
@@ -51,7 +58,7 @@ const PlayMusicIntentHandler = {
       .addDirective({
         type: 'Alexa.Presentation.APL.RenderDocument',
         token: 'playingToken',
-        document: mainDashboard,
+        document: getMainDashboard(),
         datasources: {
           body: {
             title: "Bohemian Rhapsody",
