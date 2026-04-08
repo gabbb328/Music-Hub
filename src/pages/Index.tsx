@@ -49,13 +49,15 @@ const KONAMI_SWIPES = [
   "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
   "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
 ];
+import { useAlexa } from "@/hooks/useAlexa";
 
 // ── Super Mode Overlay ────────────────────────────────────────────────────────
 function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => void }) {
   const [remaining, setRemaining] = useState(20);
+  const isAlexa = useAlexa();
 
   useEffect(() => {
-    if (!active) { setRemaining(20); return; }
+    if (!active || isAlexa) { setRemaining(20); return; }
     setRemaining(20);
     const t = setInterval(() => {
       setRemaining(r => {
@@ -64,9 +66,9 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [active]); // eslint-disable-line
+  }, [active, isAlexa]); // eslint-disable-line
 
-  if (!active) return null;
+  if (!active || isAlexa) return null; // Disable super mode visuals on Alexa to save CPU
 
   return (
     <>
@@ -154,6 +156,7 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
 
 // ═══════════════════════════════════════════════════════════════════════════════
 const Index = () => {
+  const isAlexa = useAlexa();
   const player = usePlayerStore();
   const [activeSection, setActiveSection]   = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
@@ -338,18 +341,24 @@ const Index = () => {
         <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
           <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSection}
-                className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {renderContent()}
-              </motion.div>
-            </AnimatePresence>
+            {isAlexa ? (
+               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                 {renderContent()}
+               </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSection}
+                  className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
+            )}
           </main>
         </div>
 
