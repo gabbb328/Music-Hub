@@ -110,18 +110,35 @@ const ErrorHandler = {
 let skill;
 
 export default async function handler(req, res) {
-  if (!skill) {
-    skill = Alexa.SkillBuilders.custom()
-      .addRequestHandlers(
-        LaunchRequestHandler,
-        PlayMusicIntentHandler,
-        HelpIntentHandler,
-        CancelAndStopIntentHandler
-      )
-      .addErrorHandlers(ErrorHandler)
-      .create();
+  // Alexa requests are ALWAYS POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      status: 'error',
+      message: 'Method Not Allowed. This is an Alexa Skill endpoint, use POST with a valid Alexa payload.'
+    });
   }
 
-  const response = await skill.invoke(req.body);
-  res.status(200).json(response);
+  try {
+    if (!skill) {
+      skill = Alexa.SkillBuilders.custom()
+        .addRequestHandlers(
+          LaunchRequestHandler,
+          PlayMusicIntentHandler,
+          HelpIntentHandler,
+          CancelAndStopIntentHandler
+        )
+        .addErrorHandlers(ErrorHandler)
+        .create();
+    }
+
+    const response = await skill.invoke(req.body);
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Alexa Skill Invoke Error:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error',
+      details: error.message
+    });
+  }
 }
