@@ -1,0 +1,36 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "music hub",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "PlayMusicIntent",
+          "slots": [],
+          "samples": [
+            "riproduci musica",
+            "metti della musica",
+            "fammi ascoltare qualcosa",
+            "avvia riproduzione"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

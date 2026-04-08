@@ -48,6 +48,8 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@supabase/supabase-js": "^2.95.3",
     "@tanstack/react-query": "^5.83.0",
+    "ask-sdk-core": "^2.14.0",
+    "ask-sdk-model": "^1.86.0",
     "chromaprint-wasm": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
