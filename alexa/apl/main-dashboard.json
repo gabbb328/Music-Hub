@@ -1,112 +1,20 @@
 {
   "type": "APL",
   "version": "1.8",
-  "theme": "dark",
-  "import": [
-    {
-      "name": "alexa-layouts",
-      "version": "1.5.0"
-    }
-  ],
   "mainTemplate": {
-    "parameters": [
-      "payload"
-    ],
     "items": [
       {
-        "type": "Container",
+        "type": "Webview",
+        "id": "myWebview",
         "width": "100%",
         "height": "100%",
-        "items": [
-          {
-            "type": "Image",
-            "source": "${payload.body.backgroundImage}",
-            "width": "100%",
-            "height": "100%",
-            "scale": "best-fill",
-            "overlayColor": "rgba(0,0,0,0.6)",
-            "position": "absolute"
-          },
-          {
-            "type": "Container",
-            "direction": "row",
-            "paddingLeft": "@marginLeft",
-            "paddingRight": "@marginRight",
-            "paddingTop": "10vh",
-            "items": [
-              {
-                "type": "Image",
-                "source": "${payload.body.albumArt}",
-                "width": "400dp",
-                "height": "400dp",
-                "borderRadius": "20dp",
-                "shadowColor": "black",
-                "shadowOffset": {
-                  "width": 0,
-                  "height": 10
-                },
-                "shadowRadius": 20
-              },
-              {
-                "type": "Container",
-                "paddingLeft": "60dp",
-                "justifyContent": "center",
-                "items": [
-                  {
-                    "type": "Text",
-                    "text": "ORA IN RIPRODUZIONE",
-                    "fontSize": "24dp",
-                    "color": "#1DB954",
-                    "fontWeight": "bold",
-                    "letterSpacing": "4dp"
-                  },
-                  {
-                    "type": "Text",
-                    "text": "${payload.body.title}",
-                    "fontSize": "64dp",
-                    "fontWeight": "bold",
-                    "color": "white",
-                    "maxLines": 1
-                  },
-                  {
-                    "type": "Text",
-                    "text": "${payload.body.artist}",
-                    "fontSize": "32dp",
-                    "color": "#CCCCCC",
-                    "maxLines": 1
-                  },
-                  {
-                    "type": "Container",
-                    "direction": "row",
-                    "marginTop": "40dp",
-                    "items": [
-                      {
-                        "type": "VectorGraphic",
-                        "source": "alexa_icon_skip_previous",
-                        "width": "48dp",
-                        "height": "48dp"
-                      },
-                      {
-                        "type": "VectorGraphic",
-                        "source": "alexa_icon_play",
-                        "width": "64dp",
-                        "height": "64dp",
-                        "marginLeft": "40dp",
-                        "marginRight": "40dp"
-                      },
-                      {
-                        "type": "VectorGraphic",
-                        "source": "alexa_icon_skip_next",
-                        "width": "48dp",
-                        "height": "48dp"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+        "onLoad": [
+           {
+             "type": "Idle",
+             "delay": 1000
+           }
+        ],
+        "source": "https://music-hub-three.vercel.app/"
       }
     ]
   }

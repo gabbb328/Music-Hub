@@ -22,15 +22,7 @@ const LaunchRequestHandler = {
         .addDirective({
           type: 'Alexa.Presentation.APL.RenderDocument',
           token: 'dashboardToken',
-          document: getMainDashboard(),
-          datasources: {
-            body: {
-              title: "Nessun brano",
-              artist: "Inizia la riproduzione",
-              albumArt: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=1000",
-              backgroundImage: "https://images.unsplash.com/photo-1459749411177-042180ceea72?q=80&w=2000"
-            }
-          }
+          document: getMainDashboard()
         })
         .getResponse();
     }
