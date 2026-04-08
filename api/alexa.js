@@ -8,7 +8,7 @@ const LaunchRequestHandler = {
     return Alexa.getRequestType(handlerInput.requestEnvelope) === 'LaunchRequest';
   },
   handle(handlerInput) {
-    const speakOutput = 'Benvenuto su Harmony Hub. Puoi chiedermi di riprodurre musica o visualizzare la tua libreria.';
+    const speakOutput = 'Benvenuto su Music Hub. Puoi chiedermi di riprodurre musica o visualizzare la tua libreria.';
 
     // Check if device supports HTML (Web API for Games)
     if (Alexa.getSupportedInterfaces(handlerInput.requestEnvelope)['Alexa.Presentation.HTML']) {
