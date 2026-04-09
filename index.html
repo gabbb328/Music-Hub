@@ -33,6 +33,24 @@
       content="black-translucent"
     />
     <meta name="apple-mobile-web-app-title" content="Harmony Hub" />
+
+    <!-- Colori di default applicati subito — evita schermo bianco prima che React carichi -->
+    <style>
+      :root {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --primary: 217.2 91.2% 59.8%;
+        --card: 222.2 84% 4.9%;
+        --secondary: 217.2 32.6% 17.5%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --border: 217.2 32.6% 17.5%;
+      }
+      html, body, #root {
+        background-color: hsl(222.2deg 84% 4.9%);
+        color: hsl(210deg 40% 98%);
+      }
+    </style>
   </head>
 
   <body>
