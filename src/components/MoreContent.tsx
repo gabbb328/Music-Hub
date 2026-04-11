@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import {
   Radio, Mic2, BarChart3, Headphones, Sparkles, Heart, Clock,
-  ListMusic, ScanSearch, SlidersHorizontal, Settings, User,
-  Layers, Info, Music2, Settings2
+  ListMusic, ScanSearch, Settings, User,
+  Layers, Info
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -17,11 +17,8 @@ const features = [
   { id: "radio",         label: "Radio",           icon: Radio,             color: "text-blue-400",   bg: "bg-blue-400/10"   },
   { id: "lyrics",        label: "Testi",           icon: Mic2,              color: "text-pink-400",   bg: "bg-pink-400/10"   },
   { id: "recognize",     label: "Riconosci",       icon: ScanSearch,        color: "text-orange-400", bg: "bg-orange-400/10" },
-  { id: "equalizer",     label: "Equalizzatore",   icon: SlidersHorizontal, color: "text-cyan-400",   bg: "bg-cyan-400/10"   },
   { id: "stats",         label: "Statistiche",     icon: BarChart3,         color: "text-green-400",  bg: "bg-green-400/10"  },
   { id: "devices",       label: "Dispositivi",     icon: Headphones,        color: "text-yellow-400", bg: "bg-yellow-400/10" },
-  { id: "samsung-buds",  label: "Galaxy Buds",     icon: Music2,            color: "text-blue-300",   bg: "bg-blue-300/10"   },
-  { id: "audio-settings",label: "Audio",           icon: Settings2,         color: "text-slate-400",  bg: "bg-slate-400/10"  },
 ];
 
 const libraryItems = [

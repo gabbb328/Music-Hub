@@ -3,7 +3,7 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Home, Search, Library, Radio, Mic2, BarChart3, Headphones,
   Sparkles, Heart, Clock, ListMusic, Music, ScanSearch, Layers,
-  SlidersHorizontal, Info, Music2, Settings2
+  Info
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -24,11 +24,8 @@ const features = [
   { id: "radio",          label: "Radio",           icon: Radio             },
   { id: "lyrics",         label: "Testi",           icon: Mic2              },
   { id: "recognize",      label: "Riconosci",       icon: ScanSearch        },
-  { id: "equalizer",      label: "Equalizzatore",   icon: SlidersHorizontal },
   { id: "stats",          label: "Statistiche",     icon: BarChart3         },
   { id: "devices",        label: "Dispositivi",     icon: Headphones        },
-  { id: "samsung-buds",   label: "Galaxy Buds",     icon: Music2            },
-  { id: "audio-settings", label: "Audio",           icon: Settings2         },
 ];
 
 const libraryItems = [
