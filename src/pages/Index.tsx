@@ -36,7 +36,9 @@ import {
 } from "@/hooks/useSpotify";
 import EasterEggOverlay, { EasterEggList } from "@/components/EasterEggOverlay";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
-import { Crown, Zap } from "lucide-react";
+import { useSpotifyContext } from "@/contexts/SpotifyContext";
+import { Crown, Zap, Smartphone } from "lucide-react";
+import { useAlexa } from "@/hooks/useAlexa";
 
 // ── Konami sequence: ↑↑↓↓←→←→BA ─────────────────────────────────────────────
 const KONAMI_KEYS = [
@@ -49,7 +51,6 @@ const KONAMI_SWIPES = [
   "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
   "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
 ];
-import { useAlexa } from "@/hooks/useAlexa";
 
 // ── Super Mode Overlay ────────────────────────────────────────────────────────
 function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => void }) {
@@ -68,18 +69,16 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
     return () => clearInterval(t);
   }, [active, isAlexa]); // eslint-disable-line
 
-  if (!active || isAlexa) return null; // Disable super mode visuals on Alexa to save CPU
+  if (!active || isAlexa) return null;
 
   return (
     <>
-      {/* Sfondo dorato — z:5, pointer-events none, sotto tutto */}
       <motion.div
         key="super-bg"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 5 }}
       >
-        {/* Radiale animato */}
         <motion.div
           className="absolute inset-0"
           animate={{
@@ -92,14 +91,12 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
           }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         />
-        {/* Bordo pulsante */}
         <motion.div
           className="absolute inset-0"
           style={{ border: "1.5px solid rgba(255,215,0,0.25)" }}
           animate={{ opacity: [0.3, 0.7, 0.3] }}
           transition={{ duration: 1.2, repeat: Infinity }}
         />
-        {/* Particelle dorate */}
         {Array.from({ length: 10 }, (_, i) => (
           <motion.div
             key={i}
@@ -126,7 +123,6 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
         ))}
       </motion.div>
 
-      {/* Badge centrato — pointer-events none */}
       <motion.div
         key="super-badge"
         initial={{ opacity: 0, scale: 0.4, y: -24 }}
@@ -155,9 +151,15 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-const Index = () => {
+// IndexInner — vive DENTRO SpotifyProvider, quindi può usare useSpotifyContext
+// ═══════════════════════════════════════════════════════════════════════════════
+const IndexInner = () => {
   const isAlexa = useAlexa();
-  const player = usePlayerStore();
+  const player  = usePlayerStore();
+
+  // ✅ Ora è dentro SpotifyProvider — nessun errore di contesto
+  const { isIOS, playbackState: spPb } = useSpotifyContext();
+
   const [activeSection, setActiveSection]   = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
   const [showSettings, setShowSettings]     = useState(false);
@@ -165,12 +167,11 @@ const Index = () => {
   const [showEggList, setShowEggList]       = useState(false);
   const [superMode, setSuperMode]           = useState(false);
 
-  // Refs per Konami / swipe
-  const konamiRef     = useRef<string[]>([]);
-  const swipeRef      = useRef<string[]>([]);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const superTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const superActiveRef = useRef(false); // ref sincrono per evitare doppia attivazione
+  const konamiRef      = useRef<string[]>([]);
+  const swipeRef       = useRef<string[]>([]);
+  const touchStartRef  = useRef<{ x: number; y: number } | null>(null);
+  const superTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const superActiveRef = useRef(false);
 
   useLyricsPreloader();
   useDynamicTheme();
@@ -206,15 +207,14 @@ const Index = () => {
   };
 
   useMediaSession(currentTrack, isPlaying, mediaActions);
-  
+
   const handleDismissEgg = useCallback(() => setActiveEgg(null), []);
 
-  // ── Attiva/disattiva Super Mode ────────────────────────────────────────────
+  // ── Super Mode ─────────────────────────────────────────────────────────────
   const activateSuperMode = () => {
     if (superActiveRef.current) return;
     superActiveRef.current = true;
     setSuperMode(true);
-    // Velocità 1.5x su tutti gli audio/video HTML locali
     document.querySelectorAll<HTMLMediaElement>("audio, video")
       .forEach(el => { try { el.playbackRate = 1.5; } catch {} });
     if (superTimerRef.current) clearTimeout(superTimerRef.current);
@@ -257,7 +257,6 @@ const Index = () => {
       const dy = t.clientY - touchStartRef.current.y;
       const adx = Math.abs(dx), ady = Math.abs(dy);
       touchStartRef.current = null;
-      // Soglia minima per un swipe intenzionale
       if (Math.max(adx, ady) < 55) return;
       const dir = adx > ady
         ? (dx > 0 ? "ArrowRight" : "ArrowLeft")
@@ -311,91 +310,105 @@ const Index = () => {
   const hasTrack = !!currentTrack;
 
   return (
-    <SpotifyProvider>
-      {/*
-        .super-mode sul root → sovrascrive CSS variables (--primary diventa oro)
-        e applica stili globali a tutti i componenti figli
-      */}
-      <div className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}>
-        <SpotifyStatus />
+    <div className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}>
+      <SpotifyStatus />
 
-        {/* Easter egg sfondo + lista */}
-        <AnimatePresence>
-          {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />}
-        </AnimatePresence>
-        <AnimatePresence>
-          {showEggList && (
-            <EasterEggList
-              onClose={() => setShowEggList(false)}
-              onActivate={(egg) => { setActiveEgg(egg); setShowEggList(false); }}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Super Mode overlay */}
-        <AnimatePresence>
-          {superMode && <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />}
-        </AnimatePresence>
-
-        {/* Layout principale */}
-        <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
-          <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {isAlexa ? (
-               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                 {renderContent()}
-               </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeSection}
-                  className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  {renderContent()}
-                </motion.div>
-              </AnimatePresence>
-            )}
-          </main>
+      {/* Banner iOS: nessun dispositivo attivo */}
+      {isIOS && !spPb?.device && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/25 text-sm">
+          <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
+          <p className="text-amber-200 text-xs leading-snug flex-1">
+            <span className="font-semibold">Apri l'app Spotify</span> sul tuo iPhone e avvia la riproduzione — poi torna qui per controllarlo.
+          </p>
         </div>
+      )}
 
-        {/* PlayerBar e MobileNav accorpati per evitare gap su mobile */}
-        <div className="md:contents fixed bottom-0 left-0 right-0 z-50 flex flex-col pointer-events-none bg-background/80 backdrop-blur-xl border-t border-border/40 md:bg-transparent md:backdrop-blur-none md:border-t-0">
-          <div className="md:relative md:z-auto md:static pointer-events-auto">
-            <PlayerBar
-              {...player}
-              onExpandClick={() => setShowNowPlaying(true)}
-              onNavigate={setActiveSection}
-              onOpenEggList={() => setShowEggList(true)}
-              superMode={superMode}
-            />
-          </div>
-          <div className="pointer-events-auto">
-            <MobileNav
-              activeSection={activeSection}
-              onSectionChange={setActiveSection}
-              onOpenSettings={() => setShowSettings(true)}
-            />
-          </div>
-        </div>
+      {/* Easter egg sfondo + lista */}
+      <AnimatePresence>
+        {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showEggList && (
+          <EasterEggList
+            onClose={() => setShowEggList(false)}
+            onActivate={(egg) => { setActiveEgg(egg); setShowEggList(false); }}
+          />
+        )}
+      </AnimatePresence>
 
-        <AnimatePresence>
-          {showNowPlaying && (
-            <NowPlayingView
-              {...player}
-              onClose={() => setShowNowPlaying(false)}
-              onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
-            />
+      {/* Super Mode overlay */}
+      <AnimatePresence>
+        {superMode && <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />}
+      </AnimatePresence>
+
+      {/* Layout principale */}
+      <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
+        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {isAlexa ? (
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              {renderContent()}
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
           )}
-        </AnimatePresence>
-
-        <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+        </main>
       </div>
-    </SpotifyProvider>
+
+      {/* PlayerBar e MobileNav */}
+      <div className="md:contents fixed bottom-0 left-0 right-0 z-50 flex flex-col pointer-events-none bg-background/80 backdrop-blur-xl border-t border-border/40 md:bg-transparent md:backdrop-blur-none md:border-t-0">
+        <div className="md:relative md:z-auto md:static pointer-events-auto">
+          <PlayerBar
+            {...player}
+            onExpandClick={() => setShowNowPlaying(true)}
+            onNavigate={setActiveSection}
+            onOpenEggList={() => setShowEggList(true)}
+            superMode={superMode}
+          />
+        </div>
+        <div className="pointer-events-auto">
+          <MobileNav
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showNowPlaying && (
+          <NowPlayingView
+            {...player}
+            onClose={() => setShowNowPlaying(false)}
+            onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+    </div>
   );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Index — wrapper che monta SpotifyProvider, poi renderizza IndexInner al suo
+// interno. In questo modo useSpotifyContext() in IndexInner è sempre valido.
+// ═══════════════════════════════════════════════════════════════════════════════
+const Index = () => (
+  <SpotifyProvider>
+    <IndexInner />
+  </SpotifyProvider>
+);
 
 export default Index;

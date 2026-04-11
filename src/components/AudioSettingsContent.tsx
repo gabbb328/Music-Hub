@@ -5,6 +5,7 @@ import {
   Download, Upload, Moon, Bell, Smartphone, Save, RotateCcw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import EqualizerContent from "./EqualizerContent";
 
 // ── Tipi ─────────────────────────────────────────────────────────────────────
 interface AudioSettings {
@@ -147,6 +148,16 @@ export default function AudioSettingsContent() {
             onChange={v => update({ [item.key]: v })} />
         ))}
       </Section>
+
+      {/* Equalizzatore */}
+      <div className="rounded-2xl overflow-hidden -mx-4 md:-mx-6">
+        <div className="px-4 md:px-6 pt-2 pb-1">
+          <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+            Equalizzatore
+          </h2>
+        </div>
+        <EqualizerContent />
+      </div>
 
       <Section icon={Volume2} title="Audio">
         {([

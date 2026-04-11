@@ -2,6 +2,43 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as spotifyApi from "@/services/spotify-api";
 import { getToken } from "@/services/spotify-auth";
 
+// ── Rileva iOS (Safari non supporta Web Playback SDK) ─────────────────────────
+const IS_IOS =
+  /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+/**
+ * playWithIosFallback — su iOS, se Spotify API ritorna NO_ACTIVE_DEVICE,
+ * prova automaticamente a trasferire il playback al primo dispositivo disponibile
+ * e poi riprova il play. Su iOS Safari il Web Playback SDK non è supportato,
+ * quindi il dispositivo attivo deve essere l'app Spotify nativa.
+ */
+async function playWithIosFallback(
+  params: { deviceId?: string; contextUri?: string; uris?: string[]; offset?: any }
+) {
+  try {
+    return await spotifyApi.play(params.deviceId, params.contextUri, params.uris, params.offset);
+  } catch (err: any) {
+    if (!IS_IOS) throw err;
+    if (!err.message?.includes("NO_ACTIVE_DEVICE") && err.message !== "NO_ACTIVE_DEVICE") throw err;
+
+    // Prova a trovare un dispositivo e trasferire
+    const devs = await spotifyApi.getAvailableDevices().catch(() => null);
+    const devices: any[] = devs?.devices || [];
+    const target =
+      devices.find((d: any) => d.type === "Smartphone") ||
+      devices.find((d: any) => d.type === "Computer") ||
+      devices[0];
+
+    if (!target?.id) throw new Error("Apri l'app Spotify sul dispositivo e riprova.");
+
+    await spotifyApi.transferPlayback(target.id, true);
+    // Attende che Spotify registri il dispositivo
+    await new Promise(r => setTimeout(r, 800));
+    return await spotifyApi.play(target.id, params.contextUri, params.uris, params.offset);
+  }
+}
+
 export const useCurrentlyPlaying = () => useQuery({
   queryKey: ["currentlyPlaying"],
   queryFn: spotifyApi.getCurrentlyPlaying,
@@ -110,7 +147,7 @@ export const usePlayMutation = () => {
       contextUri?: string;
       uris?: string[];
       offset?: { position: number } | { uri: string };
-    }) => spotifyApi.play(params.deviceId, params.contextUri, params.uris, params.offset),
+    }) => playWithIosFallback(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["playbackState"] });
       qc.invalidateQueries({ queryKey: ["currentlyPlaying"] });

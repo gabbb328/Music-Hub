@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, PanInfo } from "framer-motion";
+import { motion, PanInfo, useMotionValue, animate } from "framer-motion";
 import { Music2 } from "lucide-react";
 import {
   usePlaybackState,
@@ -13,14 +13,14 @@ import { extractColorsFromImage } from "@/services/color-extractor";
 // ── Vinile SVG ──
 function VinylDisc({
   size,
-  rotation,
+  rotationValue,
   colors,
   trackName,
   artistName,
   onClick,
 }: {
   size: number;
-  rotation: number;
+  rotationValue: any; // MotionValue<number>
   colors: { primary: string; secondary: string };
   trackName: string;
   artistName: string;
@@ -32,9 +32,7 @@ function VinylDisc({
   return (
     <motion.div
       className="rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.8)] cursor-pointer"
-      style={{ width: size, height: size }}
-      animate={{ rotate: rotation }}
-      transition={{ duration: 0, ease: "linear" }}
+      style={{ width: size, height: size, rotate: rotationValue }}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -157,7 +155,6 @@ function Sleeve({
 
 // ── Tonearm (Puntina) ──
 function Tonearm({ isPlaying, size }: { isPlaying: boolean; size: number }) {
-  // Angolo di puntata: ~22 gradi quando in play, -10 quando fermo (parcheggio)
   const angle = isPlaying ? 22 : -10;
 
   return (
@@ -205,59 +202,96 @@ function Tonearm({ isPlaying, size }: { isPlaying: boolean; size: number }) {
   );
 }
 
+// ── RPM costante del vinile ──
+const RPM = 33;
+const DEG_PER_SEC = RPM * 6; // 198°/s
+
 export default function VinylNowPlayingView() {
   const { data: pb } = usePlaybackState();
-  const playM = usePlayMutation();
+  const playM  = usePlayMutation();
   const pauseM = usePauseMutation();
-  const nextM = useNextMutation();
-  const prevM = usePreviousMutation();
+  const nextM  = useNextMutation();
+  const prevM  = usePreviousMutation();
 
-  const [rotation, setRotation] = useState(0);
-  const [colors, setColors] = useState({
-    primary: "#1DB954",
-    secondary: "#1DB954",
-  });
+  const [colors, setColors] = useState({ primary: "#1DB954", secondary: "#1DB954" });
   const [isMobile, setIsMobile] = useState(false);
-  const animRef = useRef<number>(0);
-  const lastTRef = useRef<number>(0);
+
+  // MotionValue per la rotazione — permette di animare velocità e stop
+  // senza re-render e funziona perfettamente sia su desktop che mobile
+  const rotation = useMotionValue(0);
+
+  // Ref per il loop rAF di rotazione
+  const rafRef    = useRef<number>(0);
+  const lastTRef  = useRef<number>(0);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
-  const track = pb?.item;
+  const track     = pb?.item;
   const isPlaying = pb?.is_playing || false;
-  const coverUrl = track?.album?.images?.[0]?.url || "";
+  const coverUrl  = track?.album?.images?.[0]?.url || "";
 
   useEffect(() => {
     if (!coverUrl) return;
     extractColorsFromImage(coverUrl)
-      .then((p) => {
-        setColors({ primary: p.primary, secondary: p.primary });
-      })
+      .then((p) => setColors({ primary: p.primary, secondary: p.primary }))
       .catch(() => {});
   }, [coverUrl]);
 
+  // ── Gestione rotazione con rAF + animate per deceleration/return ──
   useEffect(() => {
-    if (!isPlaying) {
-      cancelAnimationFrame(animRef.current);
+    isPlayingRef.current = isPlaying;
+
+    if (isPlaying) {
+      // Avvia il loop rAF per la rotazione continua
+      const step = (t: number) => {
+        if (!isPlayingRef.current) return; // fermato nel frattempo
+        if (lastTRef.current) {
+          const dt = (t - lastTRef.current) / 1000;
+          rotation.set(rotation.get() + dt * DEG_PER_SEC);
+        }
+        lastTRef.current = t;
+        rafRef.current = requestAnimationFrame(step);
+      };
       lastTRef.current = 0;
-      return;
+      rafRef.current = requestAnimationFrame(step);
+    } else {
+      // Stop: cancella il loop rAF
+      cancelAnimationFrame(rafRef.current);
+      lastTRef.current = 0;
+
+      const currentAngle = rotation.get();
+      // Calcola il prossimo multiplo di 360 più vicino verso il basso (0°)
+      // in modo da fare una deceleration naturale fino a 0°
+      const fullTurns = Math.floor(currentAngle / 360);
+      // Target = multiplo di 360 con piccola coda di decelerazione
+      // facciamo girare ancora mezzo giro max e poi torniamo a 0
+      const target = (fullTurns + 0.5) * 360;
+
+      // Prima decelera fino al target con inerzia
+      animate(rotation, target, {
+        duration: 1.2,
+        ease: [0.25, 0.1, 0.25, 1], // ease-out
+        onComplete: () => {
+          // Poi torna a 0° (equivalente visivo, salto di fase multiplo di 360)
+          const finalFull = Math.round(rotation.get() / 360) * 360;
+          animate(rotation, finalFull, {
+            duration: 0.8,
+            ease: [0.4, 0, 0.2, 1],
+          });
+        },
+      });
     }
-    const step = (t: number) => {
-      if (lastTRef.current) {
-        const dt = (t - lastTRef.current) / 1000;
-        setRotation((r) => (r + dt * 33 * 6) % 360);
-      }
-      lastTRef.current = t;
-      animRef.current = requestAnimationFrame(step);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
     };
-    animRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [isPlaying]);
+  }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!track)
     return (
@@ -276,13 +310,13 @@ export default function VinylNowPlayingView() {
   };
 
   const SLEEVE_SIZE = isMobile ? 320 : 440;
-  const VINYL_SIZE = isMobile ? 300 : 420;
+  const VINYL_SIZE  = isMobile ? 300 : 420;
 
   return (
     <motion.div
       className="absolute inset-0 z-0 overflow-hidden flex items-center justify-center bg-black"
     >
-      {/* Background (Static) */}
+      {/* Background sfocato */}
       <motion.div
         key={coverUrl}
         initial={{ opacity: 0, scale: 1.25 }}
@@ -295,7 +329,7 @@ export default function VinylNowPlayingView() {
         transition={{ duration: 1.8 }}
       />
 
-      {/* Swipeable Assembly (Sleeve + Vinyl + Tonearm) */}
+      {/* Swipeable Assembly */}
       <motion.div
         className="relative flex items-center justify-center w-full h-full cursor-grab active:cursor-grabbing"
         drag="x"
@@ -307,9 +341,9 @@ export default function VinylNowPlayingView() {
         <motion.div
           className="relative flex items-center z-20"
           animate={{
-            x: isMobile ? -80 : (isPlaying ? -60 : 0), // Shifted more on mobile to show vinyl
+            x:      isMobile ? -80 : (isPlaying ? -60 : 0),
             rotate: -5,
-            scale: isMobile ? 0.9 : 1
+            scale:  isMobile ? 0.9 : 1,
           }}
           transition={{ type: "spring", stiffness: 60, damping: 18 }}
         >
@@ -323,11 +357,13 @@ export default function VinylNowPlayingView() {
             />
           </div>
 
-          {/* Vinyl Disc */}
+          {/* Vinyl Disc — usa MotionValue per la rotazione */}
           <motion.div
             className="absolute z-10"
             animate={{
-              x: isMobile ? SLEEVE_SIZE * 0.45 : (isPlaying ? SLEEVE_SIZE * 0.52 : SLEEVE_SIZE * 0.08),
+              x: isMobile
+                ? SLEEVE_SIZE * 0.45
+                : (isPlaying ? SLEEVE_SIZE * 0.52 : SLEEVE_SIZE * 0.08),
               opacity: 1,
             }}
             initial={false}
@@ -336,7 +372,7 @@ export default function VinylNowPlayingView() {
           >
             <VinylDisc
               size={VINYL_SIZE}
-              rotation={rotation}
+              rotationValue={rotation}
               colors={colors}
               trackName={track.name}
               artistName={track.artists[0]?.name || ""}
@@ -345,14 +381,14 @@ export default function VinylNowPlayingView() {
           </motion.div>
         </motion.div>
 
-        {/* Tonearm (Hidden on Mobile) */}
+        {/* Tonearm (solo desktop) */}
         {!isMobile && (
-          <div 
+          <div
             className="absolute z-[40] pointer-events-none"
-            style={{ 
-              top: "50%", 
-              left: "50%", 
-              transform: "translate(480px, -300px)" 
+            style={{
+              top: "50%",
+              left: "50%",
+              transform: "translate(480px, -300px)",
             }}
           >
             <Tonearm isPlaying={isPlaying} size={SLEEVE_SIZE} />
