@@ -16,38 +16,39 @@ export default function SpotifyLogin() {
       <div
         style={{
           minHeight: "100vh",
-          backgroundColor: "#0a0f1e",
+          backgroundColor: "#080d1e",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           padding: "16px",
-          fontFamily: "system-ui, sans-serif",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          color: "white"
         }}
       >
         <div
           style={{
             width: "100%",
-            maxWidth: "400px",
-            backgroundColor: "#111827",
-            border: "1px solid rgba(99,102,241,0.3)",
-            borderRadius: "16px",
-            padding: "40px 32px",
+            maxWidth: "380px",
+            backgroundColor: "#0c1226",
+            border: "1px solid #1e293b",
+            borderRadius: "12px",
+            padding: "32px 24px",
             textAlign: "center",
           }}
         >
           <Headphones
-            style={{ width: 72, height: 72, color: "#6366f1", margin: "0 auto 16px" }}
+            style={{ width: 64, height: 64, color: "#3b82f6", margin: "0 auto 16px" }}
           />
 
           <h1
             style={{
-              fontSize: "32px",
-              fontWeight: 700,
-              marginBottom: "8px",
-              color: "#f8fafc",
+              fontSize: "28px",
+              fontWeight: 800,
+              marginBottom: "4px",
+              letterSpacing: "-0.02em"
             }}
           >
-            <span style={{ color: "#6366f1" }}>Music</span>Hub
+            <span style={{ color: "#3b82f6" }}>Music</span>Hub
           </h1>
 
           <p style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "32px" }}>
@@ -59,26 +60,21 @@ export default function SpotifyLogin() {
             style={{
               width: "100%",
               backgroundColor: "#1DB954",
-              color: "#ffffff",
-              fontWeight: 600,
+              color: "white",
+              fontWeight: 700,
               fontSize: "16px",
-              padding: "16px 24px",
-              borderRadius: "12px",
+              padding: "18px 24px",
+              borderRadius: "10px",
               border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "10px",
-              boxShadow: "0 4px 24px rgba(29,185,84,0.3)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em"
             }}
           >
-            <ExternalLink style={{ width: 20, height: 20 }} />
             Login with Spotify
           </button>
-
-          <p style={{ color: "#64748b", fontSize: "11px", marginTop: "16px" }}>
-            By logging in, you agree to Spotify's Terms of Service
+          
+          <p style={{ color: "#475569", fontSize: "10px", marginTop: "20px" }}>
+            Optimized for Alexa Echo Show
           </p>
         </div>
       </div>

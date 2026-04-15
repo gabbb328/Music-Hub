@@ -17,7 +17,7 @@ const LaunchRequestHandler = {
         .addDirective({
           type: 'Alexa.Presentation.HTML.Start',
           request: {
-            uri: 'https://music-hub-three.vercel.app/',
+            uri: 'https://music-hub-three.vercel.app/?env=alexa',
             method: 'GET'
           },
           configuration: {
