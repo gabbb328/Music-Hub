@@ -366,23 +366,36 @@ input[type="range"]::-moz-range-thumb {
 }
 /* ── Alexa Mode (Low Performance) ─────────────────────────────────────────── */
 .alexa-mode * {
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.001ms !important;
+  /* Disabilitiamo TOTALMENTE le animazioni e transizioni */
+  animation: none !important;
+  transition: none !important;
+  /* Alcune classi di framer-motion potrebbero aver bisogno di questo */
+  transform: none !important;
 }
 
-.alexa-mode .no-blur {
+.alexa-mode .no-blur, 
+.alexa-mode .glass-surface, 
+.alexa-mode .glass-heavy {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background-color: hsl(var(--card)) !important;
+  background-color: #0c1226 !important; /* Blu scuro solido */
+  border-width: 1px !important;
 }
 
 .alexa-mode .alexa-static {
-  background: hsl(var(--background)) !important;
+  background: #080d1e !important;
 }
 
 .alexa-mode body {
-  /* Prevent scrolling issues on some Alexa devices */
+  /* Impediamo lo scroll se non necessario per stabilità */
   overflow: hidden !important;
   position: fixed !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Evitiamo qualsiasi ritardo nel mostrare il contenuto */
+.alexa-mode #root {
+  opacity: 1 !important;
+  visibility: visible !important;
 }

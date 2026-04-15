@@ -346,6 +346,7 @@ const IndexInner = () => {
         <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {isAlexa ? (
+            // Modalità Alexa: Rendering statico diretto senza alcun overhead di animazione
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {renderContent()}
             </div>
@@ -386,17 +387,21 @@ const IndexInner = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showNowPlaying && (
-          <NowPlayingView
-            {...player}
-            onClose={() => setShowNowPlaying(false)}
-            onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
-          />
-        )}
-      </AnimatePresence>
-
-      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      {/* Disable complex views on Alexa to save memory/CPU */}
+      {!isAlexa && (
+        <>
+          <AnimatePresence>
+            {showNowPlaying && (
+              <NowPlayingView
+                {...player}
+                onClose={() => setShowNowPlaying(false)}
+                onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
+              />
+            )}
+          </AnimatePresence>
+          <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+        </>
+      )}
     </div>
   );
 };
