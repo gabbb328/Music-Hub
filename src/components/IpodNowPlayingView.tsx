@@ -160,7 +160,7 @@ function ClickWheel({
   const wheelRef = useRef<HTMLDivElement>(null);
   const lastAngleRef = useRef<number | null>(null);
   const accumulatedRef = useRef(0);
-  const TICK = 25; // gradi per "tick" di scroll
+  const TICK = 12; // gradi per "tick" di scroll (più basso = più sensibile)
 
   const getAngle = (e: Touch | MouseEvent, rect: DOMRect) => {
     const cx = rect.left + rect.width / 2;
@@ -188,10 +188,10 @@ function ClickWheel({
     accumulatedRef.current += delta;
     if (accumulatedRef.current > TICK) {
       onScrollDown();
-      accumulatedRef.current = 0;
+      accumulatedRef.current -= TICK;
     } else if (accumulatedRef.current < -TICK) {
       onScrollUp();
-      accumulatedRef.current = 0;
+      accumulatedRef.current += TICK;
     }
   };
 
@@ -214,10 +214,10 @@ function ClickWheel({
       accumulatedRef.current += delta;
       if (accumulatedRef.current > TICK) {
         onScrollDown();
-        accumulatedRef.current = 0;
+        accumulatedRef.current -= TICK;
       } else if (accumulatedRef.current < -TICK) {
         onScrollUp();
-        accumulatedRef.current = 0;
+        accumulatedRef.current += TICK;
       }
     };
 
@@ -396,7 +396,19 @@ function IpodScreenContent({
   onMenuSelect: (idx: number) => void;
 }) {
   const lyricsRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const itemRefs = useRef<(HTMLDivElement | HTMLButtonElement | null)[]>([]);
+
+  // Centering for Menu
+  useEffect(() => {
+    const container = menuRef.current;
+    const item = itemRefs.current[menuIndex];
+    if (!container || !item) return;
+
+    const target = item.offsetTop - container.clientHeight / 2 + item.clientHeight / 2;
+    container.scrollTo({ top: Math.max(0, target), behavior: "auto" }); // "auto" for instant response during wheel scroll
+  }, [menuIndex, screen]);
 
   useEffect(() => {
     const container = lyricsRef.current;
@@ -428,63 +440,83 @@ function IpodScreenContent({
           </span>
         </div>
 
-        {/* Album art */}
-        <div className="flex justify-center items-center flex-1 px-3 py-2">
-          {coverUrl ? (
-            <motion.img
-              key={track.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-              src={coverUrl}
-              alt=""
-              className="rounded shadow-lg object-cover"
-              style={{ width: 90, height: 90, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
-            />
-          ) : (
-            <div
-              className="rounded flex items-center justify-center"
-              style={{ width: 90, height: 90, background: "#333" }}
-            >
-              <span style={{ fontSize: 32 }}>🎵</span>
+        {/* Main Content Area (Split Layout) */}
+        <div className="flex-1 flex flex-row items-center px-3 py-2 gap-4 min-h-0">
+          {/* Album art (Left) */}
+          <div className="flex-shrink-0">
+            {coverUrl ? (
+              <motion.img
+                key={track.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                src={coverUrl}
+                alt=""
+                className="rounded shadow-2xl object-cover"
+                style={{ 
+                  width: "clamp(85px, 35vw, 130px)", 
+                  height: "clamp(85px, 35vw, 130px)", 
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.7)",
+                  border: `1px solid ${settings.textColor}11`
+                }}
+              />
+            ) : (
+              <div
+                className="rounded flex items-center justify-center bg-zinc-800"
+                style={{ width: 100, height: 100 }}
+              >
+                <span style={{ fontSize: 40 }}>🎵</span>
+              </div>
+            )}
+          </div>
+
+          {/* Info + Progress (Right) */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center space-y-3">
+            {/* Track info */}
+            <div className="space-y-0.5">
+              <div 
+                className="truncate font-bold leading-tight" 
+                style={{ color: settings.textColor, fontSize: 13, letterSpacing: "-0.01em" }}
+              >
+                {track.name}
+              </div>
+              <div 
+                className="truncate font-medium opacity-80" 
+                style={{ color: settings.textColor, fontSize: 11 }}
+              >
+                {track.artists?.map((a: any) => a.name).join(", ")}
+              </div>
+              <div 
+                className="truncate opacity-50" 
+                style={{ color: settings.textColor, fontSize: 10 }}
+              >
+                {track.album?.name}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Track info */}
-        <div className="px-3 pb-1">
-          <div className="truncate font-semibold" style={{ color: settings.textColor, fontSize: 11 }}>
-            {track.name}
-          </div>
-          <div className="truncate" style={{ color: `${settings.textColor}99`, fontSize: 10 }}>
-            {track.artists?.map((a: any) => a.name).join(", ")}
-          </div>
-          <div className="truncate" style={{ color: `${settings.textColor}66`, fontSize: 9 }}>
-            {track.album?.name}
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="px-3 pb-2">
-          <div
-            className="rounded-full overflow-hidden"
-            style={{ height: 3, background: `${settings.textColor}22` }}
-          >
-            <motion.div
-              className="h-full rounded-full"
-              style={{
-                width: `${progress}%`,
-                background: `linear-gradient(to right, ${settings.accentColor}, ${settings.accentColor}bb)`,
-              }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-          <div className="flex justify-between mt-0.5">
-            <span style={{ color: `${settings.textColor}88`, fontSize: 8 }}>{formatTime(elapsed)}</span>
-            <span style={{ color: isPlaying ? settings.accentColor : `${settings.textColor}88`, fontSize: 8 }}>
-              {isPlaying ? "▶" : "⏸"}
-            </span>
-            <span style={{ color: `${settings.textColor}88`, fontSize: 8 }}>-{formatTime(duration - elapsed)}</span>
+            {/* Progress Area */}
+            <div className="w-full">
+              <div
+                className="rounded-full overflow-hidden"
+                style={{ height: 4, background: `${settings.textColor}22` }}
+              >
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${progress}%`,
+                    background: `linear-gradient(to right, ${settings.accentColor}, ${settings.accentColor}dd)`,
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+              <div className="flex justify-between mt-1.5 px-0.5 font-mono">
+                <span style={{ color: `${settings.textColor}99`, fontSize: 9 }}>{formatTime(elapsed)}</span>
+                <span style={{ color: isPlaying ? settings.accentColor : `${settings.textColor}99`, fontSize: 9 }}>
+                  {isPlaying ? "▶" : "⏸"}
+                </span>
+                <span style={{ color: `${settings.textColor}99`, fontSize: 9 }}>-{formatTime(duration - elapsed)}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -525,10 +557,11 @@ function IpodScreenContent({
           <span style={{ color: "#fff", fontSize: 11, fontWeight: 600 }}>Color Theme</span>
           <span style={{ width: 40 }} />
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {PRESET_COLORS.map((p, i) => (
             <button
               key={p.name}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="w-full flex items-center gap-2 px-3 py-1.5 transition-colors"
               style={{
                 background: menuIndex === i ? settings.accentColor : "transparent",
@@ -617,7 +650,7 @@ function IpodScreenContent({
         >
           <span style={{ color: "#fff", fontSize: 11, fontWeight: 600 }}>Up Next</span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {queue.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ color: `${settings.textColor}66`, fontSize: 10 }}>Queue empty</span>
@@ -676,7 +709,7 @@ function IpodScreenContent({
         <div className="flex items-center justify-center px-2 py-1" style={{ background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`, minHeight: 22 }}>
           <span style={{ color: "#fff", fontSize: 11, fontWeight: 600 }}>{title}</span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {items.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ color: `${settings.textColor}66`, fontSize: 10 }}>Loading...</span>
@@ -685,6 +718,7 @@ function IpodScreenContent({
             items.map((item: any, i: number) => (
               <div 
                 key={item.id} 
+                ref={(el) => { itemRefs.current[i] = el; }}
                 className="flex items-center gap-2 px-2 py-1.5 cursor-pointer" 
                 style={{ background: menuIndex === i ? settings.accentColor : "transparent", borderBottom: `1px solid ${settings.textColor}11` }}
                 onClick={() => onMenuSelect(i)}
@@ -723,10 +757,11 @@ function IpodScreenContent({
             {menuData.label}
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {menuData.items.map((item, i) => (
             <button
               key={item}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="w-full flex items-center justify-between px-3 py-2 transition-colors"
               style={{
                 background: menuIndex === i ? settings.accentColor : "transparent",
@@ -1092,23 +1127,6 @@ export default function IpodNowPlayingView() {
         scale={isMobile ? 1.4 : 1.2}
       />
 
-      {/* Bottom logo */}
-      <div
-        className="absolute bottom-3 left-0 right-0 flex justify-center items-center"
-      >
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: "0.25em",
-            color: `${settings.textColor}44`,
-            fontFamily: "'SF Pro Display', 'Helvetica Neue', sans-serif",
-            textTransform: "uppercase",
-          }}
-        >
-          Harmony Hub
-        </span>
-      </div>
     </div>
   );
 }

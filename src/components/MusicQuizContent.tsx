@@ -12,7 +12,7 @@ interface Question {
   options: any[];
 }
 
-export default function MusicQuizContent() {
+export default function MusicQuizContent({ onStateChange }: { onStateChange?: (active: boolean) => void }) {
   const [gameState, setGameState] = useState<"setup" | "playing" | "results">("setup");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,6 +44,7 @@ export default function MusicQuizContent() {
 
     setQuestions(newQuestions);
     setGameState("playing");
+    onStateChange?.(true);
     setCurrentIndex(0);
     setScore(0);
     nextQuestion(newQuestions[0]);
@@ -94,6 +95,7 @@ export default function MusicQuizContent() {
         nextQuestion(questions[currentIndex + 1]);
       } else {
         setGameState("results");
+        onStateChange?.(false);
       }
     }, 2000);
   };

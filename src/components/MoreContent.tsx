@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import {
   Radio, Mic2, BarChart3, Headphones, Sparkles, Heart, Clock,
   ListMusic, ScanSearch, Settings, User,
-  Layers, Info
+  Layers, Info, Users
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -19,6 +19,8 @@ const features = [
   { id: "recognize",     label: "Riconosci",       icon: ScanSearch,        color: "text-orange-400", bg: "bg-orange-400/10" },
   { id: "stats",         label: "Statistiche",     icon: BarChart3,         color: "text-green-400",  bg: "bg-green-400/10"  },
   { id: "devices",       label: "Dispositivi",     icon: Headphones,        color: "text-yellow-400", bg: "bg-yellow-400/10" },
+  { id: "mood",          label: "Mood Gen",        icon: Sparkles,          color: "text-amber-400",  bg: "bg-amber-400/10"  },
+  { id: "listen-along",  label: "Insieme",         icon: Users,             color: "text-cyan-400",   bg: "bg-cyan-400/10"   },
 ];
 
 const libraryItems = [

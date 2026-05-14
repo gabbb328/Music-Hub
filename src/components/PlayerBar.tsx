@@ -20,6 +20,7 @@ type PlayerProps = ReturnType<typeof usePlayerStore> & {
   onNavigate?: (section: string) => void;
   onOpenEggList?: () => void;
   superMode?: boolean;
+  isQuizActive?: boolean;
 };
 
 // ── Volume slider con track colorata corretta ─────────────────────────────────
@@ -81,6 +82,7 @@ export default function PlayerBar(props: PlayerProps) {
     toggleShuffle: localToggleShuffle, toggleRepeat: localToggleRepeat,
     nextTrack: localNextTrack, prevTrack: localPrevTrack,
     onExpandClick, onNavigate, onOpenEggList, superMode = false,
+    isQuizActive = false,
   } = props;
 
   // ── TUTTI gli hook prima di qualsiasi early return ─────────────────────────
@@ -226,7 +228,7 @@ export default function PlayerBar(props: PlayerProps) {
             <motion.img
               key={currentTrack.id}
               src={currentTrack.cover} alt={currentTrack.album}
-              className="w-14 h-14 rounded-lg object-cover shadow-lg"
+              className={`w-14 h-14 rounded-lg object-cover shadow-lg transition-all duration-500 ${isQuizActive ? "blur-md scale-90" : ""}`}
               initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 320, damping: 28 }}
@@ -243,12 +245,14 @@ export default function PlayerBar(props: PlayerProps) {
           )}
         </motion.button>
 
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}>
           <p className="text-sm font-semibold truncate"
             style={{ color: superMode ? GOLD : undefined }}>
-            {currentTrack.title}
+            {isQuizActive ? "Guess the Title" : currentTrack.title}
           </p>
-          <p className="text-xs text-muted-foreground truncate">{currentTrack.artist}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {isQuizActive ? "Guess the Artist" : currentTrack.artist}
+          </p>
           {superMode && (
             <p className="text-[9px] font-bold tracking-widest"
               style={{ color: GOLD, opacity: 0.8 }}>

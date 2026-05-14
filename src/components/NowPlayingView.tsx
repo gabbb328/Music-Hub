@@ -4,7 +4,8 @@ import {
   X, Heart, Share2, MoreHorizontal, Sparkles, BarChart3, Mic2, ListMusic,
   Info, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Clock, Timer, Volume2, Headphones, Music2, ChevronUp, Radio,
-  Zap, Star, TrendingUp, Eye, EyeOff, Disc3
+  Zap, Star, TrendingUp, Eye, EyeOff, Disc3, Layers, Users,
+  Home, Search, Library, Gamepad2
 } from "lucide-react";
 import VinylNowPlayingView from "./VinylNowPlayingView";
 import IpodNowPlayingView from "./IpodNowPlayingView";
@@ -23,11 +24,11 @@ import { getCurrentLineIndex } from "@/services/lyrics-api";
 import { useIpodPersistence } from "@/hooks/useIpodPersistence";
 import type { usePlayerStore } from "@/hooks/usePlayerStore";
 
-type NowPlayingProps = ReturnType<typeof usePlayerStore> & { onClose: () => void; onNavigate?: (s: string) => void; };
-type PanelType = "lyrics" | "queue" | "analysis" | "info" | "timer" | null;
+type NowPlayingProps = ReturnType<typeof usePlayerStore> & { onClose: () => void; onNavigate?: (s: string) => void; onStateChange?: (active: boolean) => void; };
+type PanelType = "lyrics" | "queue" | "analysis" | "info" | "timer" | "mood" | "listen-along" | null;
 
 // ── Sleep timer ────────────────────────────────────────────────────────────────
-function useSleepTimer(onEnd: () => void) {
+function useSleepTimer(onEnd: () => void, onStateChange?: (active: boolean) => void) {
   const [minutes, setMinutes] = useState(0);
   const [remaining, setRemaining] = useState(0);
   const [active, setActive] = useState(false);
@@ -37,9 +38,10 @@ function useSleepTimer(onEnd: () => void) {
     if (ref.current) clearInterval(ref.current);
     const secs = mins * 60;
     setMinutes(mins); setRemaining(secs); setActive(true);
+    onStateChange?.(true);
     ref.current = setInterval(() => {
       setRemaining(r => {
-        if (r <= 1) { clearInterval(ref.current!); setActive(false); onEnd(); return 0; }
+        if (r <= 1) { clearInterval(ref.current!); setActive(false); onEnd(); onStateChange?.(false); return 0; }
         return r - 1;
       });
     }, 1000);
@@ -48,14 +50,15 @@ function useSleepTimer(onEnd: () => void) {
   const cancel = () => {
     if (ref.current) clearInterval(ref.current);
     setActive(false); setRemaining(0);
+    onStateChange?.(false);
   };
 
   useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
   return { active, remaining, minutes, start, cancel };
 }
 
-export default function NowPlayingView(props: NowPlayingProps) {
-  const { onClose, onNavigate } = props;
+export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?: boolean }) {
+  const { onClose, onNavigate, onStateChange, isQuizActive = false } = props;
   const { vinylMode, setVinylMode, ipodMode, setIpodMode } = useIpodPersistence();
   const [showVisualizer, setShowVisualizer] = useState(false);
   // Default panel: lyrics su desktop, null su mobile
@@ -90,7 +93,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
   const sleepTimer = useSleepTimer(async () => {
     await pauseMutation2.mutateAsync();
     toast({ title: "⏱ Sleep timer", description: "Riproduzione fermata" });
-  });
+  }, onStateChange);
 
   const isPlaying   = playbackState?.is_playing || false;
   const progress    = playbackState ? (playbackState.progress_ms / (playbackState.item?.duration_ms || 1)) * 100 : 0;
@@ -144,41 +147,65 @@ export default function NowPlayingView(props: NowPlayingProps) {
         className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
       >
         {/* Background */}
-        <motion.div key={currentTrack.id}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        <motion.div
+          key={currentTrack.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="absolute inset-0">
+          className="absolute inset-0"
+        >
           <img src={coverUrl} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-background/90 backdrop-blur-[60px]" />
+          <div className="absolute inset-0 bg-background/95 backdrop-blur-[100px]" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/20" />
         </motion.div>
 
         {/* Header */}
-        <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0">
-          <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
-            <X className="w-6 h-6" />
+        <div
+          className="absolute top-0 left-0 right-0 flex items-center justify-between px-2 z-50 bg-background/25 backdrop-blur-2xl border-b border-white/5"
+          style={{
+            paddingTop: "max(10px, env(safe-area-inset-top))",
+            paddingBottom: "max(10px, env(safe-area-inset-top))",
+          }}
+        >
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
           </button>
-          <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">iPod Mode</p>
-          <div className="flex items-center gap-1">
-            {/* Switch to vinyl */}
-            <button onClick={() => { setIpodMode(false); setVinylMode(true); }}
-              className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
-              <Disc3 className="w-5 h-5" />
+          <p className="text-xs font-medium text-foreground/60 uppercase tracking-wider">
+            iPod Mode
+          </p>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => {
+                setIpodMode(false);
+                setVinylMode(true);
+              }}
+              className="p-1.5 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors"
+            >
+              <Disc3 className="w-4 h-4" />
             </button>
-            {/* Back to normal */}
-            <button onClick={() => setIpodMode(false)}
-              className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
-              <Music2 className="w-5 h-5" />
+            <button
+              onClick={() => setIpodMode(false)}
+              className="p-1.5 rounded-full text-primary bg-primary/10 min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors"
+            >
+              <Music2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* iPod centered */}
-        <div className="relative flex-1 flex items-center justify-center z-10">
+        <div className="relative flex-1 flex items-center justify-center z-10 pt-16 md:pt-0 translate-y-[20px]">
           <motion.div
-            initial={{ opacity: 0, scale: 0.85, y: 30 }}
+            initial={{ opacity: 0, scale: 0.85, y: 0 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22, delay: 0.05 }}
+            transition={{
+              type: "spring",
+              stiffness: 260,
+              damping: 22,
+              delay: 0.05,
+            }}
           >
             <IpodNowPlayingView />
           </motion.div>
@@ -197,8 +224,9 @@ export default function NowPlayingView(props: NowPlayingProps) {
         transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.9 }}
         className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
       >
-        {/* Header con toggle (Trasparente senza blur per uniformità) */}
-        <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0">
+        {/* Header con toggle (Trasparente con blur per accessibilità) */}
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 z-50 bg-background/25 backdrop-blur-2xl border-b border-white/5"
+          style={{ paddingTop: "max(10px, env(safe-area-inset-top))", paddingBottom: "10px" }}>
           <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
             <X className="w-6 h-6" />
           </button>
@@ -208,7 +236,6 @@ export default function NowPlayingView(props: NowPlayingProps) {
             <button onClick={() => { setVinylMode(false); setIpodMode(true); }}
               className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               title="iPod Mode">
-              {/* iPod icon: simplified rectangle with circle */}
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="5" y="1" width="10" height="18" rx="2" />
                 <rect x="7" y="3" width="6" height="7" rx="1" />
@@ -287,7 +314,7 @@ export default function NowPlayingView(props: NowPlayingProps) {
       </AnimatePresence>
 
       {/* Header */}
-      <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0">
+      <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
         <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
           <X className="w-6 h-6" />
         </button>
@@ -372,10 +399,10 @@ export default function NowPlayingView(props: NowPlayingProps) {
               ease: [0.25, 0.1, 0.25, 1],
               delay: 0.15
             }}
-            className="hidden lg:block lg:max-w-md space-y-6">
+            className={`hidden lg:block lg:max-w-md space-y-6 transition-all duration-500 ${isQuizActive ? "blur-md" : ""}`}>
             <div>
-              <h2 className="text-3xl lg:text-4xl font-bold leading-tight">{currentTrack.name}</h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground mt-3">{currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
+              <h2 className="text-3xl lg:text-4xl font-bold leading-tight">{isQuizActive ? "Guess the Title" : currentTrack.name}</h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground mt-3">{isQuizActive ? "Guess the Artist" : currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
               <p className="text-base text-muted-foreground/70 mt-2">{currentTrack.album.name}</p>
             </div>
             <div className="flex items-center gap-3">
@@ -410,9 +437,9 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
           {/* Track info - nascosto su LG+ */}
           <div className="flex items-center justify-between lg:hidden">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold truncate">{currentTrack.name}</h2>
-              <p className="text-base text-muted-foreground truncate">{currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
+            <div className={`flex-1 min-w-0 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}>
+              <h2 className="text-xl font-bold truncate">{isQuizActive ? "Guess the Title" : currentTrack.name}</h2>
+              <p className="text-base text-muted-foreground truncate">{isQuizActive ? "Guess the Artist" : currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
               <p className="text-xs text-muted-foreground truncate">{currentTrack.album.name}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-3">
@@ -470,8 +497,8 @@ export default function NowPlayingView(props: NowPlayingProps) {
             {[
               { id: "lyrics" as PanelType, icon: Mic2, label: "Testi", action: undefined },
               { id: "queue" as PanelType, icon: ListMusic, label: "Coda", action: () => { onNavigate?.("queue"); onClose(); } },
-              { id: "analysis" as PanelType, icon: BarChart3, label: "Analisi", action: undefined },
-              { id: "info" as PanelType, icon: Info, label: "Info", action: undefined },
+              { id: "mood" as PanelType, icon: Sparkles, label: "Mood Gen", action: undefined },
+              { id: "listen-along" as PanelType, icon: Users, label: "Listen", action: undefined },
             ].map(({ id, icon: Icon, label, action }) => (
               <button key={id} onClick={action ?? (() => togglePanel(id))}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors min-h-[56px] ${activePanel === id ? "bg-primary/15 text-primary" : "bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>

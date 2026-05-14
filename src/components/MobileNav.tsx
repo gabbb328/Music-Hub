@@ -1,4 +1,4 @@
-import { Home, Search, Library, Layers, MoreHorizontal, Gamepad2 } from "lucide-react";
+import { Home, Search, Library, Gamepad2, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -9,11 +9,11 @@ interface MobileNavProps {
 }
 
 const navItems = [
-  { id: "home",         label: "Home",    icon: Home          },
-  { id: "search",       label: "Search",  icon: Search        },
-  { id: "library",      label: "Library", icon: Library       },
-  { id: "quiz",         label: "Quiz",    icon: Gamepad2      },
-  { id: "more",         label: "More",    icon: MoreHorizontal },
+  { id: "home",    label: "Home",     icon: Home           },
+  { id: "search",  label: "Cerca",    icon: Search         },
+  { id: "library", label: "Libreria", icon: Library        },
+  { id: "quiz",    label: "Quiz",     icon: Gamepad2       },
+  { id: "more",    label: "Altro",    icon: MoreHorizontal },
 ];
 
 const NAV_SPRING = { type: "spring", stiffness: 600, damping: 30, mass: 0.8 } as const;

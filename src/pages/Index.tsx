@@ -167,6 +167,7 @@ const IndexInner = () => {
   const [showNowPlaying, setShowNowPlaying] = useState(false);
   const [showSettings, setShowSettings]     = useState(false);
   const [activeEgg, setActiveEgg]           = useState<EasterEggType>(null);
+  const [isQuizActive, setIsQuizActive]     = useState(false);
   const [showEggList, setShowEggList]       = useState(false);
   const [superMode, setSuperMode]           = useState(false);
 
@@ -305,7 +306,7 @@ const IndexInner = () => {
       case "neural-mixer":   return <NeuralSpaceMixerContent />;
       case "about":          return <AboutContent />;
       case "audio-settings": return <AudioSettingsContent />;
-      case "quiz":           return <MusicQuizContent />;
+      case "quiz":           return <MusicQuizContent onStateChange={setIsQuizActive} />;
       case "mood":           return <MoodGeneratorContent />;
       case "listen-along":   return <ListenAlongContent />;
       case "more":           return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
@@ -382,6 +383,7 @@ const IndexInner = () => {
             onNavigate={setActiveSection}
             onOpenEggList={() => setShowEggList(true)}
             superMode={superMode}
+            isQuizActive={isQuizActive}
           />
         </div>
         <div className="pointer-events-auto">
@@ -402,6 +404,7 @@ const IndexInner = () => {
                 {...player}
                 onClose={() => setShowNowPlaying(false)}
                 onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
+                isQuizActive={isQuizActive}
               />
             )}
           </AnimatePresence>
