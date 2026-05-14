@@ -3,7 +3,7 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Home, Search, Library, Radio, Mic2, BarChart3, Headphones,
   Sparkles, Heart, Clock, ListMusic, Music, ScanSearch, Layers,
-  Info
+  Info, Gamepad2, Users
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -26,12 +26,18 @@ const features = [
   { id: "recognize",      label: "Riconosci",       icon: ScanSearch        },
   { id: "stats",          label: "Statistiche",     icon: BarChart3         },
   { id: "devices",        label: "Dispositivi",     icon: Headphones        },
+  { id: "mood",           label: "Mood Gen",        icon: Sparkles          },
+  { id: "listen-along",   label: "Listen Along",    icon: Users             },
 ];
 
 const libraryItems = [
   { id: "liked",  label: "Preferiti", icon: Heart     },
   { id: "recent", label: "Recenti",   icon: Clock     },
   { id: "queue",  label: "Coda",      icon: ListMusic },
+];
+
+const gameItems = [
+  { id: "quiz",   label: "Music Quiz", icon: Gamepad2 },
 ];
 
 const appItems = [
@@ -129,6 +135,20 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               onClick={() => onSectionChange(item.id)}
               mouseY={mouseY}
               isSectionHovered={hoveredSection === "library"}
+            />
+          ))}
+        </div>
+
+        <div className="px-3 mt-5" onMouseEnter={() => setHoveredSection("games")}>
+          <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Giochi</p>
+          {gameItems.map(item => (
+            <NavItem 
+              key={item.id} 
+              {...item} 
+              isActive={activeSection === item.id} 
+              onClick={() => onSectionChange(item.id)}
+              mouseY={mouseY}
+              isSectionHovered={hoveredSection === "games"}
             />
           ))}
         </div>

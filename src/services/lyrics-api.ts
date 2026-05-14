@@ -274,11 +274,7 @@ const generatePlaceholderLyrics = (title: string, duration: number): LyricLine[]
     '',
     'Lyrics not available for this track',
     '',
-    'Try searching on Genius.com or AZLyrics',
-    '',
-    'Enjoying the instrumental version...',
-    '',
-    '🎵'
+    'Try searching on Genius.com or AZLyrics'
   ];
   
   const safeDuration = Math.max(30, duration);

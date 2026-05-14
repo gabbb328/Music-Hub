@@ -4,6 +4,8 @@ import { useTopTracks, useTopArtists, useRecentlyPlayed } from "@/hooks/useSpoti
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import WrappedExport from "./WrappedExport";
+import { Share2, ArrowLeft } from "lucide-react";
 
 type TimeRange = "short_term" | "medium_term" | "long_term";
 
@@ -15,6 +17,7 @@ const timeRangeLabels: Record<TimeRange, string> = {
 
 export default function StatsContent() {
   const [timeRange, setTimeRange] = useState<TimeRange>("medium_term");
+  const [showWrapped, setShowWrapped] = useState(false);
   
   const { data: topTracksData, isLoading: loadingTracks } = useTopTracks(timeRange, 50);
   const { data: topArtistsData, isLoading: loadingArtists } = useTopArtists(timeRange, 50);
@@ -130,6 +133,15 @@ export default function StatsContent() {
     );
   }
 
+  if (showWrapped) {
+    return <WrappedView 
+      topTracks={topTracks} 
+      topArtists={topArtists} 
+      topGenres={topGenres} 
+      onBack={() => setShowWrapped(false)} 
+    />;
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <motion.div
@@ -157,6 +169,13 @@ export default function StatsContent() {
             ))}
           </div>
         </div>
+        
+        <Button 
+          onClick={() => setShowWrapped(true)}
+          className="mt-6 gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+        >
+          <Share2 className="w-4 h-4" /> Share your Wrapped
+        </Button>
       </motion.div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
@@ -307,6 +326,31 @@ export default function StatsContent() {
           )}
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+function WrappedView({ topTracks, topArtists, topGenres, onBack }: any) {
+  const topArtist = topArtists[0]?.name || "Artista Sconosciuto";
+  const topTrack = topTracks[0]?.name || "Canzone Sconosciuta";
+  const topGenre = topGenres[0]?.name || "Musica";
+  const coverUrl = topTracks[0]?.album?.images[0]?.url || "";
+  
+  return (
+    <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
+      <div className="w-full max-w-2xl mb-8">
+        <Button variant="ghost" onClick={onBack} className="gap-2">
+          <ArrowLeft className="w-4 h-4" /> Back to Stats
+        </Button>
+      </div>
+      
+      <WrappedExport 
+        topArtist={topArtist}
+        topTrack={topTrack}
+        topGenre={topGenre}
+        minutesListened={12450} // Mocked
+        coverUrl={coverUrl}
+      />
     </div>
   );
 }

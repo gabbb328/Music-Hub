@@ -7,6 +7,7 @@ import {
   Zap, Star, TrendingUp, Eye, EyeOff, Disc3
 } from "lucide-react";
 import VinylNowPlayingView from "./VinylNowPlayingView";
+import IpodNowPlayingView from "./IpodNowPlayingView";
 import WaveformProgress from "./WaveformProgress";
 import VisualizerCanvas from "./VisualizerCanvas";
 import { formatTime } from "@/lib/mock-data";
@@ -19,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { lyricsStore } from "@/hooks/useLyricsStore";
 import { getCurrentLineIndex } from "@/services/lyrics-api";
+import { useIpodPersistence } from "@/hooks/useIpodPersistence";
 import type { usePlayerStore } from "@/hooks/usePlayerStore";
 
 type NowPlayingProps = ReturnType<typeof usePlayerStore> & { onClose: () => void; onNavigate?: (s: string) => void; };
@@ -54,8 +56,8 @@ function useSleepTimer(onEnd: () => void) {
 
 export default function NowPlayingView(props: NowPlayingProps) {
   const { onClose, onNavigate } = props;
+  const { vinylMode, setVinylMode, ipodMode, setIpodMode } = useIpodPersistence();
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const [vinylMode, setVinylMode] = useState(false);
   // Default panel: lyrics su desktop, null su mobile
   const [activePanel, setActivePanel] = useState<PanelType>(typeof window !== 'undefined' && window.innerWidth >= 768 ? 'lyrics' : null);
   const [isLiked, setIsLiked] = useState(false);
@@ -131,6 +133,61 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
   const togglePanel = (p: PanelType) => setActivePanel(prev => prev === p ? null : p);
 
+  // ── iPod Mode ──────────────────────────────────────────────────────────────
+  if (ipodMode) {
+    return (
+      <motion.div
+        initial={{ opacity: 0.6, y: "100%" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }}
+        transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.9 }}
+        className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
+      >
+        {/* Background */}
+        <motion.div key={currentTrack.id}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="absolute inset-0">
+          <img src={coverUrl} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[60px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/20" />
+        </motion.div>
+
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0">
+          <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+            <X className="w-6 h-6" />
+          </button>
+          <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">iPod Mode</p>
+          <div className="flex items-center gap-1">
+            {/* Switch to vinyl */}
+            <button onClick={() => { setIpodMode(false); setVinylMode(true); }}
+              className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+              <Disc3 className="w-5 h-5" />
+            </button>
+            {/* Back to normal */}
+            <button onClick={() => setIpodMode(false)}
+              className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+              <Music2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* iPod centered */}
+        <div className="relative flex-1 flex items-center justify-center z-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 22, delay: 0.05 }}
+          >
+            <IpodNowPlayingView />
+          </motion.div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Vinyl Mode ─────────────────────────────────────────────────────────────
   if (vinylMode) {
     return (
       <motion.div
@@ -146,10 +203,23 @@ export default function NowPlayingView(props: NowPlayingProps) {
             <X className="w-6 h-6" />
           </button>
           <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">Vinyl Mode</p>
-          <button onClick={() => setVinylMode(false)}
-            className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
-            <Music2 className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Switch to iPod */}
+            <button onClick={() => { setVinylMode(false); setIpodMode(true); }}
+              className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+              title="iPod Mode">
+              {/* iPod icon: simplified rectangle with circle */}
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="1" width="10" height="18" rx="2" />
+                <rect x="7" y="3" width="6" height="7" rx="1" />
+                <circle cx="10" cy="15" r="2.2" />
+              </svg>
+            </button>
+            <button onClick={() => setVinylMode(false)}
+              className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+              <Music2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <VinylNowPlayingView />
       </motion.div>
@@ -223,9 +293,21 @@ export default function NowPlayingView(props: NowPlayingProps) {
         </button>
         <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">In riproduzione</p>
         <div className="flex items-center gap-1">
+          {/* Vinyl button */}
           <button onClick={() => setVinylMode(true)}
-            className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+            className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+            title="Vinyl Mode">
             <Disc3 className="w-5 h-5" />
+          </button>
+          {/* iPod button */}
+          <button onClick={() => setIpodMode(true)}
+            className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+            title="iPod Mode">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="1" width="10" height="18" rx="2" />
+              <rect x="7" y="3" width="6" height="7" rx="1" />
+              <circle cx="10" cy="15" r="2.2" />
+            </svg>
           </button>
           <button onClick={() => setShowVisualizer(!showVisualizer)}
             className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${showVisualizer ? "text-primary bg-primary/10" : "text-foreground/70 hover:bg-foreground/10"}`}>
@@ -253,15 +335,13 @@ export default function NowPlayingView(props: NowPlayingProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ 
                 duration: 0.7,
-                ease: [0.25, 0.1, 0.25, 1], // Apple's ease
+                ease: [0.25, 0.1, 0.25, 1],
                 delay: 0.05
               }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="relative cursor-pointer" onClick={handleCoverTap}>
-              {/* Immagine sempre quadrata */}
               <img src={coverUrl} alt="" className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 rounded-2xl object-cover shadow-2xl" />
-              {/* Bordo animato attaccato all'immagine - Apple style */}
               {isPlaying && (
                 <motion.div className="absolute inset-0 rounded-2xl border-2 border-primary/50"
                   animate={{ 
@@ -271,10 +351,9 @@ export default function NowPlayingView(props: NowPlayingProps) {
                   transition={{ 
                     duration: 2.8, 
                     repeat: Infinity, 
-                    ease: [0.4, 0, 0.2, 1] // Apple's smooth ease
+                    ease: [0.4, 0, 0.2, 1]
                   }} />
               )}
-              {/* BPM badge */}
               {bpm && (
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1">
                   <Zap className="w-3 h-3 text-primary" />
@@ -284,13 +363,13 @@ export default function NowPlayingView(props: NowPlayingProps) {
             </motion.div>
           )}
           
-          {/* Track info su LG+ schermi - affiancato alla cover con animazioni Apple */}
+          {/* Track info su LG+ schermi */}
           <motion.div 
             initial={{ opacity: 0, x: 20, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ 
               duration: 0.6,
-              ease: [0.25, 0.1, 0.25, 1], // Apple's signature ease
+              ease: [0.25, 0.1, 0.25, 1],
               delay: 0.15
             }}
             className="hidden lg:block lg:max-w-md space-y-6">
@@ -326,10 +405,10 @@ export default function NowPlayingView(props: NowPlayingProps) {
           </motion.div>
         </div>
 
-        {/* Track info + controls — Right side on desktop, scrollable */}
+        {/* Track info + controls */}
         <div className="flex-1 overflow-y-auto px-4 pb-4 md:pb-6 space-y-4 md:max-w-md md:shrink-0">
 
-          {/* Track info - nascosto su LG+ perché già affiancato alla cover */}
+          {/* Track info - nascosto su LG+ */}
           <div className="flex items-center justify-between lg:hidden">
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold truncate">{currentTrack.name}</h2>
@@ -388,12 +467,12 @@ export default function NowPlayingView(props: NowPlayingProps) {
 
           {/* Quick panel buttons */}
           <div className="grid grid-cols-4 gap-2">
-            {([
-              { id: "lyrics" as PanelType, icon: Mic2, label: "Testi" },
+            {[
+              { id: "lyrics" as PanelType, icon: Mic2, label: "Testi", action: undefined },
               { id: "queue" as PanelType, icon: ListMusic, label: "Coda", action: () => { onNavigate?.("queue"); onClose(); } },
-              { id: "analysis" as PanelType, icon: BarChart3, label: "Analisi" },
-              { id: "info" as PanelType, icon: Info, label: "Info" },
-            ] as const).map(({ id, icon: Icon, label, action }) => (
+              { id: "analysis" as PanelType, icon: BarChart3, label: "Analisi", action: undefined },
+              { id: "info" as PanelType, icon: Info, label: "Info", action: undefined },
+            ].map(({ id, icon: Icon, label, action }) => (
               <button key={id} onClick={action ?? (() => togglePanel(id))}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors min-h-[56px] ${activePanel === id ? "bg-primary/15 text-primary" : "bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="w-4 h-4" />
@@ -412,7 +491,6 @@ export default function NowPlayingView(props: NowPlayingProps) {
                   <div className="py-6 text-center text-muted-foreground text-sm">Testi non disponibili</div>
                 ) : (
                   <div ref={lyricsContainerRef} className="max-h-48 overflow-y-auto px-4 py-3 space-y-1 scroll-smooth">
-                    {/* spacer */}
                     <div style={{ height: "60px" }} />
                     {lyrics.map((line, i) => (
                       <div key={i} ref={el => { lineRefs.current[i] = el; }}
@@ -473,7 +551,6 @@ export default function NowPlayingView(props: NowPlayingProps) {
                     </div>
                   ))}
                 </div>
-                {/* Mini bar chart */}
                 <div className="space-y-1.5">
                   {[
                     { label: "Energy", v: audioFeatures.energy, color: "bg-red-500" },

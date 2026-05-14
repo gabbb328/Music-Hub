@@ -26,6 +26,9 @@ import MoreContent from "@/components/MoreContent";
 import SamsungBudsContent from "@/components/SamsungBudsContent";
 import AboutContent from "@/components/AboutContent";
 import AudioSettingsContent from "@/components/AudioSettingsContent";
+import MusicQuizContent from "@/components/MusicQuizContent";
+import MoodGeneratorContent from "@/components/MoodGeneratorContent";
+import ListenAlongContent from "@/components/ListenAlongContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
@@ -302,6 +305,9 @@ const IndexInner = () => {
       case "neural-mixer":   return <NeuralSpaceMixerContent />;
       case "about":          return <AboutContent />;
       case "audio-settings": return <AudioSettingsContent />;
+      case "quiz":           return <MusicQuizContent />;
+      case "mood":           return <MoodGeneratorContent />;
+      case "listen-along":   return <ListenAlongContent />;
       case "more":           return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
       default:               return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
     }

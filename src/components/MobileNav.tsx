@@ -1,4 +1,4 @@
-import { Home, Search, Library, Layers, MoreHorizontal } from "lucide-react";
+import { Home, Search, Library, Layers, MoreHorizontal, Gamepad2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -12,7 +12,7 @@ const navItems = [
   { id: "home",         label: "Home",    icon: Home          },
   { id: "search",       label: "Search",  icon: Search        },
   { id: "library",      label: "Library", icon: Library       },
-  { id: "neural-mixer", label: "Mixer",   icon: Layers        },
+  { id: "quiz",         label: "Quiz",    icon: Gamepad2      },
   { id: "more",         label: "More",    icon: MoreHorizontal },
 ];
 

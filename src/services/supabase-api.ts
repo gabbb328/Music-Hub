@@ -2,11 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 import { NeuroFractalState, CognitiveMetrics } from "../types/neurofractal";
 
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://placeholder-url.supabase.co";
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "placeholder-key";
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error("Missing Supabase environment variables");
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn("Supabase environment variables are missing. Some features like 'Listen Along' will not work.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

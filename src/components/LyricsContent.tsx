@@ -2,15 +2,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import type { Track } from "@/lib/mock-data";
 import { usePlaybackState, useAudioFeatures, useSeekMutation } from "@/hooks/useSpotify";
 import { formatTime } from "@/lib/mock-data";
 import { fetchSyncedLyrics, getCurrentLineIndex, type LyricLine } from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
 import { useToast } from "@/hooks/use-toast";
+import { useVocalRemover } from "@/hooks/useVocalRemover";
+import { fetchSongTrivia, type TriviaResult } from "@/services/trivia-api";
 
 interface LyricsContentProps { currentTrack: Track | null; }
-type Mode = "lyrics" | "info" | "analysis";
+type Mode = "lyrics" | "info" | "analysis" | "trivia";
 
 export default function LyricsContent({ currentTrack: localTrack }: LyricsContentProps) {
   const [mode, setMode]                         = useState<Mode>("lyrics");
@@ -23,6 +26,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [centerMode, setCenterMode]             = useState(true);
   const [userScrolling, setUserScrolling]       = useState(false);
+  const [trivia, setTrivia]                     = useState<TriviaResult[]>([]);
+  const [loadingTrivia, setLoadingTrivia]       = useState(false);
+
+  const { isKaraokeActive, toggleKaraoke } = useVocalRemover();
 
   const containerRef   = useRef<HTMLDivElement>(null);
   const lineRefs       = useRef<(HTMLDivElement | null)[]>([]);
@@ -51,12 +58,18 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     setTranslatedLyrics(new Map());
     setShowTranslation(false);
     setCurrentLineIndex(0);
-    fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
-      setLyrics(lines);
-      setIsSynced(synced);
-      setLoadingLyrics(false);
-    });
-  }, [(currentTrack as any)?.id]);
+      fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
+        setLyrics(lines);
+        setIsSynced(synced);
+        setLoadingLyrics(false);
+      });
+      
+      setLoadingTrivia(true);
+      fetchSongTrivia(artist, title).then(res => {
+        setTrivia(res);
+        setLoadingTrivia(false);
+      });
+    }, [(currentTrack as any)?.id]);
 
   // ── Aggiorna riga corrente ────────────────────────────────────────────────
   useEffect(() => {
@@ -134,6 +147,16 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
   const spotifyTrack = playbackState?.item;
 
+  if (!currentTrack) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <Music className="w-16 h-16 text-muted-foreground/20 mb-4" />
+        <h2 className="text-xl font-bold mb-2">Nessun brano in riproduzione</h2>
+        <p className="text-muted-foreground max-w-xs">Riproduci una canzone per vedere il testo e le curiosità.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
 
@@ -180,6 +203,11 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     {showTranslation ? "Original" : "Translate"}
                   </Button>
                 )}
+                <Button size="sm" variant={isKaraokeActive ? "default" : "outline"}
+                  onClick={toggleKaraoke} className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  <Mic2 className="w-2.5 h-2.5" />
+                  {isKaraokeActive ? "Karaoke ON" : "Karaoke Mode"}
+                </Button>
                 {isTranslating && (
                   <div className="flex items-center gap-1">
                     <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
@@ -194,9 +222,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         {/* Tabs */}
         <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
           {([
-            { id: "lyrics" as Mode, label: "Lyrics",   icon: Mic2      },
-            { id: "info"   as Mode, label: "Info",      icon: Disc      },
-            { id: "analysis" as Mode, label: "Analysis", icon: Lightbulb },
+            { id: "lyrics"   as Mode, label: "Lyrics",   icon: Mic2      },
+            { id: "trivia"   as Mode, label: "Trivia",   icon: Lightbulb },
+            { id: "info"     as Mode, label: "Info",     icon: Disc      },
+            { id: "analysis" as Mode, label: "Analysis", icon: Music },
           ]).map(tab => (
             <button key={tab.id} onClick={() => setMode(tab.id)}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
@@ -410,6 +439,42 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 <div className="flex flex-col items-center justify-center h-40 text-center">
                   <Music className="w-12 h-12 text-muted-foreground/30 mb-3" />
                   <p className="text-sm text-muted-foreground">Audio analysis not available</p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* ── TRIVIA ── */}
+        {mode === "trivia" && (
+          <div className="absolute inset-0 overflow-y-auto p-4">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-2xl mx-auto">
+              {loadingTrivia ? (
+                <div className="flex flex-col items-center justify-center h-40">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+                  <p className="text-sm text-muted-foreground">Loading trivia…</p>
+                </div>
+              ) : trivia.length > 0 ? (
+                <div className="space-y-6">
+                  {trivia.map((item, idx) => (
+                    <Card key={idx} className="p-6 border-border/40 bg-card/30 backdrop-blur-sm space-y-3">
+                      <div className="flex items-center gap-2 text-primary">
+                        <Lightbulb className="w-5 h-5" />
+                        <h3 className="font-bold">{item.title}</h3>
+                      </div>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {item.extract}
+                      </p>
+                      <div className="pt-2 text-[10px] text-muted-foreground/50 italic">
+                        Fonte: {item.source}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <Music className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Trivia non disponibile</p>
                 </div>
               )}
             </motion.div>
