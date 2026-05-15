@@ -139,11 +139,15 @@ export const search = async (query: string, type: string[] = ["track","artist","
 export const getUserProfile     = () => api("/me");
 export const getAvailableDevices = () => api("/me/player/devices");
 export const getAudioFeatures   = (id: string) => api(`/audio-features/${id}`);
-export const getRecommendations = (seeds?: string[], artists?: string[], genres?: string[]) => {
+export const getRecommendations = (params: Record<string, any>) => {
   const p = new URLSearchParams();
-  seeds?.length   && p.append("seed_tracks",  seeds.join(","));
-  artists?.length && p.append("seed_artists", artists.join(","));
-  genres?.length  && p.append("seed_genres",  genres.join(","));
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      p.append(key, value.join(","));
+    } else if (value !== undefined) {
+      p.append(key, String(value));
+    }
+  }
   return api(`/recommendations?${p}`);
 };
 export const getQueue   = () => api("/me/player/queue");

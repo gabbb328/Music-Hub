@@ -37,7 +37,7 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
 /**
  * Estrae colori dominanti dall'immagine
  */
-export async function extractColorsFromImage(imageUrl: string): Promise<ColorPalette> {
+export async function extractColorsFromImage(imageUrl: string, effectiveTheme: 'light' | 'dark' = 'dark'): Promise<ColorPalette> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -128,9 +128,6 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
           ) || sortedColors[1] || primary;
         }
 
-        // Background: scuro con hint del primary
-        const background = `hsl(${primary.h}, ${Math.min(primary.s, 25)}%, 8%)`;
-
         // Determina se l'immagine è prevalentemente chiara o scura per auto-switch
         const avgLightness = sortedColors.reduce((sum, c) => {
           const [,, l] = rgbToHsl(c.r, c.g, c.b);
@@ -139,11 +136,25 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
         
         const detectedTheme: 'light' | 'dark' = avgLightness > 50 ? 'light' : 'dark';
 
+        // Background: 
+        // In dark mode: scuro con hint del primary (es. 8% lightness)
+        // In light mode: chiaro con hint del primary (es. 95% lightness)
+        let background: string;
+        let text: string;
+        
+        if (effectiveTheme === 'light') {
+          background = `hsl(${primary.h}, ${Math.min(primary.s, 30)}%, 96%)`;
+          text = `hsl(${primary.h}, 40%, 15%)`; // Testo scuro
+        } else {
+          background = `hsl(${primary.h}, ${Math.min(primary.s, 25)}%, 8%)`;
+          text = primary.l > 50 ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)';
+        }
+
         resolve({
           primary: `rgb(${primary.r}, ${primary.g}, ${primary.b})`,
           secondary: `rgb(${secondary.r}, ${secondary.g}, ${secondary.b})`,
           background,
-          text: primary.l > 50 ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)',
+          text,
           detectedTheme,
         });
       } catch (error) {
@@ -159,7 +170,7 @@ export async function extractColorsFromImage(imageUrl: string): Promise<ColorPal
 /**
  * Applica palette colori al tema con transizioni smooth
  */
-export function applyColorPalette(palette: ColorPalette) {
+export function applyColorPalette(palette: ColorPalette, effectiveTheme: 'light' | 'dark' = 'dark') {
   const root = document.documentElement;
   
   // Aggiungi transizioni CSS per animazioni smooth
@@ -173,10 +184,13 @@ export function applyColorPalette(palette: ColorPalette) {
     
     // Boost saturazione per primary più vivido
     const boostedS = Math.min(s * 1.2, 100);
-    const boostedL = l < 50 ? Math.max(l, 55) : Math.min(l, 65); // Migliora leggibilità
+    // In light mode primary needs to be darker for readability, in dark mode lighter
+    const boostedL = effectiveTheme === 'light' 
+      ? Math.max(l < 50 ? l : 45, 30) // Darker for light mode
+      : (l < 50 ? Math.max(l, 55) : Math.min(l, 65)); // Lighter for dark mode
     
     root.style.setProperty('--primary', `${h} ${boostedS}% ${boostedL}%`);
-    root.style.setProperty('--primary-foreground', '0 0% 100%'); // Sempre bianco per contrasto
+    root.style.setProperty('--primary-foreground', effectiveTheme === 'light' ? '0 0% 100%' : '0 0% 100%'); 
   }
 
   const secondaryMatch = palette.secondary.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
@@ -185,10 +199,12 @@ export function applyColorPalette(palette: ColorPalette) {
     const [h, s, l] = rgbToHsl(r, g, b);
     
     // Accent leggermente meno saturo per non competere con primary
-    const accentL = l < 40 ? Math.max(l, 45) : l;
+    const accentL = effectiveTheme === 'light'
+      ? Math.max(l < 40 ? l : 45, 30)
+      : (l < 40 ? Math.max(l, 45) : l);
     
     root.style.setProperty('--accent', `${h} ${s}% ${accentL}%`);
-    root.style.setProperty('--accent-foreground', '0 0% 100%');
+    root.style.setProperty('--accent-foreground', effectiveTheme === 'light' ? '0 0% 100%' : '0 0% 100%');
   }
 
   const bgMatch = palette.background.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) ||

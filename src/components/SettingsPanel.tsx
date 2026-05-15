@@ -4,7 +4,7 @@ import {
   X, Sun, Moon, Palette, Sparkles, LogOut, ImageIcon,
   Check, Headphones, Volume2, Settings2, Wifi, Download,
   Zap, Music2, Wind, Bluetooth, ChevronDown, Info,
-  ExternalLink, CheckCircle2, RotateCcw, Save,
+  ExternalLink, CheckCircle2, RotateCcw, Save, Monitor,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { clearToken } from "@/services/spotify-auth";
@@ -232,12 +232,12 @@ function TabAspetto() {
 
       {/* Tema */}
       <SectionBox icon={Sun} title="Tema">
-        <div className="grid grid-cols-2 gap-3">
-          {(["light","dark"] as const).map(t => (
+        <div className="grid grid-cols-3 gap-3">
+          {(["light","dark","system"] as const).map(t => (
             <motion.button key={t} whileTap={{ scale: 0.97 }} onClick={() => setTheme(t)}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}>
-              {t === "light" ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-              <span className="text-sm font-medium">{t === "light" ? "Chiaro" : "Scuro"}</span>
+              className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}>
+              {t === "light" ? <Sun className="w-5 h-5" /> : t === "dark" ? <Moon className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+              <span className="text-xs font-medium">{t === "light" ? "Chiaro" : t === "dark" ? "Scuro" : "Sistema"}</span>
             </motion.button>
           ))}
         </div>

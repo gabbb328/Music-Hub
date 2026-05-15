@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
 
 type ColorTheme =
   | "blue" | "purple" | "violet" | "emerald" | "teal"
@@ -9,6 +9,7 @@ type ColorTheme =
 
 interface ThemeContextType {
   theme: Theme;
+  effectiveTheme: "light" | "dark";
   colorTheme: ColorTheme;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
@@ -26,18 +27,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // ─── Palette colori per ogni tema ────────────────────────────────────────────
 const colorThemes = {
-  blue:    { light: { primary:"221 83 53", background:"0 0 100",   foreground:"222 47 11", accent:"221 83 53", muted:"220 13 91" }, dark: { primary:"217 91 60", background:"222 84 4",  foreground:"210 40 98", accent:"217 91 70", muted:"217 33 17" } },
-  purple:  { light: { primary:"262 83 58", background:"0 0 100",   foreground:"262 30 11", accent:"262 83 68", muted:"262 13 91" }, dark: { primary:"271 91 65", background:"265 50 4",  foreground:"270 20 98", accent:"271 91 75", muted:"265 25 17" } },
-  violet:  { light: { primary:"243 75 59", background:"0 0 100",   foreground:"243 30 11", accent:"243 75 69", muted:"243 13 91" }, dark: { primary:"250 85 70", background:"243 50 4",  foreground:"250 20 98", accent:"250 85 80", muted:"243 25 17" } },
-  emerald: { light: { primary:"152 76 45", background:"0 0 100",   foreground:"152 30 11", accent:"152 76 55", muted:"152 13 91" }, dark: { primary:"158 86 55", background:"152 45 4",  foreground:"150 20 98", accent:"158 86 65", muted:"152 25 17" } },
-  teal:    { light: { primary:"173 80 40", background:"0 0 100",   foreground:"173 30 11", accent:"173 80 50", muted:"173 13 91" }, dark: { primary:"178 90 55", background:"173 45 4",  foreground:"175 20 98", accent:"178 90 65", muted:"173 25 17" } },
-  amber:   { light: { primary:"38 92 50",  background:"0 0 100",   foreground:"38 40 11",  accent:"38 92 60",  muted:"38 13 91"  }, dark: { primary:"43 96 60",  background:"38 50 4",   foreground:"40 20 98",  accent:"43 96 70",  muted:"38 25 17"  } },
-  rose:    { light: { primary:"351 83 58", background:"0 0 100",   foreground:"351 30 11", accent:"351 83 68", muted:"351 13 91" }, dark: { primary:"355 91 65", background:"351 50 4",  foreground:"355 20 98", accent:"355 91 75", muted:"351 25 17" } },
-  crimson: { light: { primary:"348 83 60", background:"0 0 100",   foreground:"348 35 11", accent:"348 83 70", muted:"348 13 91" }, dark: { primary:"0 91 71",   background:"348 50 4",  foreground:"0 20 98",   accent:"0 91 81",   muted:"348 25 17" } },
-  indigo:  { light: { primary:"231 80 58", background:"0 0 100",   foreground:"231 30 11", accent:"231 80 68", muted:"231 13 91" }, dark: { primary:"239 90 70", background:"231 50 4",  foreground:"235 20 98", accent:"239 90 80", muted:"231 25 17" } },
-  lime:    { light: { primary:"84 81 44",  background:"0 0 100",   foreground:"84 30 11",  accent:"84 81 54",  muted:"84 13 91"  }, dark: { primary:"85 90 55",  background:"84 45 4",   foreground:"83 20 98",  accent:"85 90 65",  muted:"84 25 17"  } },
-  sky:     { light: { primary:"199 89 48", background:"0 0 100",   foreground:"199 30 11", accent:"199 89 58", muted:"199 13 91" }, dark: { primary:"200 98 60", background:"199 45 4",  foreground:"198 20 98", accent:"200 98 70", muted:"199 25 17" } },
-  fuchsia: { light: { primary:"292 84 61", background:"0 0 100",   foreground:"292 30 11", accent:"292 84 71", muted:"292 13 91" }, dark: { primary:"300 91 73", background:"292 50 4",  foreground:"298 20 98", accent:"300 91 83", muted:"292 25 17" } },
+  blue:    { light: { primary:"221 83% 53%", background:"0 0% 100%",   foreground:"222 47% 11%", accent:"221 83% 53%", muted:"220 13% 91%" }, dark: { primary:"217 91% 60%", background:"222 84% 4%",  foreground:"210 40% 98%", accent:"217 91% 70%", muted:"217 33% 17%" } },
+  purple:  { light: { primary:"262 83% 58%", background:"0 0% 100%",   foreground:"262 30% 11%", accent:"262 83% 68%", muted:"262 13% 91%" }, dark: { primary:"271 91% 65%", background:"265 50% 4%",  foreground:"270 20% 98%", accent:"271 91% 75%", muted:"265 25% 17%" } },
+  violet:  { light: { primary:"243 75% 59%", background:"0 0% 100%",   foreground:"243 30% 11%", accent:"243 75% 69%", muted:"243 13% 91%" }, dark: { primary:"250 85% 70%", background:"243 50% 4%",  foreground:"250 20% 98%", accent:"250 85% 80%", muted:"243 25% 17%" } },
+  emerald: { light: { primary:"152 76% 45%", background:"0 0% 100%",   foreground:"152 30% 11%", accent:"152 76% 55%", muted:"152 13% 91%" }, dark: { primary:"158 86% 55%", background:"152 45% 4%",  foreground:"150 20% 98%", accent:"158 86% 65%", muted:"152 25% 17%" } },
+  teal:    { light: { primary:"173 80% 40%", background:"0 0% 100%",   foreground:"173 30% 11%", accent:"173 80% 50%", muted:"173 13% 91%" }, dark: { primary:"178 90% 55%", background:"173 45% 4%",  foreground:"175 20% 98%", accent:"178 90% 65%", muted:"173 25% 17%" } },
+  amber:   { light: { primary:"38 92% 50%",  background:"0 0% 100%",   foreground:"38 40% 11%",  accent:"38 92% 60%",  muted:"38 13% 91%"  }, dark: { primary:"43 96% 60%",  background:"38 50% 4%",   foreground:"40 20% 98%",  accent:"43 96% 70%",  muted:"38 25% 17%"  } },
+  rose:    { light: { primary:"351 83% 58%", background:"0 0% 100%",   foreground:"351 30% 11%", accent:"351 83% 68%", muted:"351 13% 91%" }, dark: { primary:"355 91% 65%", background:"351 50% 4%",  foreground:"355 20% 98%", accent:"355 91% 75%", muted:"351 25% 17%" } },
+  crimson: { light: { primary:"348 83% 60%", background:"0 0% 100%",   foreground:"348 35% 11%", accent:"348 83% 70%", muted:"348 13% 91%" }, dark: { primary:"0 91% 71%",   background:"348 50% 4%",  foreground:"0 20% 98%",   accent:"0 91% 81%",   muted:"348 25% 17%" } },
+  indigo:  { light: { primary:"231 80% 58%", background:"0 0% 100%",   foreground:"231 30% 11%", accent:"231 80% 68%", muted:"231 13% 91%" }, dark: { primary:"239 90% 70%", background:"231 50% 4%",  foreground:"235 20% 98%", accent:"239 90% 80%", muted:"231 25% 17%" } },
+  lime:    { light: { primary:"84 81% 44%",  background:"0 0% 100%",   foreground:"84 30% 11%",  accent:"84 81% 54%",  muted:"84 13% 91%"  }, dark: { primary:"85 90% 55%",  background:"84 45% 4%",   foreground:"83 20% 98%",  accent:"85 90% 65%",  muted:"84 25% 17%"  } },
+  sky:     { light: { primary:"199 89% 48%", background:"0 0% 100%",   foreground:"199 30% 11%", accent:"199 89% 58%", muted:"199 13% 91%" }, dark: { primary:"200 98% 60%", background:"199 45% 4%",  foreground:"198 20% 98%", accent:"200 98% 70%", muted:"199 25% 17%" } },
+  fuchsia: { light: { primary:"292 84% 61%", background:"0 0% 100%",   foreground:"292 30% 11%", accent:"292 84% 71%", muted:"292 13% 91%" }, dark: { primary:"300 91% 73%", background:"292 50% 4%",  foreground:"298 20% 98%", accent:"300 91% 83%", muted:"292 25% 17%" } },
 } as const;
 
 // ─── Mappa colore → nome icona ────────────────────────────────────────────────
@@ -130,34 +131,34 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [coverImageUrl, setCoverImageUrlState] = useState<string | null>(null);
 
   // ── Applica palette CSS ──────────────────────────────────────────────────
-  const applyTheme = useCallback((t: Theme, ct: ColorTheme) => {
+  const applyTheme = useCallback((t: Theme, ct: ColorTheme, effective: "light" | "dark") => {
     const root = document.documentElement;
     root.style.transition = "background-color 0.5s ease, color 0.5s ease";
     root.classList.remove("light", "dark");
-    root.classList.add(t);
+    root.classList.add(effective);
     if (ct === "dynamic") { setTimeout(() => { root.style.transition = ""; }, 600); return; }
 
-    const c = (colorThemes as any)[ct]?.[t];
+    const c = (colorThemes as any)[ct]?.[effective];
     if (!c) return;
 
     root.style.setProperty("--primary",    c.primary);
     root.style.setProperty("--background", c.background);
     root.style.setProperty("--foreground", c.foreground);
-    root.style.setProperty("--card",               t === "light" ? "0 0 100" : c.background);
+    root.style.setProperty("--card",               effective === "light" ? "0 0% 100%" : c.background);
     root.style.setProperty("--card-foreground",    c.foreground);
-    root.style.setProperty("--popover",            t === "light" ? "0 0 100" : c.background);
+    root.style.setProperty("--popover",            effective === "light" ? "0 0% 100%" : c.background);
     root.style.setProperty("--popover-foreground", c.foreground);
     root.style.setProperty("--secondary",          c.muted);
     root.style.setProperty("--secondary-foreground", c.foreground);
     root.style.setProperty("--muted",              c.muted);
-    root.style.setProperty("--muted-foreground",   t === "light" ? "215 16 47" : "215 20 65");
+    root.style.setProperty("--muted-foreground",   effective === "light" ? "215 16% 47%" : "215 20% 65%");
     root.style.setProperty("--accent",             c.muted);
     root.style.setProperty("--accent-foreground",  c.foreground);
-    root.style.setProperty("--border",             t === "light" ? "214 32 91" : c.muted);
-    root.style.setProperty("--input",              t === "light" ? "214 32 91" : c.muted);
+    root.style.setProperty("--border",             effective === "light" ? "214 32% 91%" : c.muted);
+    root.style.setProperty("--input",              effective === "light" ? "214 32% 91%" : c.muted);
     root.style.setProperty("--ring",               c.accent);
-    root.style.setProperty("--destructive",        t === "light" ? "0 84 60" : "0 62 51");
-    root.style.setProperty("--destructive-foreground", "0 0 98");
+    root.style.setProperty("--destructive",        effective === "light" ? "0 84% 60%" : "0 62% 51%");
+    root.style.setProperty("--destructive-foreground", "0 0% 98%");
     setTimeout(() => { root.style.transition = ""; }, 600);
   }, []);
 
@@ -191,10 +192,33 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     applyFavicon(iconPath);
   }, []);
 
-  // ── Effetto principale — applica tema + icona ─────────────────────────────
+  // ── Effetto principale — calcola tema effettivo e applica ─────────────────────────────
+  const [effectiveTheme, setEffectiveTheme] = useState<"light" | "dark">("dark");
+
   useEffect(() => {
-    applyTheme(theme, colorTheme);
-    resolveAndApplyIcon(activeAppIcon, theme, colorTheme, coverImageUrl);
+    const computeEffectiveTheme = () => {
+      if (theme === "system") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      return theme as "light" | "dark";
+    };
+
+    const eff = computeEffectiveTheme();
+    setEffectiveTheme(eff);
+    applyTheme(theme, colorTheme, eff);
+    resolveAndApplyIcon(activeAppIcon, eff, colorTheme, coverImageUrl);
+
+    if (theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => {
+        const newEff = mediaQuery.matches ? "dark" : "light";
+        setEffectiveTheme(newEff);
+        applyTheme(theme, colorTheme, newEff);
+        resolveAndApplyIcon(activeAppIcon, newEff, colorTheme, coverImageUrl);
+      };
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    }
   }, [theme, colorTheme, activeAppIcon, coverImageUrl, applyTheme, resolveAndApplyIcon]);
 
   // ── Setters con persist ──────────────────────────────────────────────────
@@ -207,7 +231,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <ThemeContext.Provider value={{
-      theme, colorTheme, setTheme, setColorTheme, toggleTheme,
+      theme, effectiveTheme, colorTheme, setTheme, setColorTheme, toggleTheme,
       isDynamicTheme: colorTheme === "dynamic",
       autoDarkMode, setAutoDarkMode,
       activeAppIcon, setActiveAppIcon,

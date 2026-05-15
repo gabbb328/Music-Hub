@@ -29,6 +29,13 @@ interface IpodSettings {
   accentColor: string;
 }
 
+const withOpacity = (color: string, hexOpacity: string, hslOpacity: number) => {
+  if (color.startsWith("hsl")) {
+    return color.replace(")", ` / ${hslOpacity})`);
+  }
+  return `${color}${hexOpacity}`;
+};
+
 const PRESET_COLORS: { name: string; settings: IpodSettings }[] = [
   {
     name: "Classic White",
@@ -116,6 +123,17 @@ const PRESET_COLORS: { name: string; settings: IpodSettings }[] = [
       wheelCenterColor: "#B45309",
       textColor: "#FFFBEB",
       accentColor: "#FDE68A",
+    },
+  },
+  {
+    name: "Dynamic Theme",
+    settings: {
+      bodyColor: "hsl(var(--background))",
+      screenColor: "hsl(var(--background))",
+      wheelColor: "hsl(var(--accent))",
+      wheelCenterColor: "hsl(var(--background))",
+      textColor: "hsl(var(--primary-foreground))",
+      accentColor: "hsl(var(--primary))",
     },
   },
 ];
@@ -347,7 +365,7 @@ function ClickWheel({
           transform: "translate(-50%, -50%)",
           width: centerR * 2,
           height: centerR * 2,
-          background: `radial-gradient(circle at 40% 40%, ${settings.wheelCenterColor}ff, ${settings.wheelCenterColor}bb)`,
+          background: `radial-gradient(circle at 40% 40%, ${withOpacity(settings.wheelCenterColor, "ff", 1)}, ${withOpacity(settings.wheelCenterColor, "bb", 0.73)})`,
           boxShadow: `0 2px 8px rgba(0,0,0,0.4), inset 0 1px 3px rgba(255,255,255,0.3)`,
         }}
         onClick={(e) => {
@@ -428,7 +446,7 @@ function IpodScreenContent({
         <div
           className="flex items-center justify-center px-2 py-1"
           style={{
-            background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`,
+            background: `linear-gradient(to bottom, ${withOpacity(settings.accentColor, "cc", 0.8)}, ${withOpacity(settings.accentColor, "88", 0.53)})`,
             minHeight: 22,
           }}
         >
@@ -457,7 +475,7 @@ function IpodScreenContent({
                   width: "clamp(85px, 35vw, 130px)", 
                   height: "clamp(85px, 35vw, 130px)", 
                   boxShadow: "0 8px 30px rgba(0,0,0,0.7)",
-                  border: `1px solid ${settings.textColor}11`
+                  border: `1px solid ${withOpacity(settings.textColor, "11", 0.07)}`
                 }}
               />
             ) : (
@@ -600,7 +618,7 @@ function IpodScreenContent({
         <div
           className="flex items-center justify-center px-2 py-1"
           style={{
-            background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`,
+            background: `linear-gradient(to bottom, ${withOpacity(settings.accentColor, "cc", 0.8)}, ${withOpacity(settings.accentColor, "88", 0.53)})`,
             minHeight: 22,
           }}
         >
@@ -608,7 +626,7 @@ function IpodScreenContent({
         </div>
         {lyrics.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
-            <span style={{ color: `${settings.textColor}66`, fontSize: 10 }}>Not available</span>
+            <span style={{ color: withOpacity(settings.textColor, "66", 0.4), fontSize: 10 }}>Not available</span>
           </div>
         ) : (
           <div ref={lyricsRef} className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 scroll-smooth">
@@ -616,17 +634,17 @@ function IpodScreenContent({
               <div
                 key={i}
                 ref={(el) => { lineRefs.current[i] = el; }}
-                className="text-center py-0.5 rounded transition-all duration-300"
+                className="text-center py-1 rounded transition-all duration-300"
                 style={{
-                  fontSize: i === currentLineIndex ? 11 : 10,
+                  fontSize: i === currentLineIndex ? 20 : 16,
                   fontWeight: i === currentLineIndex ? 700 : 400,
                   color:
                     i === currentLineIndex
                       ? settings.accentColor
                       : i < currentLineIndex
-                      ? `${settings.textColor}44`
-                      : `${settings.textColor}88`,
-                  background: i === currentLineIndex ? `${settings.accentColor}22` : "transparent",
+                      ? withOpacity(settings.textColor, "44", 0.27)
+                      : withOpacity(settings.textColor, "88", 0.53),
+                  background: i === currentLineIndex ? withOpacity(settings.accentColor, "22", 0.13) : "transparent",
                 }}
               >
                 {line.text || "♪"}
@@ -644,7 +662,7 @@ function IpodScreenContent({
         <div
           className="flex items-center justify-center px-2 py-1"
           style={{
-            background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`,
+            background: `linear-gradient(to bottom, ${withOpacity(settings.accentColor, "cc", 0.8)}, ${withOpacity(settings.accentColor, "88", 0.53)})`,
             minHeight: 22,
           }}
         >
@@ -653,16 +671,16 @@ function IpodScreenContent({
         <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {queue.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <span style={{ color: `${settings.textColor}66`, fontSize: 10 }}>Queue empty</span>
+              <span style={{ color: withOpacity(settings.textColor, "66", 0.4), fontSize: 10 }}>Queue empty</span>
             </div>
           ) : (
             queue.slice(0, 12).map((t: any, i: number) => (
               <div
                 key={i}
                 className="flex items-center gap-2 px-2 py-1.5"
-                style={{ borderBottom: `1px solid ${settings.textColor}11` }}
+                style={{ borderBottom: `1px solid ${withOpacity(settings.textColor, "11", 0.07)}` }}
               >
-                <span style={{ color: `${settings.textColor}66`, fontSize: 9, width: 14 }}>{i + 1}</span>
+                <span style={{ color: withOpacity(settings.textColor, "66", 0.4), fontSize: 9, width: 14 }}>{i + 1}</span>
                 {t.album?.images?.[0]?.url && (
                   <img
                     src={t.album.images[0].url}
@@ -675,7 +693,7 @@ function IpodScreenContent({
                   <div className="truncate" style={{ color: settings.textColor, fontSize: 10, fontWeight: 500 }}>
                     {t.name}
                   </div>
-                  <div className="truncate" style={{ color: `${settings.textColor}66`, fontSize: 9 }}>
+                  <div className="truncate" style={{ color: withOpacity(settings.textColor, "66", 0.4), fontSize: 9 }}>
                     {t.artists?.[0]?.name}
                   </div>
                 </div>
@@ -706,13 +724,13 @@ function IpodScreenContent({
 
     return (
       <div className="flex flex-col h-full" style={{ fontFamily: "'SF Pro Display', 'Helvetica Neue', sans-serif" }}>
-        <div className="flex items-center justify-center px-2 py-1" style={{ background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`, minHeight: 22 }}>
+        <div className="flex items-center justify-center px-2 py-1" style={{ background: `linear-gradient(to bottom, ${withOpacity(settings.accentColor, "cc", 0.8)}, ${withOpacity(settings.accentColor, "88", 0.53)})`, minHeight: 22 }}>
           <span style={{ color: "#fff", fontSize: 11, fontWeight: 600 }}>{title}</span>
         </div>
         <div ref={menuRef} className="flex-1 overflow-y-auto scroll-smooth">
           {items.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <span style={{ color: `${settings.textColor}66`, fontSize: 10 }}>Loading...</span>
+              <span style={{ color: withOpacity(settings.textColor, "66", 0.4), fontSize: 10 }}>Loading...</span>
             </div>
           ) : (
             items.map((item: any, i: number) => (
@@ -720,7 +738,7 @@ function IpodScreenContent({
                 key={item.id} 
                 ref={(el) => { itemRefs.current[i] = el; }}
                 className="flex items-center gap-2 px-2 py-1.5 cursor-pointer" 
-                style={{ background: menuIndex === i ? settings.accentColor : "transparent", borderBottom: `1px solid ${settings.textColor}11` }}
+                style={{ background: menuIndex === i ? settings.accentColor : "transparent", borderBottom: `1px solid ${withOpacity(settings.textColor, "11", 0.07)}` }}
                 onClick={() => onMenuSelect(i)}
               >
                 {(item.images?.[0]?.url || item.url || item.cover) ? (
@@ -749,7 +767,7 @@ function IpodScreenContent({
         <div
           className="flex items-center justify-center px-2 py-1"
           style={{
-            background: `linear-gradient(to bottom, ${settings.accentColor}cc, ${settings.accentColor}88)`,
+            background: `linear-gradient(to bottom, ${withOpacity(settings.accentColor, "cc", 0.8)}, ${withOpacity(settings.accentColor, "88", 0.53)})`,
             minHeight: 22,
           }}
         >
@@ -765,7 +783,7 @@ function IpodScreenContent({
               className="w-full flex items-center justify-between px-3 py-2 transition-colors"
               style={{
                 background: menuIndex === i ? settings.accentColor : "transparent",
-                borderBottom: `1px solid ${settings.textColor}11`,
+                borderBottom: `1px solid ${withOpacity(settings.textColor, "11", 0.07)}`,
               }}
               onClick={() => onMenuSelect(i)}
             >
@@ -1028,7 +1046,9 @@ export default function IpodNowPlayingView() {
         width: isMobile ? "100%" : BODY_W * 1.5,
         height: isMobile ? "100%" : BODY_H * 1.2,
         borderRadius: isMobile ? 0 : 28,
-        background: `linear-gradient(160deg, ${settings.bodyColor}ff 0%, ${settings.bodyColor}cc 100%)`,
+        background: settings.bodyColor.startsWith("hsl") 
+          ? `linear-gradient(160deg, ${settings.bodyColor} 0%, hsl(var(--background) / 0.8) 100%)`
+          : `linear-gradient(160deg, ${settings.bodyColor}ff 0%, ${settings.bodyColor}cc 100%)`,
         boxShadow: isMobile ? "none" : `
           0 30px 80px rgba(0,0,0,0.6),
           0 10px 30px rgba(0,0,0,0.4),

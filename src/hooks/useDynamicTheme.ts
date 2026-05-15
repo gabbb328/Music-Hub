@@ -4,7 +4,7 @@ import { usePlaybackState } from '@/hooks/useSpotify';
 import { extractColorsFromImage, applyColorPalette, clearColorPalette } from '@/services/color-extractor';
 
 export function useDynamicTheme() {
-  const { isDynamicTheme, autoDarkMode, setTheme, theme, setCoverImageUrl } = useTheme();
+  const { isDynamicTheme, autoDarkMode, setTheme, theme, effectiveTheme, setCoverImageUrl } = useTheme();
   const { data: playbackState } = usePlaybackState();
   const lastTrackRef  = useRef<string | null>(null);
   const lastThemeRef  = useRef<string | null>(null);
@@ -35,7 +35,7 @@ export function useDynamicTheme() {
 
     let cancelled = false;
 
-    extractColorsFromImage(albumCover)
+    extractColorsFromImage(albumCover, effectiveTheme)
       .then(palette => {
         if (cancelled) return;
         if (autoDarkMode && palette.detectedTheme !== theme) {
@@ -43,12 +43,12 @@ export function useDynamicTheme() {
           setTheme(palette.detectedTheme);
           setTimeout(() => {
             if (!cancelled) {
-              applyColorPalette(palette);
+              applyColorPalette(palette, palette.detectedTheme);
               lastTrackRef.current = trackId;
             }
           }, 100);
         } else {
-          applyColorPalette(palette);
+          applyColorPalette(palette, effectiveTheme);
           lastTrackRef.current = trackId;
           lastThemeRef.current = theme;
         }
@@ -56,7 +56,7 @@ export function useDynamicTheme() {
       .catch(err => console.error('[dynamic-theme]', err));
 
     return () => { cancelled = true; };
-  }, [isDynamicTheme, playbackState?.item?.id, autoDarkMode, theme, setTheme, setCoverImageUrl]);
+  }, [isDynamicTheme, playbackState?.item?.id, autoDarkMode, theme, effectiveTheme, setTheme, setCoverImageUrl]);
 
   return { isDynamicTheme };
 }
