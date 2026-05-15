@@ -3,7 +3,7 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Home, Search, Library, Radio, Mic2, BarChart3, Headphones,
   Sparkles, Heart, Clock, ListMusic, Music, ScanSearch, Layers,
-  Info, Gamepad2, Users
+  Info, Gamepad2, Users, ScrollText
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -41,7 +41,8 @@ const gameItems = [
 ];
 
 const appItems = [
-  { id: "about",  label: "Chi siamo", icon: Info },
+  { id: "about",     label: "Chi siamo",  icon: Info },
+  { id: "changelog", label: "Changelog",  icon: ScrollText },
 ];
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {

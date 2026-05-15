@@ -35,7 +35,8 @@ export default function MusicQuizContent({ onStateChange }: { onStateChange?: (a
     const tracks = [...topTracksData.items].sort(() => Math.random() - 0.5);
     const newQuestions: Question[] = [];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10
+      ; i++) {
       const correctTrack = tracks[i];
       const otherOptions = tracks.filter(t => t.id !== correctTrack.id).sort(() => Math.random() - 0.5).slice(0, 3);
       const options = [correctTrack, ...otherOptions].sort(() => Math.random() - 0.5);
@@ -129,7 +130,7 @@ export default function MusicQuizContent({ onStateChange }: { onStateChange?: (a
             <div className="space-y-2">
               <h2 className="text-2xl font-bold">Pronto per la sfida?</h2>
               <p className="text-muted-foreground max-w-md">
-                Pescheremo 5 brani dai tuoi artisti preferiti. 
+                Pescheremo 10 brani dai tuoi artisti preferiti. 
                 Hai 10 secondi per indovinare il titolo mentre la musica suona!
               </p>
             </div>

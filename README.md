@@ -18,6 +18,7 @@ Un moderno music player web integrato con Spotify, costruito con React, TypeScri
 - 🤖 **AI DJ** - Raccomandazioni musicali intelligenti
 - 📝 **Testi Sincronizzati** - Visualizza i testi mentre ascolti
 - 🎛️ **Controlli Completi** - Play, pause, skip, volume, shuffle, repeat
+- 🔢 **Raggruppamento Recenti** - Visualizza i brani ascoltati più volte con un moltiplicatore (es. x2)
 
 ## 🚀 Quick Start
 

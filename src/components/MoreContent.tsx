@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import {
   Radio, Mic2, BarChart3, Headphones, Sparkles, Heart, Clock,
   ListMusic, ScanSearch, Settings, User,
-  Layers, Info, Users
+  Layers, Info, Users, ScrollText
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -139,6 +139,11 @@ export default function MoreContent({ onSectionChange, onOpenSettings }: MoreCon
               onClick: () => onSectionChange("about"),
               icon: Info, iconColor: "text-violet-400", iconBg: "bg-violet-500/10",
               label: "Chi siamo", sub: "Autori, stack e versione",
+            },
+            {
+              onClick: () => onSectionChange("changelog"),
+              icon: ScrollText, iconColor: "text-emerald-400", iconBg: "bg-emerald-500/10",
+              label: "Changelog", sub: "Cronologia degli aggiornamenti",
             },
           ].map(({ onClick, icon: Icon, iconColor, iconBg, label, sub }, i) => (
             <motion.button

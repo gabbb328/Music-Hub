@@ -6,6 +6,7 @@ import { useRecentlyPlayed, useTopTracks, useUserPlaylists } from "@/hooks/useSp
 import { SpotifyTrack } from "@/types/spotify";
 import { formatTime } from "@/lib/mock-data";
 import { LIST_CONTAINER, LIST_ITEM, SPRING_ITEM } from "@/lib/animations";
+import { groupRecentTracks } from "@/lib/spotify-utils";
 
 interface HomeContentProps {
   onPlayTrack: (track: Track) => void;
@@ -34,7 +35,7 @@ const SkeletonCard = () => (
 );
 
 const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
-  const { data: recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed(12);
+  const { data: recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed(50);
   const { data: topTracks, isLoading: loadingTop } = useTopTracks("medium_term");
   const { data: playlists, isLoading: loadingPlaylists } = useUserPlaylists();
 
@@ -89,7 +90,7 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
             initial="hidden"
             animate="visible"
           >
-            {recentlyPlayed?.items?.slice(0, 12).map((item: any) => {
+            {groupRecentTracks(recentlyPlayed?.items || []).slice(0, 12).map((item: any) => {
               const track = item.track;
               return (
                 <motion.div
@@ -109,6 +110,11 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
                             alt={track.name}
                             className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                           />
+                        )}
+                        {item.count > 1 && (
+                          <div className="absolute bottom-1 right-1 bg-primary/90 text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border border-primary-foreground/20 z-10 backdrop-blur-sm">
+                            x{item.count}
+                          </div>
                         )}
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <motion.div

@@ -101,7 +101,7 @@ export default function AboutContent() {
             <Music2 className="w-4 h-4 text-primary" /> Info app
           </h2>
           <div className="space-y-1.5 text-sm text-muted-foreground">
-            <div className="flex justify-between"><span>Versione</span><span className="font-mono text-foreground">1.0.0</span></div>
+            <div className="flex justify-between"><span>Versione</span><span className="font-mono text-foreground">1.3.1</span></div>
             <div className="flex justify-between"><span>Licenza</span><span className="text-foreground">Uso personale</span></div>
             <div className="flex justify-between"><span>Spotify API</span><span className="text-green-400">✓ Connessa</span></div>
             <div className="flex justify-between"><span>Claude AI</span><span className="text-violet-400">✓ Integrata</span></div>

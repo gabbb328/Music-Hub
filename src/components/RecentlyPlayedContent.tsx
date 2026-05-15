@@ -4,6 +4,7 @@ import { useRecentlyPlayed, usePlayMutation, useAddToQueueMutation } from "@/hoo
 import { useToast } from "@/hooks/use-toast";
 import { formatTime } from "@/lib/mock-data";
 import { motion } from "framer-motion";
+import { groupRecentTracks } from "@/lib/spotify-utils";
 
 export default function RecentlyPlayedContent() {
   const { data: recentData, isLoading } = useRecentlyPlayed(50);
@@ -11,7 +12,8 @@ export default function RecentlyPlayedContent() {
   const addToQueueMutation = useAddToQueueMutation();
   const { toast } = useToast();
 
-  const items = recentData?.items || [];
+
+  const items = groupRecentTracks(recentData?.items || []);
 
   const handlePlayTrack = async (uri: string, trackName: string) => {
     try {
@@ -135,6 +137,11 @@ export default function RecentlyPlayedContent() {
                           className="object-cover w-full h-full"
                           loading="lazy"
                         />
+                      )}
+                      {item.count > 1 && (
+                        <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-1 rounded-tl-md z-10">
+                          x{item.count}
+                        </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

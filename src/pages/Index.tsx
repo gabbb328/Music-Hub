@@ -29,6 +29,7 @@ import AudioSettingsContent from "@/components/AudioSettingsContent";
 import MusicQuizContent from "@/components/MusicQuizContent";
 import MoodGeneratorContent from "@/components/MoodGeneratorContent";
 import ListenAlongContent from "@/components/ListenAlongContent";
+import ChangelogContent from "@/components/ChangelogContent";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
@@ -309,6 +310,7 @@ const IndexInner = () => {
       case "quiz":           return <MusicQuizContent onStateChange={setIsQuizActive} />;
       case "mood":           return <MoodGeneratorContent />;
       case "listen-along":   return <ListenAlongContent />;
+      case "changelog":      return <ChangelogContent />;
       case "more":           return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
       default:               return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
     }
