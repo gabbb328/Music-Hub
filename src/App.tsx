@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SpotifyLogin from "./pages/SpotifyLogin";
 import SpotifyCallback from "./pages/SpotifyCallback";
+import AdminPage from "./pages/AdminPage";
+import CollabApprove from "./pages/CollabApprove";
 
 const queryClient = new QueryClient();
 
@@ -25,17 +27,22 @@ const AppRouter = () => {
 
   return (
     <Routes>
+      {/* ── Admin — route separata, non visibile nel sito ─────────────────── */}
+      <Route path="/admin" element={<AdminPage />} />
+
+      {/* ── App principale ────────────────────────────────────────────────── */}
       <Route path="/login" element={<SpotifyLogin />} />
       <Route path="/callback" element={<SpotifyCallback />} />
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <ProtectedRoute>
             <Index />
           </ProtectedRoute>
-        } 
+        }
       />
       <Route path="*" element={<NotFound />} />
+      <Route path="/collab/approve" element={<CollabApprove />} />
     </Routes>
   );
 };

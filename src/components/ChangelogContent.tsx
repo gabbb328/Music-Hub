@@ -10,6 +10,17 @@ interface ChangelogEntry {
 
 const changelogData: ChangelogEntry[] = [
   {
+    date: "17 Maggio 2026",
+    version: "v1.3.2",
+    commits: [
+      "Risoluzione bug di login di spotify tramite PWA su Mobile",
+      "Risoluzione bug di riproduzione su Mobile",
+      "Aggiunta pagina di gestione del sito per admin",
+      "Aggiunta pagina di account",
+      "Aggiunta la possibilità di inviare una richiesta di collaborazione all'admin"
+    ]
+  },
+  {
     date: "15 Maggio 2026",
     version: "v1.3.1",
     commits: [

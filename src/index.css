@@ -60,7 +60,6 @@
     width: 100%;
     overflow: hidden;
     position: fixed;
-    touch-action: pan-y;
   }
 
   button, a, [role="button"] {

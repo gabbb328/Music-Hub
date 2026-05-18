@@ -35,8 +35,12 @@ import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
 import { useMediaSession } from "@/hooks/useMediaSession";
 import {
-  usePlaybackState, usePlayMutation, usePauseMutation,
-  useNextMutation, usePreviousMutation, useSeekMutation,
+  usePlaybackState,
+  usePlayMutation,
+  usePauseMutation,
+  useNextMutation,
+  usePreviousMutation,
+  useSeekMutation,
 } from "@/hooks/useSpotify";
 import EasterEggOverlay, { EasterEggList } from "@/components/EasterEggOverlay";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
@@ -46,27 +50,53 @@ import { useAlexa } from "@/hooks/useAlexa";
 
 // ── Konami sequence: ↑↑↓↓←→←→BA ─────────────────────────────────────────────
 const KONAMI_KEYS = [
-  "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
-  "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
-  "b","a",
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "b",
+  "a",
 ];
 // Sequenza mobile (swipe): ↑↑↓↓←→←→
 const KONAMI_SWIPES = [
-  "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
-  "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
 ];
 
 // ── Super Mode Overlay ────────────────────────────────────────────────────────
-function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => void }) {
+function SuperModeOverlay({
+  active,
+  onEnd,
+}: {
+  active: boolean;
+  onEnd: () => void;
+}) {
   const [remaining, setRemaining] = useState(20);
   const isAlexa = useAlexa();
 
   useEffect(() => {
-    if (!active || isAlexa) { setRemaining(20); return; }
+    if (!active || isAlexa) {
+      setRemaining(20);
+      return;
+    }
     setRemaining(20);
     const t = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) { clearInterval(t); onEnd(); return 0; }
+      setRemaining((r) => {
+        if (r <= 1) {
+          clearInterval(t);
+          onEnd();
+          return 0;
+        }
         return r - 1;
       });
     }, 1000);
@@ -79,7 +109,9 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
     <>
       <motion.div
         key="super-bg"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 5 }}
       >
@@ -91,7 +123,7 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
               "radial-gradient(ellipse at 85% 25%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
               "radial-gradient(ellipse at 50% 85%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
               "radial-gradient(ellipse at 15% 50%, rgba(255,215,0,0.22) 0%, rgba(255,140,0,0.1) 45%, transparent 70%)",
-            ]
+            ],
           }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         />
@@ -108,7 +140,7 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
             style={{
               left: `${5 + i * 9.5}%`,
               bottom: "4rem",
-              width:  4 + (i % 3) * 2,
+              width: 4 + (i % 3) * 2,
               height: 4 + (i % 3) * 2,
               background: `hsla(${42 + (i % 4) * 5},100%,55%,0.85)`,
               boxShadow: "0 0 6px rgba(255,215,0,0.5)",
@@ -138,17 +170,28 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
           zIndex: 48,
           pointerEvents: "none",
           background: "linear-gradient(135deg, #FFD700 0%, #FF8C00 100%)",
-          boxShadow: "0 0 28px rgba(255,215,0,0.55), 0 3px 10px rgba(0,0,0,0.35)",
+          boxShadow:
+            "0 0 28px rgba(255,215,0,0.55), 0 3px 10px rgba(0,0,0,0.35)",
         }}
       >
-        <motion.span animate={{ rotate: [0, 18, -18, 0] }} transition={{ duration: 0.45, repeat: Infinity }}>
+        <motion.span
+          animate={{ rotate: [0, 18, -18, 0] }}
+          transition={{ duration: 0.45, repeat: Infinity }}
+        >
           <Crown size={15} color="#000" strokeWidth={2.5} />
         </motion.span>
-        <span className="text-black font-black text-xs tracking-widest uppercase">SUPER MODE</span>
-        <motion.span animate={{ scale: [1, 1.35, 1] }} transition={{ duration: 0.5, repeat: Infinity }}>
+        <span className="text-black font-black text-xs tracking-widest uppercase">
+          SUPER MODE
+        </span>
+        <motion.span
+          animate={{ scale: [1, 1.35, 1] }}
+          transition={{ duration: 0.5, repeat: Infinity }}
+        >
           <Zap size={14} color="#000" strokeWidth={2.5} />
         </motion.span>
-        <span className="text-black/60 font-mono text-[10px] font-bold tabular-nums ml-0.5">{remaining}s</span>
+        <span className="text-black/60 font-mono text-[10px] font-bold tabular-nums ml-0.5">
+          {remaining}s
+        </span>
       </motion.div>
     </>
   );
@@ -159,56 +202,60 @@ function SuperModeOverlay({ active, onEnd }: { active: boolean; onEnd: () => voi
 // ═══════════════════════════════════════════════════════════════════════════════
 const IndexInner = () => {
   const isAlexa = useAlexa();
-  const player  = usePlayerStore();
+  const player = usePlayerStore();
 
   // ✅ Ora è dentro SpotifyProvider — nessun errore di contesto
   const { isIOS, playbackState: spPb } = useSpotifyContext();
 
-  const [activeSection, setActiveSection]   = useState("home");
+  const [activeSection, setActiveSection] = useState("home");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
-  const [showSettings, setShowSettings]     = useState(false);
-  const [activeEgg, setActiveEgg]           = useState<EasterEggType>(null);
-  const [isQuizActive, setIsQuizActive]     = useState(false);
-  const [showEggList, setShowEggList]       = useState(false);
-  const [superMode, setSuperMode]           = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeEgg, setActiveEgg] = useState<EasterEggType>(null);
+  const [isQuizActive, setIsQuizActive] = useState(false);
+  const [showEggList, setShowEggList] = useState(false);
+  const [superMode, setSuperMode] = useState(false);
 
-  const konamiRef      = useRef<string[]>([]);
-  const swipeRef       = useRef<string[]>([]);
-  const touchStartRef  = useRef<{ x: number; y: number } | null>(null);
-  const superTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const konamiRef = useRef<string[]>([]);
+  const swipeRef = useRef<string[]>([]);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const superTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const superActiveRef = useRef(false);
 
   useLyricsPreloader();
   useDynamicTheme();
 
   const { data: playbackState } = usePlaybackState();
-  const playMutation     = usePlayMutation();
-  const pauseMutation    = usePauseMutation();
-  const nextMutation     = useNextMutation();
+  const playMutation = usePlayMutation();
+  const pauseMutation = usePauseMutation();
+  const nextMutation = useNextMutation();
   const previousMutation = usePreviousMutation();
-  const seekMutation     = useSeekMutation();
+  const seekMutation = useSeekMutation();
 
   const spotifyTrack = playbackState?.item;
-  const isPlaying    = playbackState?.is_playing ?? player.isPlaying;
+  const isPlaying = playbackState?.is_playing ?? player.isPlaying;
 
-  const currentTrack = spotifyTrack ? {
-    id: spotifyTrack.id,
-    title: spotifyTrack.name,
-    artist: spotifyTrack.artists[0]?.name || "Unknown Artist",
-    album: spotifyTrack.album.name,
-    cover: spotifyTrack.album.images[0]?.url || "",
-    duration: Math.floor(spotifyTrack.duration_ms / 1000),
-  } : player.currentTrack;
+  const currentTrack = spotifyTrack
+    ? {
+        id: spotifyTrack.id,
+        title: spotifyTrack.name,
+        artist: spotifyTrack.artists[0]?.name || "Unknown Artist",
+        album: spotifyTrack.album.name,
+        cover: spotifyTrack.album.images[0]?.url || "",
+        duration: Math.floor(spotifyTrack.duration_ms / 1000),
+      }
+    : player.currentTrack;
 
   const mediaActions = {
-    play:      () => spotifyTrack ? playMutation.mutate({}) : player.play(),
-    pause:     () => spotifyTrack ? pauseMutation.mutate() : player.pause(),
-    nextTrack: () => spotifyTrack ? nextMutation.mutate() : player.nextTrack(),
-    prevTrack: () => spotifyTrack ? previousMutation.mutate() : player.prevTrack(),
+    play: () => (spotifyTrack ? playMutation.mutate({}) : player.play()),
+    pause: () => (spotifyTrack ? pauseMutation.mutate() : player.pause()),
+    nextTrack: () =>
+      spotifyTrack ? nextMutation.mutate() : player.nextTrack(),
+    prevTrack: () =>
+      spotifyTrack ? previousMutation.mutate() : player.prevTrack(),
     seekTo: (time: number) => {
       if (spotifyTrack) seekMutation.mutate(Math.floor(time * 1000));
       else player.setProgress((time / (currentTrack?.duration || 1)) * 100);
-    }
+    },
   };
 
   useMediaSession(currentTrack, isPlaying, mediaActions);
@@ -220,8 +267,13 @@ const IndexInner = () => {
     if (superActiveRef.current) return;
     superActiveRef.current = true;
     setSuperMode(true);
-    document.querySelectorAll<HTMLMediaElement>("audio, video")
-      .forEach(el => { try { el.playbackRate = 1.5; } catch {} });
+    document
+      .querySelectorAll<HTMLMediaElement>("audio, video")
+      .forEach((el) => {
+        try {
+          el.playbackRate = 1.5;
+        } catch {}
+      });
     if (superTimerRef.current) clearTimeout(superTimerRef.current);
     superTimerRef.current = setTimeout(() => deactivateSuperMode(), 20000);
   };
@@ -229,17 +281,29 @@ const IndexInner = () => {
   const deactivateSuperMode = () => {
     superActiveRef.current = false;
     setSuperMode(false);
-    document.querySelectorAll<HTMLMediaElement>("audio, video")
-      .forEach(el => { try { el.playbackRate = 1; } catch {} });
+    document
+      .querySelectorAll<HTMLMediaElement>("audio, video")
+      .forEach((el) => {
+        try {
+          el.playbackRate = 1;
+        } catch {}
+      });
     if (superTimerRef.current) clearTimeout(superTimerRef.current);
   };
 
-  useEffect(() => () => { if (superTimerRef.current) clearTimeout(superTimerRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (superTimerRef.current) clearTimeout(superTimerRef.current);
+    },
+    [],
+  );
 
   // ── Konami Code — keyboard ─────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      konamiRef.current = [...konamiRef.current, e.key].slice(-KONAMI_KEYS.length);
+      konamiRef.current = [...konamiRef.current, e.key].slice(
+        -KONAMI_KEYS.length,
+      );
       if (konamiRef.current.join(",") === KONAMI_KEYS.join(",")) {
         konamiRef.current = [];
         activateSuperMode();
@@ -260,23 +324,31 @@ const IndexInner = () => {
       const t = e.changedTouches[0];
       const dx = t.clientX - touchStartRef.current.x;
       const dy = t.clientY - touchStartRef.current.y;
-      const adx = Math.abs(dx), ady = Math.abs(dy);
+      const adx = Math.abs(dx),
+        ady = Math.abs(dy);
       touchStartRef.current = null;
       if (Math.max(adx, ady) < 55) return;
-      const dir = adx > ady
-        ? (dx > 0 ? "ArrowRight" : "ArrowLeft")
-        : (dy > 0 ? "ArrowDown"  : "ArrowUp");
-      swipeRef.current = [...swipeRef.current, dir].slice(-KONAMI_SWIPES.length);
+      const dir =
+        adx > ady
+          ? dx > 0
+            ? "ArrowRight"
+            : "ArrowLeft"
+          : dy > 0
+            ? "ArrowDown"
+            : "ArrowUp";
+      swipeRef.current = [...swipeRef.current, dir].slice(
+        -KONAMI_SWIPES.length,
+      );
       if (swipeRef.current.join(",") === KONAMI_SWIPES.join(",")) {
         swipeRef.current = [];
         activateSuperMode();
       }
     };
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchend",   onTouchEnd,   { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend",   onTouchEnd);
+      window.removeEventListener("touchend", onTouchEnd);
     };
   }, []); // eslint-disable-line
 
@@ -291,35 +363,85 @@ const IndexInner = () => {
       );
     }
     switch (activeSection) {
-      case "search":         return <SearchContent onPlayTrack={player.playTrack} onActivateEgg={setActiveEgg} />;
-      case "library":        return <LibraryContent onPlayTrack={player.playTrack} onOpenPlaylist={id => setActiveSection(`playlist-${id}`)} />;
-      case "ai-dj":          return <AIDJContent />;
-      case "lyrics":         return <LyricsContent currentTrack={player.currentTrack} />;
-      case "stats":          return <StatsContent />;
-      case "devices":        return <DevicesContent />;
-      case "samsung-buds":   return <SamsungBudsContent />;
-      case "queue":          return <QueueContent queue={player.queue} currentTrack={player.currentTrack} onPlayTrack={player.playTrack} />;
-      case "radio":          return <RadioContent />;
-      case "recognize":      return <RecognizeContent />;
-      case "equalizer":      return <EqualizerContent />;
-      case "liked":          return <LikedSongsContent />;
-      case "recent":         return <RecentlyPlayedContent />;
-      case "neural-mixer":   return <NeuralSpaceMixerContent />;
-      case "about":          return <AboutContent />;
-      case "audio-settings": return <AudioSettingsContent />;
-      case "quiz":           return <MusicQuizContent onStateChange={setIsQuizActive} />;
-      case "mood":           return <MoodGeneratorContent />;
-      case "listen-along":   return <ListenAlongContent />;
-      case "changelog":      return <ChangelogContent />;
-      case "more":           return <MoreContent onSectionChange={setActiveSection} onOpenSettings={() => setShowSettings(true)} />;
-      default:               return <HomeContent onPlayTrack={player.playTrack} onOpenSettings={() => setShowSettings(true)} />;
+      case "search":
+        return (
+          <SearchContent
+            onPlayTrack={player.playTrack}
+            onActivateEgg={setActiveEgg}
+          />
+        );
+      case "library":
+        return (
+          <LibraryContent
+            onPlayTrack={player.playTrack}
+            onOpenPlaylist={(id) => setActiveSection(`playlist-${id}`)}
+          />
+        );
+      case "ai-dj":
+        return <AIDJContent />;
+      case "lyrics":
+        return <LyricsContent currentTrack={player.currentTrack} />;
+      case "stats":
+        return <StatsContent />;
+      case "devices":
+        return <DevicesContent />;
+      case "samsung-buds":
+        return <SamsungBudsContent />;
+      case "queue":
+        return (
+          <QueueContent
+            queue={player.queue}
+            currentTrack={player.currentTrack}
+            onPlayTrack={player.playTrack}
+          />
+        );
+      case "radio":
+        return <RadioContent />;
+      case "recognize":
+        return <RecognizeContent />;
+      case "equalizer":
+        return <EqualizerContent />;
+      case "liked":
+        return <LikedSongsContent />;
+      case "recent":
+        return <RecentlyPlayedContent />;
+      case "neural-mixer":
+        return <NeuralSpaceMixerContent />;
+      case "about":
+        return <AboutContent />;
+      case "audio-settings":
+        return <AudioSettingsContent />;
+      case "quiz":
+        return <MusicQuizContent onStateChange={setIsQuizActive} />;
+      case "mood":
+        return <MoodGeneratorContent />;
+      case "listen-along":
+        return <ListenAlongContent />;
+      case "changelog":
+        return <ChangelogContent />;
+      case "more":
+        return (
+          <MoreContent
+            onSectionChange={setActiveSection}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        );
+      default:
+        return (
+          <HomeContent
+            onPlayTrack={player.playTrack}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        );
     }
   };
 
   const hasTrack = !!currentTrack;
 
   return (
-    <div className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}>
+    <div
+      className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}
+    >
       <SpotifyStatus />
 
       {/* Banner iOS: nessun dispositivo attivo */}
@@ -327,32 +449,45 @@ const IndexInner = () => {
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/25 text-sm">
           <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
           <p className="text-amber-200 text-xs leading-snug flex-1">
-            <span className="font-semibold">Apri l'app Spotify</span> sul tuo iPhone e avvia la riproduzione — poi torna qui per controllarlo.
+            <span className="font-semibold">Apri l'app Spotify</span> sul tuo
+            iPhone e avvia la riproduzione — poi torna qui per controllarlo.
           </p>
         </div>
       )}
 
       {/* Easter egg sfondo + lista */}
       <AnimatePresence>
-        {activeEgg && <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />}
+        {activeEgg && (
+          <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />
+        )}
       </AnimatePresence>
       <AnimatePresence>
         {showEggList && (
           <EasterEggList
             onClose={() => setShowEggList(false)}
-            onActivate={(egg) => { setActiveEgg(egg); setShowEggList(false); }}
+            onActivate={(egg) => {
+              setActiveEgg(egg);
+              setShowEggList(false);
+            }}
           />
         )}
       </AnimatePresence>
 
       {/* Super Mode overlay */}
       <AnimatePresence>
-        {superMode && <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />}
+        {superMode && (
+          <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />
+        )}
       </AnimatePresence>
 
       {/* Layout principale */}
-      <div className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}>
-        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      <div
+        className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}
+      >
+        <Sidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+        />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {isAlexa ? (
             // Modalità Alexa: Rendering statico diretto senza alcun overhead di animazione
@@ -367,7 +502,11 @@ const IndexInner = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ type: "tween", duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                transition={{
+                  type: "tween",
+                  duration: 0.22,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
               >
                 {renderContent()}
               </motion.div>
@@ -405,12 +544,18 @@ const IndexInner = () => {
               <NowPlayingView
                 {...player}
                 onClose={() => setShowNowPlaying(false)}
-                onNavigate={(s) => { setActiveSection(s); setShowNowPlaying(false); }}
+                onNavigate={(s) => {
+                  setActiveSection(s);
+                  setShowNowPlaying(false);
+                }}
                 isQuizActive={isQuizActive}
               />
             )}
           </AnimatePresence>
-          <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
+          <SettingsPanel
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+          />
         </>
       )}
     </div>

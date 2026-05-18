@@ -1,0 +1,1010 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Shield, LogOut, RefreshCw, Server, Smartphone, Key,
+  Clock, AlertCircle, Activity, GitBranch, Globe,
+  Copy, Check, ChevronDown, ChevronUp, Zap,
+  TerminalSquare, User, XCircle, WifiOff, Music,
+  TrendingUp, Radio, List, Heart, BarChart2,
+  Mail, Users, Lock, Unlock, Trash2, Eye, EyeOff,
+  Keyboard, X,
+} from "lucide-react";
+import { getToken } from "@/services/spotify-auth";
+import { usePlaybackState } from "@/hooks/useSpotify";
+import { clearAdminSession, AdminSession } from "./AdminLogin";
+
+// ─── utils ────────────────────────────────────────────────────────────────────
+function fmtDate(ts: number | string | undefined) {
+  if (!ts) return "—";
+  return new Date(Number(ts)).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+}
+function fmtMs(ms: number) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function ago(iso: string) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return "ora";
+  if (m < 60) return `${m}m fa`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h fa`;
+  return `${Math.floor(h / 24)}g fa`;
+}
+async function spotifyGet(path: string) {
+  const token = getToken();
+  if (!token) throw new Error("no token");
+  const r = await fetch(`https://api.spotify.com/v1${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+// ─── Users storage (localStorage, condiviso fra tab) ─────────────────────────
+const USERS_KEY = "admin_collab_users";
+interface CollabUser {
+  id: string;
+  name: string;
+  email?: string;
+  requestedAt: string;
+  status: "pending" | "accepted" | "rejected";
+  permissions: {
+    canViewStats: boolean;
+    canViewToken: boolean;
+    canAccessAdmin: boolean;
+  };
+  message?: string;
+}
+function loadUsers(): CollabUser[] {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]"); } catch { return []; }
+}
+function saveUsers(u: CollabUser[]) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(u));
+}
+
+// ─── Messages storage ─────────────────────────────────────────────────────────
+const MSGS_KEY = "admin_messages";
+interface AdminMessage {
+  id: string;
+  from: string;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  read: boolean;
+}
+function loadMessages(): AdminMessage[] {
+  try { return JSON.parse(localStorage.getItem(MSGS_KEY) ?? "[]"); } catch { return []; }
+}
+
+// ─── micro components ─────────────────────────────────────────────────────────
+function CopyBtn({ text }: { text: string }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button onClick={() => { navigator.clipboard.writeText(text); setOk(true); setTimeout(() => setOk(false), 1800); }}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: ok ? "#34d399" : "rgba(255,255,255,0.25)", display: "flex", alignItems: "center" }}>
+      {ok ? <Check size={11} /> : <Copy size={11} />}
+    </button>
+  );
+}
+function Dot({ active, color = "#34d399" }: { active: boolean; color?: string }) {
+  return <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: active ? color : "rgba(255,255,255,0.15)", boxShadow: active ? `0 0 5px ${color}` : "none", flexShrink: 0 }} />;
+}
+function PLabel({ children }: { children: React.ReactNode }) {
+  return <p style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)", marginBottom: 5, marginTop: 0 }}>{children}</p>;
+}
+function KV({ k, v }: { k: string; v: any }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 6, background: "rgba(0,0,0,0.22)", borderRadius: 7, padding: "4px 8px" }}>
+      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>{k}</span>
+      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.55)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{v}</span>
+    </div>
+  );
+}
+function MiniBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div style={{ height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 99, overflow: "hidden" }}>
+      <motion.div style={{ height: "100%", background: color, borderRadius: 99 }}
+        initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: "easeOut" }} />
+    </div>
+  );
+}
+function Spinner() {
+  return <RefreshCw size={12} style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.3)" }} />;
+}
+function Empty({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(255,255,255,0.2)", fontSize: 11, paddingTop: 4 }}>
+      <Icon size={13} /> {text}
+    </div>
+  );
+}
+function Panel({ children, delay = 0, style = {} }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+      style={{ background: "rgba(13,19,34,0.9)", backdropFilter: "blur(14px)", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 20, padding: 16, ...style }}>
+      {children}
+    </motion.div>
+  );
+}
+function PHead({ icon: Icon, label, color, right }: { icon: React.ElementType; label: string; color: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <Icon size={13} color={color} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.58)", letterSpacing: "0.13em", textTransform: "uppercase" }}>{label}</span>
+      </div>
+      {right}
+    </div>
+  );
+}
+function RefreshBtn({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button onClick={onClick} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.25)", display: "flex" }}>
+      <RefreshCw size={12} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
+    </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS OVERLAY
+// ═══════════════════════════════════════════════════════════════════════════════
+function ShortcutsModal({ onClose }: { onClose: () => void }) {
+  const shortcuts = [
+    ["R", "Refresh tutti i pannelli"],
+    ["1", "Scroll → Sezione token/riproduzione"],
+    ["2", "Scroll → Sezione statistiche"],
+    ["3", "Scroll → Sezione utenti/messaggi"],
+    ["4", "Scroll → Sezione Vercel"],
+    ["Esc", "Chiudi questo pannello"],
+    ["?", "Mostra shortcuts"],
+    ["Ctrl+L", "Logout"],
+  ];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <motion.div initial={{ scale: 0.92, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 16 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: "rgba(13,19,34,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: 24, minWidth: 340, boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Keyboard size={14} color="#34d399" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>Keyboard Shortcuts</span>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)" }}><X size={14} /></button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {shortcuts.map(([key, desc]) => (
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <kbd style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.7)", minWidth: 60, textAlign: "center", flexShrink: 0 }}>{key}</kbd>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Token
+// ═══════════════════════════════════════════════════════════════════════════════
+function TokenPanel() {
+  const token = getToken();
+  const expiresAt = localStorage.getItem("spotify_token_expires_at");
+  const expiresInSec = expiresAt ? Math.max(0, Math.floor((Number(expiresAt) - Date.now()) / 1000)) : 0;
+  const pct = Math.min(100, (expiresInSec / 3600) * 100);
+  const [expanded, setExpanded] = useState(false);
+  let decoded: Record<string, any> | null = null;
+  if (token) {
+    try { const p = token.split("."); if (p.length === 3) decoded = JSON.parse(atob(p[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch {}
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Key} label="Access Token" color="#34d399"
+        right={<div style={{ display: "flex", alignItems: "center", gap: 5 }}><Dot active={!!token} /><span style={{ fontSize: 9, fontFamily: "monospace", color: token ? "#34d399" : "#f87171" }}>{token ? "ACTIVE" : "NULL"}</span></div>} />
+      {token ? (
+        <>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <PLabel>scadenza</PLabel>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>{Math.floor(expiresInSec / 60)}m · {fmtDate(Number(expiresAt))}</span>
+            </div>
+            <MiniBar pct={pct} color="linear-gradient(90deg,#10b981,#34d399)" />
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <PLabel>raw token</PLabel>
+              <CopyBtn text={token} />
+            </div>
+            <div onClick={() => setExpanded(v => !v)} style={{ background: "rgba(0,0,0,0.38)", borderRadius: 11, padding: "9px 11px", cursor: "pointer" }}>
+              <p style={{ fontFamily: "monospace", fontSize: 9, color: "rgba(255,255,255,0.3)", wordBreak: "break-all", lineHeight: 1.6, margin: 0, display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: expanded ? 999 : 2, overflow: "hidden" }}>{token}</p>
+              <span style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 5, fontSize: 9, color: "rgba(255,255,255,0.16)" }}>
+                {expanded ? <><ChevronUp size={9} /> riduci</> : <><ChevronDown size={9} /> espandi</>}
+              </span>
+            </div>
+          </div>
+          {decoded && (
+            <div>
+              <PLabel>jwt payload</PLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {Object.entries(decoded).slice(0, 6).map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", gap: 8, background: "rgba(255,255,255,0.02)", borderRadius: 6, padding: "3px 8px", fontFamily: "monospace", fontSize: 9 }}>
+                    <span style={{ color: "rgba(52,211,153,0.5)", minWidth: 65, flexShrink: 0 }}>{k}</span>
+                    <span style={{ color: "rgba(255,255,255,0.36)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : <Empty icon={XCircle} text="Nessun token — utente non loggato" />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Now Playing
+// ═══════════════════════════════════════════════════════════════════════════════
+function NowPlayingPanel() {
+  const { data: pb } = usePlaybackState();
+  const track = pb?.item;
+  const pct = track && pb ? (pb.progress_ms / track.duration_ms) * 100 : 0;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Activity} label="Riproduzione" color="#a78bfa"
+        right={pb?.is_playing ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, fontFamily: "monospace", color: "#34d399" }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#34d399", animation: "pulse 1.5s infinite" }} /> PLAYING
+          </span>
+        ) : undefined} />
+      {track ? (
+        <>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <img src={track.album.images[0]?.url} alt="" style={{ width: 46, height: 46, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.88)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.name}</p>
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.artists.map((a: any) => a.name).join(", ")}</p>
+              <p style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.album.name}</p>
+            </div>
+          </div>
+          <div>
+            <MiniBar pct={pct} color="linear-gradient(90deg,#7c3aed,#a78bfa)" />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", marginTop: 3 }}>
+              <span>{fmtMs(pb?.progress_ms ?? 0)}</span><span>{fmtMs(track.duration_ms)}</span>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+            {[["repeat", pb?.repeat_state], ["shuffle", pb?.shuffle_state ? "on" : "off"], ["device", pb?.device?.name ?? "—"], ["volume", `${pb?.device?.volume_percent ?? 0}%`], ["pop.", track.popularity], ["explicit", track.explicit ? "yes" : "no"]].map(([k, v]) => (
+              <KV key={k} k={k} v={v} />
+            ))}
+          </div>
+        </>
+      ) : <Empty icon={Zap} text="Nessuna traccia in riproduzione" />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Dispositivi Spotify (tutti gli utenti connessi all'account)
+// ═══════════════════════════════════════════════════════════════════════════════
+function ConnectedUsersPanel() {
+  const [devices, setDevices] = useState<any[]>([]);
+  const [playbacks, setPlaybacks] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await spotifyGet("/me/player/devices");
+      const devs = d.devices ?? [];
+      setDevices(devs);
+      // Per ogni dispositivo attivo, prova a prendere lo stato di riproduzione
+      const pb = await spotifyGet("/me/player").catch(() => null);
+      if (pb) {
+        const map: Record<string, any> = {};
+        devs.forEach((dev: any) => { if (dev.is_active) map[dev.id] = pb; });
+        setPlaybacks(map);
+      }
+    } catch { setDevices([]); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); const t = setInterval(fetchAll, 15000); return () => clearInterval(t); }, [fetchAll]);
+
+  const typeEmoji: Record<string, string> = { Smartphone: "📱", Computer: "💻", Speaker: "🔊", TV: "📺", CastAudio: "🔊", CastVideo: "📺" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Users} label="Dispositivi connessi" color="#60a5fa"
+        right={<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.25)" }}>auto 15s</span>
+          <RefreshBtn onClick={fetchAll} loading={loading} />
+        </div>} />
+
+      {loading && devices.length === 0 ? <Empty icon={Spinner as any} text="caricamento…" /> :
+        devices.length === 0 ? <Empty icon={WifiOff} text="nessun dispositivo rilevato" /> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {devices.map(d => {
+              const pb = playbacks[d.id];
+              const track = pb?.item;
+              return (
+                <div key={d.id} style={{ borderRadius: 13, padding: "11px 13px", border: d.is_active ? "1px solid rgba(96,165,250,0.25)" : "1px solid rgba(255,255,255,0.05)", background: d.is_active ? "rgba(96,165,250,0.06)" : "rgba(255,255,255,0.015)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <span style={{ fontSize: 20, lineHeight: 1, marginTop: 2 }}>{typeEmoji[d.type] ?? "🎵"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.82)", margin: 0 }}>{d.name}</p>
+                        {d.is_active && (
+                          <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(96,165,250,0.18)", color: "#93c5fd", padding: "2px 7px", borderRadius: 99, flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}>
+                            <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#60a5fa", animation: "pulse 2s infinite" }} /> ATTIVO
+                          </span>
+                        )}
+                        {d.is_private_session && <span style={{ fontSize: 8, color: "rgba(251,191,36,0.7)", background: "rgba(251,191,36,0.1)", padding: "2px 6px", borderRadius: 99 }}>🔒 privata</span>}
+                      </div>
+                      <div style={{ display: "flex", gap: 10, marginTop: 3 }}>
+                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>{d.type}</span>
+                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>vol {d.volume_percent}%</span>
+                        {d.is_restricted && <span style={{ fontSize: 9, color: "rgba(248,113,113,0.6)" }}>restricted</span>}
+                      </div>
+
+                      {/* What they're playing */}
+                      {d.is_active && track && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, background: "rgba(0,0,0,0.25)", borderRadius: 9, padding: "7px 10px" }}>
+                          <img src={track.album.images[0]?.url} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.75)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.name}</p>
+                            <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{track.artists.map((a: any) => a.name).join(", ")}</p>
+                          </div>
+                          <span style={{ fontSize: 9, fontFamily: "monospace", color: pb.is_playing ? "#34d399" : "rgba(255,255,255,0.3)", flexShrink: 0 }}>
+                            {pb.is_playing ? "▶" : "⏸"} {fmtMs(pb.progress_ms ?? 0)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <CopyBtn text={d.id} />
+                  </div>
+                  <p style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.1)", marginTop: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.id}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Users / Permessi collaboratori
+// ═══════════════════════════════════════════════════════════════════════════════
+function UsersPermissionsPanel() {
+  const [users, setUsers] = useState<CollabUser[]>(loadUsers);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const update = (id: string, patch: Partial<CollabUser>) => {
+    const next = users.map(u => u.id === id ? { ...u, ...patch } : u);
+    setUsers(next); saveUsers(next);
+  };
+  const remove = (id: string) => {
+    const next = users.filter(u => u.id !== id);
+    setUsers(next); saveUsers(next);
+  };
+  const togglePerm = (id: string, perm: keyof CollabUser["permissions"]) => {
+    const u = users.find(u => u.id === id);
+    if (!u) return;
+    update(id, { permissions: { ...u.permissions, [perm]: !u.permissions[perm] } });
+  };
+
+  const statusColors: Record<string, { c: string; bg: string }> = {
+    pending: { c: "#fcd34d", bg: "rgba(245,158,11,0.12)" },
+    accepted: { c: "#6ee7b7", bg: "rgba(16,185,129,0.1)" },
+    rejected: { c: "#fca5a5", bg: "rgba(239,68,68,0.1)" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Users} label="Collaboratori & Permessi" color="#c084fc"
+        right={<span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>{users.length} utenti</span>} />
+
+      {users.length === 0 ? (
+        <Empty icon={Users} text="Nessun utente — le richieste appariranno qui" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {users.map(u => {
+            const sc = statusColors[u.status] ?? statusColors.pending;
+            const isOpen = expanded === u.id;
+            return (
+              <div key={u.id} style={{ borderRadius: 13, border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)", overflow: "hidden" }}>
+                {/* Row */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer" }} onClick={() => setExpanded(isOpen ? null : u.id)}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(192,132,252,0.15)", border: "1px solid rgba(192,132,252,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c084fc" }}>{u.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.78)", margin: 0 }}>{u.name}</p>
+                    <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0, fontFamily: "monospace" }}>{ago(u.requestedAt)}</p>
+                  </div>
+                  <span style={{ fontSize: 8, fontWeight: 700, fontFamily: "monospace", background: sc.bg, color: sc.c, padding: "2px 8px", borderRadius: 99 }}>{u.status.toUpperCase()}</span>
+                  <ChevronDown size={12} color="rgba(255,255,255,0.25)" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+                </div>
+
+                {/* Expanded */}
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      style={{ overflow: "hidden", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        {/* Status actions */}
+                        <div>
+                          <PLabel>stato</PLabel>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {(["pending", "accepted", "rejected"] as const).map(s => (
+                              <button key={s} onClick={() => update(u.id, { status: s })}
+                                style={{ flex: 1, padding: "5px 0", borderRadius: 8, border: u.status === s ? `1px solid ${statusColors[s].c}` : "1px solid rgba(255,255,255,0.07)", background: u.status === s ? statusColors[s].bg : "transparent", color: u.status === s ? statusColors[s].c : "rgba(255,255,255,0.35)", fontSize: 9, fontFamily: "monospace", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Permissions */}
+                        <div>
+                          <PLabel>permessi</PLabel>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                            {([
+                              ["canViewStats", "Può vedere statistiche Spotify"],
+                              ["canViewToken", "Può vedere il token OAuth"],
+                              ["canAccessAdmin", "Accesso alla dashboard admin"],
+                            ] as [keyof CollabUser["permissions"], string][]).map(([perm, label]) => (
+                              <div key={perm} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "6px 10px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  {u.permissions[perm] ? <Unlock size={10} color="#34d399" /> : <Lock size={10} color="rgba(255,255,255,0.25)" />}
+                                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{label}</span>
+                                </div>
+                                <button onClick={() => togglePerm(u.id, perm)}
+                                  style={{ width: 32, height: 16, borderRadius: 99, border: "none", cursor: "pointer", background: u.permissions[perm] ? "#10b981" : "rgba(255,255,255,0.1)", position: "relative", flexShrink: 0, transition: "background 0.2s" }}>
+                                  <div style={{ position: "absolute", top: 2, left: u.permissions[perm] ? 18 : 2, width: 12, height: 12, borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Se accesso admin è attivo, mostra link */}
+                        {u.permissions.canAccessAdmin && (
+                          <div style={{ background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: 10, padding: "8px 10px" }}>
+                            <p style={{ fontSize: 9, color: "rgba(52,211,153,0.7)", margin: "0 0 4px" }}>Link dashboard per questo utente:</p>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <code style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {window.location.origin}/admin
+                              </code>
+                              <CopyBtn text={`${window.location.origin}/admin`} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Message */}
+                        {u.message && (
+                          <div>
+                            <PLabel>messaggio</PLabel>
+                            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "7px 10px", margin: 0, lineHeight: 1.5 }}>{u.message}</p>
+                          </div>
+                        )}
+
+                        {/* Delete */}
+                        <button onClick={() => remove(u.id)}
+                          style={{ alignSelf: "flex-end", display: "flex", alignItems: "center", gap: 5, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "5px 10px", color: "#f87171", fontSize: 10, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Trash2 size={11} /> Rimuovi
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Messaggi ricevuti
+// ═══════════════════════════════════════════════════════════════════════════════
+function MessagesPanel() {
+  const [messages, setMessages] = useState<AdminMessage[]>(loadMessages);
+  const [selected, setSelected] = useState<AdminMessage | null>(null);
+
+  const markRead = (id: string) => {
+    const next = messages.map(m => m.id === id ? { ...m, read: true } : m);
+    setMessages(next);
+    localStorage.setItem(MSGS_KEY, JSON.stringify(next));
+  };
+  const deleteMsg = (id: string) => {
+    const next = messages.filter(m => m.id !== id);
+    setMessages(next);
+    localStorage.setItem(MSGS_KEY, JSON.stringify(next));
+    if (selected?.id === id) setSelected(null);
+  };
+
+  const unread = messages.filter(m => !m.read).length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Mail} label="Messaggi ricevuti" color="#fb923c"
+        right={unread > 0 ? <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(251,146,60,0.2)", color: "#fb923c", padding: "2px 7px", borderRadius: 99 }}>{unread} nuovi</span> : undefined} />
+
+      {messages.length === 0 ? (
+        <Empty icon={Mail} text="Nessun messaggio" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {messages.map(m => (
+            <div key={m.id} style={{ borderRadius: 11, padding: "9px 12px", border: m.read ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(251,146,60,0.2)", background: m.read ? "rgba(255,255,255,0.015)" : "rgba(251,146,60,0.04)", cursor: "pointer" }}
+              onClick={() => { setSelected(m); markRead(m.id); }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {!m.read && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#fb923c", flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 11, fontWeight: m.read ? 500 : 700, color: "rgba(255,255,255,0.75)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.subject}</p>
+                  <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0 }}>{m.from} · {ago(m.receivedAt)}</p>
+                </div>
+                <button onClick={e => { e.stopPropagation(); deleteMsg(m.id); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 3 }}>
+                  <Trash2 size={11} />
+                </button>
+              </div>
+              {selected?.id === m.id && (
+                <div style={{ marginTop: 8, padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>{m.body}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Nota su EmailJS */}
+      <div style={{ background: "rgba(251,146,60,0.06)", border: "1px solid rgba(251,146,60,0.12)", borderRadius: 10, padding: "8px 10px" }}>
+        <p style={{ fontSize: 9, color: "rgba(251,146,60,0.6)", margin: 0, fontFamily: "monospace" }}>
+          Le email arrivano via EmailJS. I messaggi salvati qui provengono dalle richieste di collaborazione degli utenti.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Top Tracks
+// ═══════════════════════════════════════════════════════════════════════════════
+function TopTracksPanel() {
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    spotifyGet("/me/top/tracks?limit=6&time_range=short_term").then(d => setTracks(d.items ?? [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={TrendingUp} label="Top Tracks 4 sett." color="#f472b6" />
+      {loading ? <Empty icon={Spinner as any} text="caricamento…" /> : tracks.length === 0 ? <Empty icon={Music} text="nessun dato" /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {tracks.map((t, i) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 7px", borderRadius: 9, background: "rgba(255,255,255,0.02)" }}>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", width: 14, textAlign: "right", flexShrink: 0 }}>#{i + 1}</span>
+              <img src={t.album.images[0]?.url} alt="" style={{ width: 28, height: 28, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.78)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</p>
+                <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.artists[0]?.name}</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                <div style={{ width: 28, height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${t.popularity}%`, background: "#f472b6", borderRadius: 99 }} />
+                </div>
+                <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>{t.popularity}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Top Artists
+// ═══════════════════════════════════════════════════════════════════════════════
+function TopArtistsPanel() {
+  const [artists, setArtists] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    spotifyGet("/me/top/artists?limit=5&time_range=short_term").then(d => setArtists(d.items ?? [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={BarChart2} label="Top Artisti 4 sett." color="#fb923c" />
+      {loading ? <Empty icon={Spinner as any} text="caricamento…" /> : artists.length === 0 ? <Empty icon={Music} text="nessun dato" /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {artists.map((a, i) => (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", width: 14, textAlign: "right", flexShrink: 0 }}>#{i + 1}</span>
+              <img src={a.images[0]?.url} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.78)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</p>
+                <p style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", margin: 0 }}>{a.genres.slice(0, 2).join(", ") || "—"}</p>
+              </div>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", flexShrink: 0 }}>{(a.followers.total / 1000).toFixed(0)}k</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Queue
+// ═══════════════════════════════════════════════════════════════════════════════
+function QueuePanel() {
+  const [queue, setQueue] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetch_ = useCallback(async () => {
+    setLoading(true);
+    try { const d = await spotifyGet("/me/player/queue"); setQueue(d.queue ?? []); } catch { setQueue([]); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { fetch_(); }, [fetch_]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={List} label="Coda" color="#facc15" right={<RefreshBtn onClick={fetch_} loading={loading} />} />
+      {loading ? <Empty icon={Spinner as any} text="caricamento…" /> : queue.length === 0 ? <Empty icon={List} text="coda vuota" /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {queue.slice(0, 7).map((t: any, i: number) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px" }}>
+              <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.18)", width: 12, flexShrink: 0 }}>{i + 1}</span>
+              <img src={t.album?.images[0]?.url} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.68)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</p>
+                <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0 }}>{t.artists?.[0]?.name}</p>
+              </div>
+              <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>{fmtMs(t.duration_ms)}</span>
+            </div>
+          ))}
+          {queue.length > 7 && <p style={{ fontSize: 9, color: "rgba(255,255,255,0.18)", textAlign: "center", margin: 0 }}>+{queue.length - 7} altri</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Libreria
+// ═══════════════════════════════════════════════════════════════════════════════
+function LibraryPanel() {
+  const [liked, setLiked] = useState<number | null>(null);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      spotifyGet("/me/tracks?limit=1").then(d => setLiked(d.total)),
+      spotifyGet("/me/playlists?limit=5").then(d => setPlaylists(d.items ?? [])),
+    ]).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Heart} label="Libreria" color="#f87171" />
+      {loading ? <Empty icon={Spinner as any} text="caricamento…" /> : (
+        <>
+          <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ flex: 1, background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.14)", borderRadius: 11, padding: "10px 12px", textAlign: "center" }}>
+              <p style={{ fontSize: 22, fontWeight: 700, color: "#fca5a5", margin: 0 }}>{liked ?? "—"}</p>
+              <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0 }}>brani salvati</p>
+            </div>
+            <div style={{ flex: 1, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.14)", borderRadius: 11, padding: "10px 12px", textAlign: "center" }}>
+              <p style={{ fontSize: 22, fontWeight: 700, color: "#c4b5fd", margin: 0 }}>{playlists.length}</p>
+              <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0 }}>playlist</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {playlists.map((p: any) => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px" }}>
+                {p.images?.[0]?.url ? <img src={p.images[0].url} alt="" style={{ width: 22, height: 22, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 22, height: 22, borderRadius: 4, background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />}
+                <p style={{ flex: 1, fontSize: 10, color: "rgba(255,255,255,0.65)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
+                <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>{p.tracks.total}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Recenti
+// ═══════════════════════════════════════════════════════════════════════════════
+function RecentPanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetch_ = useCallback(async () => {
+    setLoading(true);
+    try { const d = await spotifyGet("/me/player/recently-played?limit=8"); setItems(d.items ?? []); } catch { setItems([]); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { fetch_(); }, [fetch_]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Radio} label="Ascoltati di recente" color="#2dd4bf" right={<RefreshBtn onClick={fetch_} loading={loading} />} />
+      {loading ? <Empty icon={Spinner as any} text="caricamento…" /> : items.length === 0 ? <Empty icon={Music} text="nessun dato" /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {items.map((item: any, i: number) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, background: "rgba(255,255,255,0.018)" }}>
+              <img src={item.track.album.images[0]?.url} alt="" style={{ width: 26, height: 26, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.72)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.track.name}</p>
+                <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0 }}>{item.track.artists[0]?.name}</p>
+              </div>
+              <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.18)", flexShrink: 0 }}>{ago(item.played_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Sistema
+// ═══════════════════════════════════════════════════════════════════════════════
+function SystemPanel() {
+  const lsKeys = Object.keys(localStorage).filter(k => k.startsWith("spotify_"));
+  const lsSize = lsKeys.reduce((acc, k) => acc + (localStorage.getItem(k)?.length ?? 0), 0);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={TerminalSquare} label="Sistema" color="#2dd4bf" />
+      <div>
+        <PLabel>localStorage spotify</PLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {lsKeys.map(k => {
+            const v = localStorage.getItem(k) ?? "";
+            return (
+              <div key={k} style={{ display: "flex", alignItems: "center", gap: 7, background: "rgba(0,0,0,0.22)", borderRadius: 7, padding: "4px 8px" }}>
+                <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.26)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.replace("spotify_", "")}</span>
+                <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.48)", flexShrink: 0 }}>{v.length > 18 ? v.slice(0, 8) + "…" : v}</span>
+                <CopyBtn text={v} />
+              </div>
+            );
+          })}
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", margin: "2px 0 0" }}>{lsKeys.length} chiavi · ~{(lsSize / 1024).toFixed(1)} KB</p>
+        </div>
+      </div>
+      <div>
+        <PLabel>client</PLabel>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+          {[["platform", /Mobi|Android/i.test(navigator.userAgent) ? "mobile" : "desktop"], ["lingua", navigator.language], ["viewport", `${window.innerWidth}×${window.innerHeight}`], ["online", navigator.onLine ? "yes" : "no"], ["timezone", Intl.DateTimeFormat().resolvedOptions().timeZone], ["cores", String(navigator.hardwareConcurrency ?? "—")]].map(([k, v]) => <KV key={k} k={k} v={v} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: Vercel
+// ═══════════════════════════════════════════════════════════════════════════════
+function VercelPanel() {
+  const [deployments, setDeployments] = useState<any[]>([]);
+  const [proj, setProj] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const vToken = import.meta.env.VITE_VERCEL_TOKEN;
+  const teamId = import.meta.env.VITE_VERCEL_TEAM_ID ?? "";
+  const projectName = import.meta.env.VITE_VERCEL_PROJECT ?? "";
+  const fetchVercel = useCallback(async () => {
+    if (!vToken) { setLoading(false); return; }
+    setLoading(true); setErr("");
+    try {
+      const qs = new URLSearchParams({ limit: "8" });
+      if (teamId) qs.set("teamId", teamId);
+      if (projectName) qs.set("app", projectName);
+      const [depRes, projRes] = await Promise.all([
+        fetch(`https://api.vercel.com/v6/deployments?${qs}`, { headers: { Authorization: `Bearer ${vToken}` } }),
+        projectName ? fetch(`https://api.vercel.com/v9/projects/${projectName}${teamId ? `?teamId=${teamId}` : ""}`, { headers: { Authorization: `Bearer ${vToken}` } }) : Promise.resolve(null),
+      ]);
+      setDeployments((await depRes.json()).deployments ?? []);
+      if (projRes?.ok) setProj(await projRes.json());
+    } catch (e: any) { setErr(e.message); }
+    setLoading(false);
+  }, [vToken, teamId, projectName]);
+  useEffect(() => { fetchVercel(); }, [fetchVercel]);
+  const sc = (s: string) => {
+    if (s === "READY") return { c: "#6ee7b7", bg: "rgba(16,185,129,0.1)" };
+    if (s === "ERROR" || s === "CANCELED") return { c: "#fca5a5", bg: "rgba(239,68,68,0.1)" };
+    if (s === "BUILDING") return { c: "#fcd34d", bg: "rgba(245,158,11,0.12)" };
+    return { c: "rgba(255,255,255,0.3)", bg: "rgba(255,255,255,0.05)" };
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={Server} label="Vercel Deploy" color="#fbbf24" right={vToken ? <RefreshBtn onClick={fetchVercel} loading={loading} /> : undefined} />
+      {!vToken ? (
+        <div style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.14)", borderRadius: 11, padding: "10px 13px" }}>
+          <p style={{ fontSize: 11, color: "rgba(252,211,77,0.8)", margin: 0 }}>Aggiungi <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 5px", borderRadius: 4, fontSize: 9 }}>VITE_VERCEL_TOKEN</code> al .env</p>
+        </div>
+      ) : err ? <Empty icon={AlertCircle} text={err} /> : loading ? <Empty icon={Spinner as any} text="caricamento…" /> : (
+        <>
+          {proj && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, marginBottom: 4 }}>
+            {[["framework", proj.framework ?? "—"], ["branch", proj.link?.productionBranch ?? "main"], ["alias", proj.alias?.[0] ?? "—"], ["creato", fmtDate(proj.createdAt)]].map(([k, v]) => <KV key={k} k={k} v={v} />)}
+          </div>}
+          <PLabel>ultimi deploy</PLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {deployments.length === 0 ? <Empty icon={Server} text="nessun deploy trovato" /> : deployments.map(d => {
+              const s = sc(d.state);
+              return (
+                <div key={d.uid} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, background: s.bg, color: s.c, padding: "2px 7px", borderRadius: 5 }}>{d.state}</span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                    <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>{ago(new Date(d.createdAt).toISOString())}</span>
+                  </div>
+                  {d.meta?.githubCommitMessage && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
+                      <GitBranch size={9} color="rgba(255,255,255,0.18)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{d.meta.githubCommitMessage}</span>
+                      {d.meta?.githubCommitSha && <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>{d.meta.githubCommitSha.slice(0, 7)}</span>}
+                    </div>
+                  )}
+                  {d.url && <a href={`https://${d.url}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 9, color: "rgba(96,165,250,0.5)", textDecoration: "none" }}><Globe size={9} /> {d.url}</a>}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOPBAR
+// ═══════════════════════════════════════════════════════════════════════════════
+function Topbar({ session, onLogout, onShowShortcuts, onRefreshAll }: {
+  session: AdminSession; onLogout: () => void;
+  onShowShortcuts: () => void; onRefreshAll: () => void;
+}) {
+  const remaining = Math.max(0, Math.floor((session.expiresAt - Date.now()) / 60000));
+  const [now, setNow] = useState(new Date().toLocaleTimeString("it-IT"));
+  useEffect(() => { const t = setInterval(() => setNow(new Date().toLocaleTimeString("it-IT")), 1000); return () => clearInterval(t); }, []);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(8,12,20,0.92)", backdropFilter: "blur(16px)", position: "sticky", top: 0, zIndex: 20 }}>
+      <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Shield size={13} color="#34d399" />
+      </div>
+      <div>
+        <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>Harmony Hub</p>
+        <p style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.2 }}>Admin Panel</p>
+      </div>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+        <span style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.2)", letterSpacing: 1 }}>{now}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.28)" }}>
+          <User size={10} color="rgba(52,211,153,0.6)" />
+          <span style={{ color: "rgba(110,231,183,0.7)" }}>{session.username}</span>
+          <span style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
+          <Clock size={9} /><span>{remaining}m</span>
+        </div>
+        {/* Actions */}
+        <button onClick={onRefreshAll} title="Refresh (R)"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+          <RefreshCw size={11} /> Refresh
+        </button>
+        <button onClick={onShowShortcuts} title="Shortcuts (?)"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+          <Keyboard size={11} /> ?
+        </button>
+        <button onClick={onLogout} title="Logout (Ctrl+L)"
+          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(248,113,113,0.7)", fontSize: 10, fontFamily: "inherit" }}>
+          <LogOut size={11} /> Esci
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
+interface AdminDashboardProps { session: AdminSession; onLogout: () => void; }
+
+export default function AdminDashboard({ session, onLogout }: AdminDashboardProps) {
+  const handleLogout = () => { clearAdminSession(); onLogout(); };
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Section refs for keyboard nav
+  const sec1 = useRef<HTMLDivElement>(null);
+  const sec2 = useRef<HTMLDivElement>(null);
+  const sec3 = useRef<HTMLDivElement>(null);
+  const sec4 = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (ref: React.RefObject<HTMLDivElement>) => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "?" || e.key === "/") { e.preventDefault(); setShowShortcuts(v => !v); return; }
+      if (e.key === "Escape") { setShowShortcuts(false); return; }
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); setRefreshKey(v => v + 1); return; }
+      if (e.key === "1") { scrollTo(sec1); return; }
+      if (e.key === "2") { scrollTo(sec2); return; }
+      if (e.key === "3") { scrollTo(sec3); return; }
+      if (e.key === "4") { scrollTo(sec4); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === "l") { e.preventDefault(); handleLogout(); return; }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#080c14" }}>
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", opacity: 0.018, backgroundImage: "linear-gradient(#00ff88 1px,transparent 1px),linear-gradient(90deg,#00ff88 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
+
+      <Topbar session={session} onLogout={handleLogout} onShowShortcuts={() => setShowShortcuts(true)} onRefreshAll={() => setRefreshKey(v => v + 1)} />
+
+      <div key={refreshKey} style={{ position: "relative", padding: 14 }}>
+
+        {/* ── SEZIONE 1: Token + Riproduzione + Dispositivi connessi ── */}
+        <div ref={sec1} style={{ scrollMarginTop: 60 }}>
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>① Autenticazione & Riproduzione</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1.2fr", gap: 11, marginBottom: 11 }}>
+            <Panel delay={0.04}><TokenPanel /></Panel>
+            <Panel delay={0.08}><NowPlayingPanel /></Panel>
+            <Panel delay={0.12}><ConnectedUsersPanel /></Panel>
+          </div>
+        </div>
+
+        {/* ── SEZIONE 2: Stats Spotify ── */}
+        <div ref={sec2} style={{ scrollMarginTop: 60 }}>
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>② Statistiche Spotify</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
+            <Panel delay={0.16}><TopTracksPanel /></Panel>
+            <Panel delay={0.20}><TopArtistsPanel /></Panel>
+            <Panel delay={0.24}><QueuePanel /></Panel>
+            <Panel delay={0.28}><LibraryPanel /></Panel>
+          </div>
+        </div>
+
+        {/* ── SEZIONE 3: Utenti + Messaggi + Recenti ── */}
+        <div ref={sec3} style={{ scrollMarginTop: 60 }}>
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>③ Utenti & Comunicazioni</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
+            <Panel delay={0.30}><UsersPermissionsPanel /></Panel>
+            <Panel delay={0.34}><MessagesPanel /></Panel>
+            <Panel delay={0.38}><RecentPanel /></Panel>
+          </div>
+        </div>
+
+        {/* ── SEZIONE 4: Sistema + Vercel ── */}
+        <div ref={sec4} style={{ scrollMarginTop: 60 }}>
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>④ Infrastruttura</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 11, marginBottom: 16 }}>
+            <Panel delay={0.42}><SystemPanel /></Panel>
+            <Panel delay={0.46}><VercelPanel /></Panel>
+          </div>
+        </div>
+
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.07)", paddingBottom: 20, paddingTop: 4 }}>
+        ADMIN · RESTRICTED · {new Date().toLocaleDateString("it-IT")} · Press ? for shortcuts
+      </p>
+
+      <AnimatePresence>
+        {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+      </AnimatePresence>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+      `}</style>
+    </div>
+  );
+}

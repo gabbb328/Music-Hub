@@ -22,7 +22,7 @@ export default function SpotifyLogin() {
           justifyContent: "center",
           padding: "16px",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          color: "white"
+          color: "white",
         }}
       >
         <div
@@ -37,7 +37,12 @@ export default function SpotifyLogin() {
           }}
         >
           <Headphones
-            style={{ width: 64, height: 64, color: "#3b82f6", margin: "0 auto 16px" }}
+            style={{
+              width: 64,
+              height: 64,
+              color: "#3b82f6",
+              margin: "0 auto 16px",
+            }}
           />
 
           <h1
@@ -45,13 +50,15 @@ export default function SpotifyLogin() {
               fontSize: "28px",
               fontWeight: 800,
               marginBottom: "4px",
-              letterSpacing: "-0.02em"
+              letterSpacing: "-0.02em",
             }}
           >
             <span style={{ color: "#3b82f6" }}>Music</span>Hub
           </h1>
 
-          <p style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "32px" }}>
+          <p
+            style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "32px" }}
+          >
             Your personal music experience
           </p>
 
@@ -67,12 +74,12 @@ export default function SpotifyLogin() {
               borderRadius: "10px",
               border: "none",
               textTransform: "uppercase",
-              letterSpacing: "0.05em"
+              letterSpacing: "0.05em",
             }}
           >
             Login with Spotify
           </button>
-          
+
           <p style={{ color: "#475569", fontSize: "10px", marginTop: "20px" }}>
             Optimized for Alexa Echo Show
           </p>
@@ -92,11 +99,14 @@ export default function SpotifyLogin() {
       >
         <div className="glass-surface border-2 border-primary/20 rounded-2xl">
           <div className="p-8 space-y-6">
-
             <div className="text-center space-y-2">
               <motion.div
                 animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: "reverse",
+                }}
                 className="inline-block"
               >
                 <Headphones className="w-20 h-20 text-primary mx-auto" />
@@ -106,7 +116,9 @@ export default function SpotifyLogin() {
                 <span className="text-primary">Music</span>
                 <span className="text-foreground">Hub</span>
               </h1>
-              <p className="text-muted-foreground">Your personal music experience</p>
+              <p className="text-muted-foreground">
+                Your personal music experience
+              </p>
             </div>
 
             <div className="space-y-4">
@@ -119,7 +131,8 @@ export default function SpotifyLogin() {
               </button>
 
               <p className="text-xs text-muted-foreground text-center">
-                Music Hub uses Spotify to provide you with personalized music experience
+                Music Hub uses Spotify to provide you with personalized music
+                experience
               </p>
             </div>
 
@@ -128,7 +141,6 @@ export default function SpotifyLogin() {
                 By logging in, you agree to Spotify's Terms of Service
               </p>
             </div>
-
           </div>
         </div>
       </motion.div>
