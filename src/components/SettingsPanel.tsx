@@ -30,6 +30,8 @@ import {
   Clock3,
   Shield,
   Users,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -1263,6 +1265,7 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
   const [feedbackType, setFeedbackType] = useState("Migliorie");
   const [feedbackText, setFeedbackText] = useState("");
   const [collabUser, setCollabUser] = useState<any>(null);
+  const [showCollabPassword, setShowCollabPassword] = useState(false);
 
   const userName = userProfile?.display_name || "Utente Spotify";
 
@@ -1507,9 +1510,22 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                         <p className="text-[10px] text-muted-foreground mb-1">
                           Password
                         </p>
-                        <p className="text-sm font-mono bg-background/50 p-2 rounded-lg border border-border select-all">
-                          {collabUser.credentials.password}
-                        </p>
+                        <div className="relative flex items-center">
+                          <p className="w-full text-sm font-mono bg-background/50 p-2 pr-10 rounded-lg border border-border select-all">
+                            {showCollabPassword ? collabUser.credentials.password : "••••••••"}
+                          </p>
+                          <button
+                            onClick={() => setShowCollabPassword(!showCollabPassword)}
+                            className="absolute right-2 p-1.5 rounded-md hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+                            type="button"
+                          >
+                            {showCollabPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1609,9 +1625,9 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Database</span>
             {isSupabaseConfigured() ? (
-              <span className="font-semibold text-green-400">🟢 Supabase Connesso</span>
+              <span className="font-semibold text-green-400">Supabase Connesso</span>
             ) : (
-              <span className="font-semibold text-amber-500">🟡 LocalStorage (Offline)</span>
+              <span className="font-semibold text-amber-500">LocalStorage (Offline)</span>
             )}
           </div>
 
