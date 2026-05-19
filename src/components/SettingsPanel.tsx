@@ -1249,6 +1249,7 @@ import {
   saveCollabUsers,
   getAdminFeedbacks,
   saveAdminFeedbacks,
+  isSupabaseConfigured,
 } from "@/services/supabase-api";
 import { MessageSquare, Bug, Lightbulb, Star } from "lucide-react";
 
@@ -1270,7 +1271,7 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
     const fetchUser = async () => {
       const users = await getCollabUsers();
       if (!mounted) return;
-      const me = users.find((u: any) => u.name === userName);
+      const me = users.find((u: any) => u.name.toLowerCase() === userName.toLowerCase());
       setCollabUser(me || null);
     };
 
@@ -1602,7 +1603,16 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Versione</span>
-            <span className="font-medium">Music-Hub v1.3.3</span>
+            <span className="font-medium">Music-Hub v1.4.0</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Database</span>
+            {isSupabaseConfigured() ? (
+              <span className="font-semibold text-green-400">🟢 Supabase Connesso</span>
+            ) : (
+              <span className="font-semibold text-amber-500">🟡 LocalStorage (Offline)</span>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
