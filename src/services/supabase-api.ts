@@ -213,21 +213,32 @@ export interface CollabUser {
 
 const LOCAL_KEY = "admin_collab_users";
 
-// Helper for checking if Supabase is actually configured
+let supabaseActive = true;
+
+// Helper for checking if Supabase is actually configured and working
 export const isSupabaseConfigured = () => {
-  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const envConfigured = !!import.meta.env.VITE_SUPABASE_URL && 
+                         !!import.meta.env.VITE_SUPABASE_ANON_KEY &&
+                         import.meta.env.VITE_SUPABASE_URL.startsWith("http");
+  return envConfigured && supabaseActive;
 };
 
 export const getCollabUsers = async (): Promise<CollabUser[]> => {
-  if (isSupabaseConfigured()) {
+  const envConfigured = !!import.meta.env.VITE_SUPABASE_URL && 
+                         !!import.meta.env.VITE_SUPABASE_ANON_KEY &&
+                         import.meta.env.VITE_SUPABASE_URL.startsWith("http");
+                         
+  if (envConfigured) {
     try {
       const { data, error } = await supabase.from("admin_collab_users").select("*");
       if (!error && data) {
-        // Supabase returns rows. We assume the table structure maps directly to CollabUser
-        // JSONB columns for permissions and credentials
+        supabaseActive = true;
         return data as CollabUser[];
+      } else {
+        supabaseActive = false;
       }
     } catch (e) {
+      supabaseActive = false;
       console.warn("Supabase non ha la tabella admin_collab_users o errore connessione, fallback su localStorage", e);
     }
   }
@@ -243,12 +254,22 @@ export const saveCollabUsers = async (users: CollabUser[]): Promise<void> => {
   // Save to local storage always, as a backup
   localStorage.setItem(LOCAL_KEY, JSON.stringify(users));
 
-  if (isSupabaseConfigured()) {
+  const envConfigured = !!import.meta.env.VITE_SUPABASE_URL && 
+                         !!import.meta.env.VITE_SUPABASE_ANON_KEY &&
+                         import.meta.env.VITE_SUPABASE_URL.startsWith("http");
+
+  if (envConfigured) {
     try {
       // Upsert all users
       const { error } = await supabase.from("admin_collab_users").upsert(users);
-      if (error) console.error("Errore salvataggio Supabase:", error);
+      if (error) {
+        supabaseActive = false;
+        console.error("Errore salvataggio Supabase:", error);
+      } else {
+        supabaseActive = true;
+      }
     } catch (e) {
+      supabaseActive = false;
       console.warn("Errore salvataggio Supabase:", e);
     }
   }
