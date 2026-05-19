@@ -29,12 +29,13 @@ import {
   Github,
   Clock3,
   Shield,
+  Users,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 import { useTheme } from "@/contexts/ThemeContext";
 import { clearToken } from "@/services/spotify-auth";
 import { useNavigate } from "react-router-dom";
-import { usePlaybackState } from "@/hooks/useSpotify";
+import { usePlaybackState, useUserProfile } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
 // ─────────────────────────────────────────────────────────────────────────────
 // DATI STATICI
@@ -1243,73 +1244,193 @@ function TabCuffie() {
   );
 }
 
+import {
+  getCollabUsers,
+  saveCollabUsers,
+  getAdminFeedbacks,
+  saveAdminFeedbacks,
+} from "@/services/supabase-api";
+import { MessageSquare, Bug, Lightbulb, Star } from "lucide-react";
+
 function TabAccount({ handleLogout }: { handleLogout: () => void }) {
   const { toast } = useToast();
+  const { data: userProfile } = useUserProfile();
   const { data: playbackState } = usePlaybackState();
   const [showCollabPage, setShowCollabPage] = useState(false);
-  const [collabRequested, setCollabRequested] = useState(false);
-  const [collabAccepted, setCollabAccepted] = useState(false);
+  const [showCollabDetails, setShowCollabDetails] = useState(false);
+  const [showFeedbackPage, setShowFeedbackPage] = useState(false);
+  const [feedbackType, setFeedbackType] = useState("Migliorie");
+  const [feedbackText, setFeedbackText] = useState("");
+  const [collabUser, setCollabUser] = useState<any>(null);
 
-  localStorage.setItem("collab_accepted", "true");
+  const userName = userProfile?.display_name || "Utente Spotify";
 
-useEffect(() => {
-  setCollabRequested(localStorage.getItem("collab_requested") === "true");
-  setCollabAccepted(localStorage.getItem("collab_accepted") === "true");
-}, []);
+  useEffect(() => {
+    let mounted = true;
+    const fetchUser = async () => {
+      const users = await getCollabUsers();
+      if (!mounted) return;
+      const me = users.find((u: any) => u.name === userName);
+      setCollabUser(me || null);
+    };
 
-const sendCollabRequest = async () => {
-  try {
-    setCollabRequested(true);
-    localStorage.setItem("collab_requested", "true");
+    fetchUser();
+    const interval = setInterval(fetchUser, 2000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [userName]);
 
-    // Registra utente nella lista admin (visibile su /admin)
-    const USERS_KEY = "admin_collab_users";
-    const existingUsers = JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]");
-    if (!existingUsers.some((u: any) => u.name === userName)) {
-      existingUsers.push({
+  const sendCollabRequest = async () => {
+    try {
+      const existingUsers = await getCollabUsers();
+      let me = existingUsers.find((u: any) => u.name === userName);
+
+      if (!me) {
+        me = {
+          id: Date.now().toString(),
+          name: userName,
+          requestedAt: new Date().toISOString(),
+          status: "pending",
+          permissions: {
+            canViewStats: false,
+            canViewToken: false,
+            canAccessAdmin: false,
+            canAccessGithub: false,
+          },
+          message: "Richiesta inviata dal pannello impostazioni",
+        };
+        existingUsers.push(me);
+        await saveCollabUsers(existingUsers);
+      }
+
+      setCollabUser(me);
+
+      // Messaggio nella inbox admin
+      const MSGS_KEY = "admin_messages";
+      const msgs = JSON.parse(localStorage.getItem(MSGS_KEY) ?? "[]");
+      msgs.unshift({
         id: Date.now().toString(),
-        name: userName,
-        requestedAt: new Date().toISOString(),
-        status: "pending",
-        permissions: { canViewStats: false, canViewToken: false, canAccessAdmin: false },
-        message: "Richiesta inviata dal pannello impostazioni",
+        from: userName,
+        subject: "Nuova richiesta di collaborazione",
+        body: `L'utente "${userName}" vuole collaborare al progetto. Vai in Utenti & Permessi per gestirla.`,
+        receivedAt: new Date().toISOString(),
+        read: false,
       });
-      localStorage.setItem(USERS_KEY, JSON.stringify(existingUsers));
+      localStorage.setItem(MSGS_KEY, JSON.stringify(msgs));
+
+      // Invia email via EmailJS con i link per approvare/rifiutare
+      const acceptLink = `${window.location.origin}/collab/approve?status=accepted&user=${encodeURIComponent(userName)}`;
+      const rejectLink = `${window.location.origin}/collab/approve?status=rejected&user=${encodeURIComponent(userName)}`;
+
+      await emailjs.send(
+        "service_fu31pxb",
+        "template_collab",
+        {
+          from_name: userName,
+          message: `Nuova richiesta di collaborazione da "${userName}" su Harmony Hub.\n\nPer approvare clicca qui:\n${acceptLink}\n\nPer rifiutare clicca qui:\n${rejectLink}`,
+          to_name: "Admin",
+          reply_to: "noreply@harmonyhub.app",
+        },
+        "j3z-hU3f_1v_x-b1E",
+      );
+
+      toast({
+        title: "✓ Richiesta inviata",
+        description: "Il titolare riceverà una notifica",
+      });
+    } catch (err) {
+      toast({
+        title: "Richiesta registrata",
+        description: "Salvata localmente, l'email potrebbe non essere partita",
+      });
     }
+  };
 
-    // Messaggio nella inbox admin
-    const MSGS_KEY = "admin_messages";
-    const msgs = JSON.parse(localStorage.getItem(MSGS_KEY) ?? "[]");
-    msgs.unshift({
-      id: Date.now().toString(),
-      from: userName,
-      subject: "Nuova richiesta di collaborazione",
-      body: `L'utente "${userName}" vuole collaborare al progetto. Vai in Utenti & Permessi per gestirla.`,
-      receivedAt: new Date().toISOString(),
-      read: false,
-    });
-    localStorage.setItem(MSGS_KEY, JSON.stringify(msgs));
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim()) return;
+    try {
+      const existing = await getAdminFeedbacks();
+      existing.unshift({
+        id: Date.now().toString(),
+        userName: userName,
+        type: feedbackType,
+        message: feedbackText,
+        submittedAt: new Date().toISOString(),
+        read: false,
+      });
+      await saveAdminFeedbacks(existing);
+      toast({
+        title: "✓ Feedback inviato",
+        description: "Grazie per il tuo contributo!",
+      });
+      setFeedbackText("");
+      setShowFeedbackPage(false);
+    } catch (e) {
+      toast({
+        title: "Errore",
+        description: "Non è stato possibile inviare il feedback.",
+        variant: "destructive",
+      });
+    }
+  };
 
-    // Invia email via EmailJS
-    await emailjs.send(
-      "service_fu31pxb",
-      "template_collab",
-      {
-        from_name: userName,
-        message: `Nuova richiesta di collaborazione da "${userName}" su Harmony Hub.`,
-        to_name: "Admin",
-        reply_to: "noreply@harmonyhub.app",
-      },
-      "j3z-hU3f_1v_x-b1E",
+  if (showFeedbackPage) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setShowFeedbackPage(false)}
+            className="p-2 rounded-xl hover:bg-secondary/60 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-bold">Invia Feedback</h2>
+        </div>
+        <div className="flex-1 rounded-2xl border border-dashed border-border bg-secondary/20 p-4 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-2 block">
+              Categoria
+            </label>
+            <select
+              value={feedbackType}
+              onChange={(e) => setFeedbackType(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+            >
+              <option value="Migliorie">Migliorie</option>
+              <option value="Fix bug">Fix bug</option>
+              <option value="Aggiunte">Aggiunte</option>
+              <option value="Varie">Varie</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-2 block">
+              Messaggio (Max 2000 car.)
+            </label>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value.slice(0, 2000))}
+              placeholder="Scrivi qui il tuo feedback..."
+              className="w-full h-32 bg-background border border-border rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-primary transition-colors"
+            />
+            <div className="text-right text-[10px] text-muted-foreground mt-1">
+              {feedbackText.length}/2000
+            </div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <button
+            onClick={handleSendFeedback}
+            disabled={!feedbackText.trim()}
+            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            Invia
+          </button>
+        </div>
+      </div>
     );
-
-    toast({ title: "✓ Richiesta inviata", description: "Il titolare riceverà una notifica" });
-  } catch (err) {
-    toast({ title: "Richiesta registrata", description: "Salvata localmente, l'email potrebbe non essere partita" });
   }
-};
-
-  const userName = playbackState?.device?.name || "Utente Spotify";
 
   if (showCollabPage) {
     return (
@@ -1324,49 +1445,89 @@ const sendCollabRequest = async () => {
           </button>
 
           <div>
-            <h2 className="text-lg font-bold">Collabora con noi</h2>
+            <h2 className="text-lg font-bold">Impostazioni Collaboratore</h2>
           </div>
         </div>
 
-        <div className="flex-1 rounded-2xl border border-dashed border-border bg-secondary/20" />
-        {collabAccepted ? (
-          <div className="space-y-2">
-            <button className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold text-sm flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              Accettato — benvenuto!
-            </button>
+        <div className="flex-1 rounded-2xl border border-dashed border-border bg-secondary/20 p-4 overflow-y-auto">
+          {collabUser?.status === "accepted" ? (
+            <div className="space-y-3 animate-in slide-in-from-top-2 opacity-1 fade-in duration-200">
+              <div className="flex items-center gap-3 p-3 bg-green-600 text-white rounded-xl">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span className="text-xs font-semibold">
+                  Collaborazione Attiva
+                </span>
+              </div>
 
-            <button
-              onClick={() =>
-                window.open("https://github.com/gabbb328/Music-Hub", "_blank")
-              }
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              <Github className="w-4 h-4" />
-              Apri GitHub del sito
-            </button>
+              {collabUser.permissions?.canAccessGithub && (
+                <button
+                  onClick={() =>
+                    window.open(
+                      "https://github.com/gabbb328/Music-Hub",
+                      "_blank",
+                    )
+                  }
+                  className="w-full py-3 rounded-xl bg-zinc-800 text-white font-semibold text-sm hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Github className="w-4 h-4" />
+                  Apri GitHub del sito
+                </button>
+              )}
 
-            <button
-              onClick={() => window.open(`${window.location.origin}/admin`, "_blank")}
-              className="w-full py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 font-semibold text-sm hover:bg-emerald-600/30 transition-colors flex items-center justify-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              Accedi alla Dashboard Admin
-            </button>
-          </div>
-        ) : collabRequested ? (
-          <button className="w-full py-3 rounded-xl bg-amber-500/20 text-amber-400 font-semibold text-sm flex items-center justify-center gap-2 cursor-default">
-            <Clock3 className="w-4 h-4" />
-            In attesa di approvazione
-          </button>
-        ) : (
-          <button
-            onClick={sendCollabRequest}
-            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-          >
-            Collabora
-          </button>
-        )}
+              {collabUser.permissions?.canAccessAdmin && (
+                <button
+                  onClick={() => window.open(`${window.location.origin}/admin`)}
+                  className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  Accedi alla Dashboard Admin
+                </button>
+              )}
+
+              {collabUser.credentials &&
+                (collabUser.credentials.username ||
+                  collabUser.credentials.password) && (
+                  <div className="mt-4 p-4 rounded-xl bg-secondary/40 border border-border space-y-3 text-left">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                      Credenziali Admin
+                    </p>
+                    {collabUser.credentials.username && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">
+                          Nome utente / Email
+                        </p>
+                        <p className="text-sm font-mono bg-background/50 p-2 rounded-lg border border-border select-all">
+                          {collabUser.credentials.username}
+                        </p>
+                      </div>
+                    )}
+                    {collabUser.credentials.password && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">
+                          Password
+                        </p>
+                        <p className="text-sm font-mono bg-background/50 p-2 rounded-lg border border-border select-all">
+                          {collabUser.credentials.password}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Invia la richiesta per collaborare e sbloccare i pulsanti.
+              </p>
+              <button
+                onClick={sendCollabRequest}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+              >
+                Collabora
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -1453,12 +1614,59 @@ const sendCollabRequest = async () => {
 
       {/* Footer */}
       <div className="pt-2 border-t border-border space-y-2">
-        <button
-          onClick={() => setShowCollabPage(true)}
-          className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-        >
-          Collabora con noi
-        </button>
+        {collabUser?.status !== "accepted" ? (
+          <>
+            <button
+              onClick={() => setShowFeedbackPage(true)}
+              className="w-full py-3 rounded-xl bg-amber-600 text-white font-semibold text-sm hover:bg-amber-500 transition-colors"
+            >
+              Invia Feedback
+            </button>
+            <button
+              onClick={() =>
+                collabUser?.status !== "pending" && setShowCollabPage(true)
+              }
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                collabUser?.status === "pending"
+                  ? "bg-amber-600/35 text-white/50 cursor-default"
+                  : "bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"
+              }`}
+            >
+              {collabUser?.status === "pending" ? (
+                <>
+                  <Clock3 className="w-4 h-4 text-amber-500" />
+                  In attesa di approvazione
+                </>
+              ) : (
+                "Collabora con noi"
+              )}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="w-full py-2.5 rounded-xl bg-green-600 text-white font-semibold text-sm flex items-center justify-center gap-2 cursor-default">
+              <CheckCircle2 className="w-4 h-4" />
+              Collaborazione Attiva
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowCollabPage(true)}
+                className="py-3 rounded-xl bg-primary text-primary-foreground hover:opacity-90 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                Impostazioni
+              </button>
+              <button
+                onClick={() => setShowFeedbackPage(true)}
+                className="py-3 rounded-xl bg-amber-600 text-white hover:bg-amber-500 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Feedback
+              </button>
+            </div>
+          </>
+        )}
 
         <button
           onClick={handleLogout}

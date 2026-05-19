@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Eye, EyeOff, Lock, User, AlertTriangle } from "lucide-react";
 
+import { getCollabUsers } from "@/services/supabase-api";
+
 // ─── SHA-256 via Web Crypto API ───────────────────────────────────────────────
 async function sha256hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest(
@@ -89,7 +91,25 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
       ]);
 
       const pairs = getAuthorizedPairs();
-      const match = pairs.find((p) => p.u === uHash && p.p === pHash);
+      let match = pairs.find((p) => p.u === uHash && p.p === pHash);
+
+      if (!match) {
+        try {
+          const collabUsers = await getCollabUsers();
+          const found = collabUsers.find(
+            (u) =>
+              u.status === "accepted" &&
+              u.permissions?.canAccessAdmin &&
+              u.credentials?.username?.trim() === username.trim() &&
+              u.credentials?.password === password
+          );
+          if (found) {
+            match = { u: username.trim(), p: "" };
+          }
+        } catch (err) {
+          console.error("Errore check credenziali collab db:", err);
+        }
+      }
 
       if (match) {
         setAdminSession(username.trim());

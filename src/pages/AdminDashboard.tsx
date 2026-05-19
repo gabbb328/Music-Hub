@@ -8,6 +8,7 @@ import {
   TrendingUp, Radio, List, Heart, BarChart2,
   Mail, Users, Lock, Unlock, Trash2, Eye, EyeOff,
   Keyboard, X,
+  MessageSquare,
 } from "lucide-react";
 import { getToken } from "@/services/spotify-auth";
 import { usePlaybackState } from "@/hooks/useSpotify";
@@ -40,27 +41,14 @@ async function spotifyGet(path: string) {
   return r.json();
 }
 
+async function sha256hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ─── Users storage (localStorage, condiviso fra tab) ─────────────────────────
 const USERS_KEY = "admin_collab_users";
-interface CollabUser {
-  id: string;
-  name: string;
-  email?: string;
-  requestedAt: string;
-  status: "pending" | "accepted" | "rejected";
-  permissions: {
-    canViewStats: boolean;
-    canViewToken: boolean;
-    canAccessAdmin: boolean;
-  };
-  message?: string;
-}
-function loadUsers(): CollabUser[] {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]"); } catch { return []; }
-}
-function saveUsers(u: CollabUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(u));
-}
+import { CollabUser, getCollabUsers, saveCollabUsers, deleteCollabUser, AdminFeedback, deleteAdminFeedback, getAdminFeedbacks, saveAdminFeedbacks } from "@/services/supabase-api";
 
 // ─── Messages storage ─────────────────────────────────────────────────────────
 const MSGS_KEY = "admin_messages";
@@ -378,17 +366,42 @@ function ConnectedUsersPanel() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PANEL: Users / Permessi collaboratori
 // ═══════════════════════════════════════════════════════════════════════════════
+
+function EnvString({ u, p }: { u?: string; p?: string }) {
+  const [str, setStr] = useState("");
+  useEffect(() => {
+    if (!u || !p) { setStr(""); return; }
+    Promise.all([sha256hex(u), sha256hex(p)]).then(([uh, ph]) => setStr(`${uh}:${ph}`));
+  }, [u, p]);
+  if (!str) return null;
+  return (
+    <div style={{ marginTop: 8, background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "8px" }}>
+      <p style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", margin: "0 0 4px" }}>Stringa hash per file .env (VITE_ADMIN_CREDENTIALS):</p>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <code style={{ fontSize: 9, fontFamily: "monospace", color: "#6ee7b7", wordBreak: "break-all", flex: 1 }}>{str}</code>
+        <CopyBtn text={str} />
+      </div>
+    </div>
+  );
+}
+
 function UsersPermissionsPanel() {
-  const [users, setUsers] = useState<CollabUser[]>(loadUsers);
+  const [users, setUsers] = useState<CollabUser[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const update = (id: string, patch: Partial<CollabUser>) => {
+  useEffect(() => {
+    getCollabUsers().then(setUsers);
+  }, []);
+
+  const update = async (id: string, patch: Partial<CollabUser>) => {
     const next = users.map(u => u.id === id ? { ...u, ...patch } : u);
-    setUsers(next); saveUsers(next);
+    setUsers(next); 
+    await saveCollabUsers(next);
   };
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const next = users.filter(u => u.id !== id);
-    setUsers(next); saveUsers(next);
+    setUsers(next); 
+    await deleteCollabUser(id);
   };
   const togglePerm = (id: string, perm: keyof CollabUser["permissions"]) => {
     const u = users.find(u => u.id === id);
@@ -448,48 +461,75 @@ function UsersPermissionsPanel() {
                           </div>
                         </div>
 
-                        {/* Permissions */}
-                        <div>
-                          <PLabel>permessi</PLabel>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                            {([
-                              ["canViewStats", "Può vedere statistiche Spotify"],
-                              ["canViewToken", "Può vedere il token OAuth"],
-                              ["canAccessAdmin", "Accesso alla dashboard admin"],
-                            ] as [keyof CollabUser["permissions"], string][]).map(([perm, label]) => (
-                              <div key={perm} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "6px 10px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  {u.permissions[perm] ? <Unlock size={10} color="#34d399" /> : <Lock size={10} color="rgba(255,255,255,0.25)" />}
-                                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{label}</span>
-                                </div>
-                                <button onClick={() => togglePerm(u.id, perm)}
-                                  style={{ width: 32, height: 16, borderRadius: 99, border: "none", cursor: "pointer", background: u.permissions[perm] ? "#10b981" : "rgba(255,255,255,0.1)", position: "relative", flexShrink: 0, transition: "background 0.2s" }}>
-                                  <div style={{ position: "absolute", top: 2, left: u.permissions[perm] ? 18 : 2, width: 12, height: 12, borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
-                                </button>
+                        {u.status === "accepted" && (
+                          <>
+                            {/* Permissions */}
+                            <div>
+                              <PLabel>permessi</PLabel>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                                {([
+                                  ["canViewStats", "Può vedere statistiche Spotify"],
+                                  ["canViewToken", "Può vedere il token OAuth"],
+                                  ["canAccessGithub", "Accesso al progetto su GitHub"],
+                                  ["canAccessAdmin", "Accesso alla dashboard admin"],
+                                ] as [keyof CollabUser["permissions"], string][]).map(([perm, label]) => (
+                                  <div key={perm} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "6px 10px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      {u.permissions[perm] ? <Unlock size={10} color="#34d399" /> : <Lock size={10} color="rgba(255,255,255,0.25)" />}
+                                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{label}</span>
+                                    </div>
+                                    <button onClick={() => togglePerm(u.id, perm)}
+                                      style={{ width: 32, height: 16, borderRadius: 99, border: "none", cursor: "pointer", background: u.permissions[perm] ? "#10b981" : "rgba(255,255,255,0.1)", position: "relative", flexShrink: 0, transition: "background 0.2s" }}>
+                                      <div style={{ position: "absolute", top: 2, left: u.permissions[perm] ? 18 : 2, width: 12, height: 12, borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Se accesso admin è attivo, mostra link */}
-                        {u.permissions.canAccessAdmin && (
-                          <div style={{ background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: 10, padding: "8px 10px" }}>
-                            <p style={{ fontSize: 9, color: "rgba(52,211,153,0.7)", margin: "0 0 4px" }}>Link dashboard per questo utente:</p>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <code style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {window.location.origin}/admin
-                              </code>
-                              <CopyBtn text={`${window.location.origin}/admin`} />
                             </div>
-                          </div>
-                        )}
 
-                        {/* Message */}
-                        {u.message && (
-                          <div>
-                            <PLabel>messaggio</PLabel>
-                            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "7px 10px", margin: 0, lineHeight: 1.5 }}>{u.message}</p>
-                          </div>
+                            {/* Se accesso admin è attivo, mostra link e campi credenziali */}
+                            {u.permissions.canAccessAdmin && (
+                              <div style={{ background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: 10, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+                                <div>
+                                  <p style={{ fontSize: 9, color: "rgba(52,211,153,0.7)", margin: "0 0 4px" }}>Link dashboard per questo utente:</p>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <code style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.5)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {window.location.origin}/admin
+                                    </code>
+                                    <CopyBtn text={`${window.location.origin}/admin`} />
+                                  </div>
+                                </div>
+                                <div style={{ borderTop: "1px solid rgba(52,211,153,0.15)", paddingTop: 8 }}>
+                                  <p style={{ fontSize: 9, color: "rgba(52,211,153,0.7)", margin: "0 0 4px" }}>Credenziali generate per l'utente:</p>
+                                  <div style={{ display: "flex", gap: 6 }}>
+                                    <input 
+                                      type="text" 
+                                      placeholder="Username" 
+                                      value={u.credentials?.username || ""} 
+                                      onChange={e => update(u.id, { credentials: { ...u.credentials, username: e.target.value } })}
+                                      style={{ flex: 1, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 8px", fontSize: 10, color: "white", outline: "none" }}
+                                    />
+                                    <input 
+                                      type="text" 
+                                      placeholder="Password" 
+                                      value={u.credentials?.password || ""} 
+                                      onChange={e => update(u.id, { credentials: { ...u.credentials, password: e.target.value } })}
+                                      style={{ flex: 1, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 8px", fontSize: 10, color: "white", outline: "none" }}
+                                    />
+                                  </div>
+                                  <EnvString u={u.credentials?.username} p={u.credentials?.password} />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Message */}
+                            {u.message && (
+                              <div>
+                                <PLabel>messaggio</PLabel>
+                                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "7px 10px", margin: 0, lineHeight: 1.5 }}>{u.message}</p>
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* Delete */}
@@ -570,6 +610,76 @@ function MessagesPanel() {
           Le email arrivano via EmailJS. I messaggi salvati qui provengono dalle richieste di collaborazione degli utenti.
         </p>
       </div>
+    </div>
+  );
+}
+
+function FeedbackPanel() {
+  const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
+  const [selected, setSelected] = useState<AdminFeedback | null>(null);
+
+  useEffect(() => {
+    getAdminFeedbacks().then(setFeedbacks);
+  }, []);
+
+  const markRead = async (id: string) => {
+    const next = feedbacks.map(f => f.id === id ? { ...f, read: true } : f);
+    setFeedbacks(next);
+    await saveAdminFeedbacks(next);
+  };
+
+  const deleteFb = async (id: string) => {
+    const next = feedbacks.filter(f => f.id !== id);
+    setFeedbacks(next);
+    await deleteAdminFeedback(id);
+    if (selected?.id === id) setSelected(null);
+  };
+
+  const unread = feedbacks.filter(f => !f.read).length;
+
+  const typeColors: Record<string, { bg: string, c: string }> = {
+    "Migliorie": { bg: "rgba(52,211,153,0.1)", c: "#34d399" },
+    "Fix bug": { bg: "rgba(239,68,68,0.1)", c: "#ef4444" },
+    "Aggiunte": { bg: "rgba(96,165,250,0.1)", c: "#60a5fa" },
+    "Varie": { bg: "rgba(167,139,250,0.1)", c: "#a78bfa" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead icon={MessageSquare} label="Feedback Utenti" color="#a78bfa"
+        right={unread > 0 ? <span style={{ fontSize: 8, fontWeight: 700, background: "rgba(167,139,250,0.2)", color: "#a78bfa", padding: "2px 7px", borderRadius: 99 }}>{unread} nuovi</span> : undefined} />
+
+      {feedbacks.length === 0 ? (
+        <Empty icon={MessageSquare} text="Nessun feedback" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 300, overflowY: "auto", paddingRight: 4 }}>
+          {feedbacks.map(f => {
+            const colors = typeColors[f.type] || typeColors["Varie"];
+            return (
+              <div key={f.id} style={{ borderRadius: 11, padding: "9px 12px", border: f.read ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(167,139,250,0.2)", background: f.read ? "rgba(255,255,255,0.015)" : "rgba(167,139,250,0.04)", cursor: "pointer" }}
+                onClick={() => { setSelected(f); markRead(f.id); }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {!f.read && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#a78bfa", flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, background: colors.bg, color: colors.c, padding: "2px 6px", borderRadius: 4, flexShrink: 0 }}>{f.type}</span>
+                    <p style={{ fontSize: 11, fontWeight: f.read ? 500 : 700, color: "rgba(255,255,255,0.75)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.userName}</p>
+                  </div>
+                  <button onClick={e => { e.stopPropagation(); deleteFb(f.id); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 3 }}>
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+                {selected?.id === f.id && (
+                  <div style={{ marginTop: 8, padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{f.message}</p>
+                    <p style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", marginTop: 6 }}>{ago(f.submittedAt)}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -944,7 +1054,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080c14" }}>
+    <div style={{ height: "100vh", overflowY: "auto", background: "#080c14" }}>
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", opacity: 0.018, backgroundImage: "linear-gradient(#00ff88 1px,transparent 1px),linear-gradient(90deg,#00ff88 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
 
       <Topbar session={session} onLogout={handleLogout} onShowShortcuts={() => setShowShortcuts(true)} onRefreshAll={() => setRefreshKey(v => v + 1)} />
@@ -975,9 +1085,10 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         {/* ── SEZIONE 3: Utenti + Messaggi + Recenti ── */}
         <div ref={sec3} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>③ Utenti & Comunicazioni</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
             <Panel delay={0.30}><UsersPermissionsPanel /></Panel>
             <Panel delay={0.34}><MessagesPanel /></Panel>
+            <Panel delay={0.36}><FeedbackPanel /></Panel>
             <Panel delay={0.38}><RecentPanel /></Panel>
           </div>
         </div>

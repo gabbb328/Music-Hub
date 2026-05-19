@@ -12,6 +12,7 @@ export default function SpotifyCallback() {
     if (processed.current) return;
 
     const code  = searchParams.get("code");
+    const state = searchParams.get("state");
     const error = searchParams.get("error");
 
     if (!code && !error) return;
@@ -25,7 +26,7 @@ export default function SpotifyCallback() {
           navigate("/login");
           return;
         }
-        await handleSpotifyCallback(code as string);
+        await handleSpotifyCallback(code as string, state);
         navigate("/");
       } catch (err) {
         console.error("Callback error:", err);

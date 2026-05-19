@@ -184,3 +184,139 @@ export const getAverageMetrics = async (
 
   return avgMetrics;
 };
+
+// ─── ADMIN COLLAB USERS (Supabase / LocalStorage fallback) ─────────────────────
+
+export interface CollabUser {
+  id: string;
+  name: string;
+  email?: string;
+  requestedAt: string;
+  status: "pending" | "accepted" | "rejected";
+  permissions: {
+    canViewStats: boolean;
+    canViewToken: boolean;
+    canAccessAdmin: boolean;
+    canAccessGithub: boolean;
+  };
+  message?: string;
+  credentials?: {
+    username?: string;
+    password?: string;
+  };
+}
+
+const LOCAL_KEY = "admin_collab_users";
+
+// Helper for checking if Supabase is actually configured
+export const isSupabaseConfigured = () => {
+  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+};
+
+export const getCollabUsers = async (): Promise<CollabUser[]> => {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.from("admin_collab_users").select("*");
+      if (!error && data) {
+        // Supabase returns rows. We assume the table structure maps directly to CollabUser
+        // JSONB columns for permissions and credentials
+        return data as CollabUser[];
+      }
+    } catch (e) {
+      console.warn("Supabase non ha la tabella admin_collab_users o errore connessione, fallback su localStorage", e);
+    }
+  }
+  // Fallback a localStorage
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+export const saveCollabUsers = async (users: CollabUser[]): Promise<void> => {
+  // Save to local storage always, as a backup
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(users));
+
+  if (isSupabaseConfigured()) {
+    try {
+      // Upsert all users
+      const { error } = await supabase.from("admin_collab_users").upsert(users);
+      if (error) console.error("Errore salvataggio Supabase:", error);
+    } catch (e) {
+      console.warn("Errore salvataggio Supabase:", e);
+    }
+  }
+};
+
+export const deleteCollabUser = async (id: string): Promise<void> => {
+  const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+  const next = users.filter((u: any) => u.id !== id);
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase.from("admin_collab_users").delete().eq("id", id);
+    } catch (e) {
+      console.warn("Errore eliminazione Supabase:", e);
+    }
+  }
+};
+
+// ─── ADMIN FEEDBACKS (Supabase / LocalStorage fallback) ─────────────────────
+
+export interface AdminFeedback {
+  id: string;
+  userName: string;
+  type: string;
+  message: string;
+  submittedAt: string;
+  read: boolean;
+}
+
+const FEEDBACKS_KEY = "admin_feedbacks";
+
+export const getAdminFeedbacks = async (): Promise<AdminFeedback[]> => {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.from("admin_feedbacks").select("*").order("submittedAt", { ascending: false });
+      if (!error && data) {
+        return data as AdminFeedback[];
+      }
+    } catch (e) {
+      console.warn("Supabase fallback for admin_feedbacks", e);
+    }
+  }
+  try {
+    return JSON.parse(localStorage.getItem(FEEDBACKS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+export const saveAdminFeedbacks = async (feedbacks: AdminFeedback[]): Promise<void> => {
+  localStorage.setItem(FEEDBACKS_KEY, JSON.stringify(feedbacks));
+
+  if (isSupabaseConfigured()) {
+    try {
+      const { error } = await supabase.from("admin_feedbacks").upsert(feedbacks);
+      if (error) console.error("Errore salvataggio feedbacks Supabase:", error);
+    } catch (e) {
+      console.warn("Errore salvataggio feedbacks Supabase:", e);
+    }
+  }
+};
+
+export const deleteAdminFeedback = async (id: string): Promise<void> => {
+  const feedbacks = JSON.parse(localStorage.getItem(FEEDBACKS_KEY) || "[]");
+  const next = feedbacks.filter((f: any) => f.id !== id);
+  localStorage.setItem(FEEDBACKS_KEY, JSON.stringify(next));
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase.from("admin_feedbacks").delete().eq("id", id);
+    } catch (e) {
+      console.warn("Errore eliminazione feedbacks Supabase:", e);
+    }
+  }
+};

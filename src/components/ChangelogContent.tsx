@@ -10,6 +10,19 @@ interface ChangelogEntry {
 
 const changelogData: ChangelogEntry[] = [
   {
+    date: "19 Maggio 2026",
+    version: "v1.4.0",
+    commits: [
+      "Integrazione del modulo di feedback utenti e pannello monitoraggio admin",
+      "Autenticazione Admin in tempo reale tramite database Supabase (senza .env)",
+      "Sistema di notifiche push PWA nativo e banner toast in-app per l'Admin",
+      "Fallback mailto nativo per garantire le notifiche di collaborazione all'admin",
+      "Risoluzione del bug di layout dei pulsanti collaboratore (visibilità solida)",
+      "Risoluzione delle RLS policy di Supabase per la sincronizzazione stabile",
+      "Approvazione collaboratore via email senza permessi automatici preimpostati"
+    ]
+  },
+  {
     date: "17 Maggio 2026",
     version: "v1.3.2",
     commits: [
@@ -178,7 +191,7 @@ export default function ChangelogContent() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">
-          Harmony Hub v1.3.1 • Sviluppato con ❤️
+          Harmony Hub v1.4.0 • Sviluppato con ❤️
         </p>
       </motion.div>
     </div>

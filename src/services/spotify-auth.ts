@@ -32,7 +32,10 @@ function base64encode(input: ArrayBuffer): string {
 export async function redirectToSpotifyAuth() {
   const codeVerifier = generateRandomString(64);
   const codeChallenge = base64encode(await sha256(codeVerifier));
+  // Salva in entrambi: localStorage può essere cancellato da Safari durante
+  // navigazioni cross-origin (ITP). sessionStorage sopravvive al redirect.
   window.localStorage.setItem("code_verifier", codeVerifier);
+  window.sessionStorage.setItem("code_verifier", codeVerifier);
 
   const scope = [
     "user-read-private",
@@ -60,6 +63,7 @@ export async function redirectToSpotifyAuth() {
     code_challenge_method: "S256",
     code_challenge: codeChallenge,
     show_dialog: "true",
+    state: codeVerifier,
   });
 
   const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
@@ -76,8 +80,13 @@ export async function redirectToSpotifyAuth() {
   }
 }
 
-export async function handleSpotifyCallback(code: string) {
-  const codeVerifier = window.localStorage.getItem("code_verifier");
+export async function handleSpotifyCallback(code: string, state: string | null) {
+  // Safari/iOS ITP può cancellare localStorage durante redirect cross-origin.
+  // Fallback su state (se fornito), poi su sessionStorage se localStorage è vuoto.
+  const codeVerifier =
+    state ||
+    window.localStorage.getItem("code_verifier") ||
+    window.sessionStorage.getItem("code_verifier");
   if (!codeVerifier) throw new Error("Code verifier not found");
 
   const redirectUri = getRedirectUri();
@@ -103,6 +112,7 @@ export async function handleSpotifyCallback(code: string) {
     window.localStorage.setItem("spotify_refresh_token", data.refresh_token);
   window.localStorage.setItem("spotify_token_expires_at", String(expiresAt));
   window.localStorage.removeItem("code_verifier");
+  window.sessionStorage.removeItem("code_verifier"); // pulizia fallback Safari
 
   return data.access_token;
 }
@@ -111,7 +121,8 @@ export function getToken(): string | null {
   const token = window.localStorage.getItem("spotify_access_token");
   const expiresAt = window.localStorage.getItem("spotify_token_expires_at");
   if (!token || !expiresAt) return null;
-  if (Date.now() >= parseInt(expiresAt)) {
+  // Margine di 30s: Safari a volte ha clock leggermente sfasato
+  if (Date.now() >= parseInt(expiresAt) - 30_000) {
     clearToken();
     return null;
   }
