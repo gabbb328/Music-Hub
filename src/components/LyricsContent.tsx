@@ -45,6 +45,38 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const isPlaying   = playbackState?.is_playing;
   const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
 
+  // Real-time timer to drive smooth 60fps animations
+  const [activeTime, setActiveTime] = useState(0);
+
+  // Dynamic container height tracker for perfect pixel-centered vertical spacers
+  const [containerHeight, setContainerHeight] = useState(300);
+
+  // Sync activeTime with playbackState updates
+  useEffect(() => {
+    setActiveTime(currentTime);
+  }, [currentTime]);
+
+  // Tick activeTime locally if playing to guarantee smooth transition animations
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setActiveTime(prev => prev + 0.1);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  // Monitor exact container height dynamically to center the lyrics vertically
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [lyrics]);
+
   // ── Carica testo ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentTrack) return;
@@ -58,26 +90,28 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     setTranslatedLyrics(new Map());
     setShowTranslation(false);
     setCurrentLineIndex(0);
-      fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
-        setLyrics(lines);
-        setIsSynced(synced);
-        setLoadingLyrics(false);
-      });
-      
-      setLoadingTrivia(true);
-      fetchSongTrivia(artist, title).then(res => {
-        setTrivia(res);
-        setLoadingTrivia(false);
-      });
-    }, [(currentTrack as any)?.id]);
+    setActiveTime(0);
+    
+    fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
+      setLyrics(lines);
+      setIsSynced(synced);
+      setLoadingLyrics(false);
+    });
+    
+    setLoadingTrivia(true);
+    fetchSongTrivia(artist, title).then(res => {
+      setTrivia(res);
+      setLoadingTrivia(false);
+    });
+  }, [(currentTrack as any)?.id]);
 
   // ── Aggiorna riga corrente ────────────────────────────────────────────────
   useEffect(() => {
     if (lyrics.length > 0) {
-      const idx = getCurrentLineIndex(lyrics, currentTime);
+      const idx = getCurrentLineIndex(lyrics, activeTime);
       if (idx !== currentLineIndex) setCurrentLineIndex(idx);
     }
-  }, [currentTime, lyrics]);
+  }, [activeTime, lyrics]);
 
   // ── Scroll al centro ──────────────────────────────────────────────────────
   const scrollToCurrentLine = useCallback(() => {
@@ -85,8 +119,16 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     const container = containerRef.current;
     const line      = lineRefs.current[currentLineIndex];
     if (!container || !line) return;
-    // Calcolo preciso: porta la riga esattamente al centro verticale del container
-    const targetScroll = line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
+
+    // Recursively accumulate offsets relative to the scrolling container to ensure dead-center placement
+    let actualOffsetTop = 0;
+    let currentEl: HTMLElement | null = line;
+    while (currentEl && currentEl !== container) {
+      actualOffsetTop += currentEl.offsetTop;
+      currentEl = currentEl.offsetParent as HTMLElement | null;
+    }
+
+    const targetScroll = actualOffsetTop - container.clientHeight / 2 + line.clientHeight / 2;
     container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
   }, [centerMode, currentLineIndex]);
 
@@ -118,20 +160,40 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     if (showTranslation) { setShowTranslation(false); return; }
     if (translatedLyrics.size > 0) { setShowTranslation(true); return; }
     setIsTranslating(true);
-    toast({ title: "Translating…", description: "This may take a moment" });
+    
+    const systemLang = (typeof navigator !== 'undefined' && navigator.language)
+      ? navigator.language.split('-')[0]
+      : "it";
+    
+    const langDisplay = systemLang.toUpperCase();
+    
+    toast({ 
+      title: `Traduzione in corso (${langDisplay})…`, 
+      description: "Traduzione intelligente in corso alla lingua del tuo sistema..." 
+    });
+
     const map = new Map<number, string>();
-    for (let i = 0; i < lyrics.length; i++) {
-      const l = lyrics[i];
-      if (l.text.trim() && !l.text.includes("♪")) {
-        const res = await translateText(l.text, "it");
-        if (res) map.set(i, res.translatedText);
+    try {
+      for (let i = 0; i < lyrics.length; i++) {
+        const l = lyrics[i];
+        if (l.text.trim() && !l.text.includes("♪")) {
+          const res = await translateText(l.text, systemLang);
+          if (res) map.set(i, res.translatedText);
+        }
+        if (i % 5 === 0) setTranslatedLyrics(new Map(map));
       }
-      if (i % 5 === 0) setTranslatedLyrics(new Map(map));
+      setTranslatedLyrics(map);
+      setShowTranslation(true);
+      toast({ title: "✓ Traduzione completata", description: `${map.size} righe tradotte in ${langDisplay}` });
+    } catch (err) {
+      toast({ 
+        title: "Errore di traduzione", 
+        description: "Impossibile tradurre i testi, riprova più tardi.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsTranslating(false);
     }
-    setTranslatedLyrics(map);
-    setIsTranslating(false);
-    setShowTranslation(true);
-    toast({ title: "✓ Translation complete", description: `${map.size} lines translated` });
   };
 
   if (!currentTrack) {
@@ -139,7 +201,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="text-center">
           <Mic2 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">Play a track to see lyrics</p>
+          <p className="text-muted-foreground">Riproduci un brano per visualizzare il testo</p>
         </div>
       </div>
     );
@@ -147,18 +209,8 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
   const spotifyTrack = playbackState?.item;
 
-  if (!currentTrack) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <Music className="w-16 h-16 text-muted-foreground/20 mb-4" />
-        <h2 className="text-xl font-bold mb-2">Nessun brano in riproduzione</h2>
-        <p className="text-muted-foreground max-w-xs">Riproduci una canzone per vedere il testo e le curiosità.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 overflow-hidden flex flex-col">
+    <div className="flex-1 overflow-hidden flex flex-col animate-fade-in">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 pt-4 pb-3 shrink-0 border-b border-border/30">
@@ -204,7 +256,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   </Button>
                 )}
                 <Button size="sm" variant={isKaraokeActive ? "default" : "outline"}
-                  onClick={toggleKaraoke} className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  onClick={toggleKaraoke} className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-pink-600 text-white hover:bg-pink-700" : "text-muted-foreground"}`}>
                   <Mic2 className="w-2.5 h-2.5" />
                   {isKaraokeActive ? "Karaoke ON" : "Karaoke Mode"}
                 </Button>
@@ -243,7 +295,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
         {/* ── LYRICS ── */}
         {mode === "lyrics" && (
-          <div ref={containerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto">
+          <div ref={containerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto pb-10">
             {loadingLyrics ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
@@ -257,8 +309,8 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
               </div>
             ) : (
               <>
-                {/* Spacer top: porta la prima riga al centro */}
-                <div style={{ height: "50vh" }} aria-hidden />
+                {/* Dynamic spacer that perfectly targets the vertical center of the container */}
+                <div style={{ height: `${containerHeight / 2}px` }} aria-hidden />
 
                 <AnimatePresence>
                   {userScrolling && centerMode && (
@@ -269,13 +321,6 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   )}
                 </AnimatePresence>
 
-                {/*
-                  FIX CENTRAMENTO:
-                  - Il contenitore di tutte le righe è centrato orizzontalmente
-                  - max-w-2xl limita la larghezza su schermi grandi
-                  - text-center centra il testo dentro ogni riga
-                  - mx-auto centra il blocco
-                */}
                 <div className="mx-auto w-full max-w-2xl px-4 md:px-8 space-y-1 flex flex-col items-center">
                   {lyrics.map((line, index) => {
                     const isCurrent = index === currentLineIndex;
@@ -285,54 +330,90 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                       /^\[.*\]$/.test(line.text) || /^\(.*\)$/.test(line.text) ||
                       /instrumental|music/i.test(line.text);
 
+                    // Split original line into individual words for karaoke zoom effect
+                    const words = line.text.split(/\s+/);
+                    const nextLine = lyrics[index + 1];
+                    const lineDuration = nextLine ? nextLine.time - line.time : 4;
+                    const lineProgress = Math.max(0, Math.min(1, (activeTime - line.time) / lineDuration));
+                    const activeWordIndex = Math.floor(lineProgress * words.length);
+
                     return (
                       <div
                         key={index}
                         ref={el => { lineRefs.current[index] = el; }}
                         onClick={() => isSynced && handleLineClick(line)}
                         className={`
-                          w-full px-4 py-3 rounded-2xl transition-all duration-300 text-center
+                          w-full px-4 py-3 rounded-2xl transition-all duration-300 text-center flex flex-col items-center justify-center
                           ${isSynced ? "cursor-pointer hover:bg-secondary/40 active:scale-[0.98]" : "cursor-default"}
                           ${isCurrent ? "bg-primary/10" : ""}
                         `}
                       >
                         {isBreak ? (
-                          <div className="flex items-center justify-center gap-2 py-1">
+                          <div className="flex items-center justify-center gap-2 py-1 text-center w-full">
                             <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
-                            <span className={`text-sm italic ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
+                            <span className={`text-sm italic text-center ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
                               {line.text.trim() || "Instrumental"}
                             </span>
                             <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
                           </div>
                         ) : (
-                          <div className="space-y-0.5">
-                            {/* Traduzione (principale se attiva) */}
+                          <div className="space-y-1.5 flex flex-col items-center justify-center w-full text-center">
+                            {/* Subtitle Translation - Explicitly centered horizontally and given full width */}
                             {showTranslation && translation && (
-                              <p className={`leading-snug transition-all duration-300 font-medium ${
+                              <p className={`leading-snug transition-all duration-300 font-medium text-center w-full px-2 ${
                                 isCurrent
-                                  ? "text-primary font-bold text-xl md:text-3xl scale-105"
+                                  ? "text-primary/80 font-semibold text-base md:text-xl animate-fade-in"
                                   : isPast
-                                    ? "text-muted-foreground/35 text-base md:text-xl"
-                                    : "text-muted-foreground/55 text-base md:text-xl"
+                                    ? "text-muted-foreground/25 text-xs md:text-sm"
+                                    : "text-muted-foreground/45 text-xs md:text-sm"
                               }`}>
                                 {translation}
                               </p>
                             )}
-                            {/* Testo originale */}
-                            <p className={`leading-snug transition-all duration-300 font-medium ${
-                              showTranslation && translation
-                                ? "text-muted-foreground/35 text-xs"
-                                : isCurrent
+                            
+                            {/* Bouncy word-magnification Karaoke Rendering */}
+                            {isCurrent && isSynced && isKaraokeActive ? (
+                              <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 w-full text-center px-4 py-1">
+                                {words.map((word, wIdx) => {
+                                  const isWordActive = wIdx === activeWordIndex;
+                                  const isWordPast = wIdx < activeWordIndex;
+                                  return (
+                                    <motion.span
+                                      key={wIdx}
+                                      animate={{
+                                        scale: isWordActive ? 1.25 : 1,
+                                        y: isWordActive ? -2 : 0,
+                                      }}
+                                      transition={{ duration: 0.15, ease: "easeOut" }}
+                                      className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none text-center ${
+                                        isWordActive
+                                          ? "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
+                                          : isWordPast
+                                            ? "text-muted-foreground/30"
+                                            : "text-foreground/80"
+                                      }`}
+                                    >
+                                      {word}
+                                    </motion.span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              /* Standard Plain Text Rendering - Centered horizontally explicitly inside <p> */
+                              <p className={`leading-snug transition-all duration-300 font-medium text-center w-full px-2 ${
+                                isCurrent
                                   ? "text-primary font-bold text-2xl md:text-3xl"
                                   : isPast
                                     ? "text-muted-foreground/35 text-lg md:text-xl"
                                     : "text-foreground/65 text-lg md:text-xl"
-                            }`}>
-                              {line.text}
-                            </p>
-                            {/* Timestamp solo sulla riga corrente */}
+                              }`}>
+                                {line.text}
+                              </p>
+                            )}
+
+                            {/* Timestamp */}
                             {isSynced && isCurrent && (
-                              <p className="text-[10px] text-primary/50 font-mono mt-1">
+                              <p className="text-[10px] text-primary/50 font-mono mt-1 text-center w-full">
                                 {formatTime(Math.floor(line.time))}
                               </p>
                             )}
@@ -343,8 +424,8 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   })}
                 </div>
 
-                {/* Spacer bottom */}
-                <div style={{ height: "50vh" }} aria-hidden />
+                {/* Dynamic spacer that perfectly targets the vertical center of the container */}
+                <div style={{ height: `${containerHeight / 2 + 650}px` }} aria-hidden />
               </>
             )}
           </div>

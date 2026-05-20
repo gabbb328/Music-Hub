@@ -1,5 +1,3 @@
-const LIBRETRANSLATE_API = "https://libretranslate.com/translate";
-
 export interface TranslationResult {
   translatedText: string;
   detectedLanguage?: string;
@@ -8,7 +6,8 @@ export interface TranslationResult {
 
 export const translateText = async (
   text: string,
-  targetLang: string = 'it'
+  targetLang: string = 'it',
+  sourceLang: string = 'auto'
 ): Promise<TranslationResult | null> => {
   if (!text || text.trim().length === 0) {
     return null;
@@ -16,48 +15,51 @@ export const translateText = async (
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch(LIBRETRANSLATE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        q: text,
-        source: 'en',
-        target: targetLang,
-        format: 'text'
-      }),
-      signal: controller.signal
-    });
+    // Google Translate Public Client REST API (supports sl=auto, completely free, no API keys, extremely fast)
+    const GOOGLE_API = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
 
+    const response = await fetch(GOOGLE_API, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      return fallbackTranslate(text, targetLang);
+      return fallbackTranslate(text, targetLang, sourceLang);
     }
 
     const data = await response.json();
 
-    if (data.translatedText) {
-      return {
-        translatedText: data.translatedText,
-        detectedLanguage: 'en',
-        targetLanguage: targetLang
-      };
+    // Parse the multi-chunk nested translation matrix from Google
+    if (data && data[0] && Array.isArray(data[0])) {
+      const translatedText = data[0]
+        .map((chunk: any) => chunk && chunk[0] ? chunk[0] : "")
+        .join("")
+        .trim();
+        
+      const detectedLanguage = data[2] || sourceLang;
+
+      if (translatedText) {
+        return {
+          translatedText,
+          detectedLanguage,
+          targetLanguage: targetLang
+        };
+      }
     }
 
-    return fallbackTranslate(text, targetLang);
+    return fallbackTranslate(text, targetLang, sourceLang);
   } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.warn('Translation timeout');
-    }
-    return fallbackTranslate(text, targetLang);
+    return fallbackTranslate(text, targetLang, sourceLang);
   }
 };
 
-async function fallbackTranslate(text: string, targetLang: string): Promise<TranslationResult | null> {
+async function fallbackTranslate(
+  text: string,
+  targetLang: string,
+  sourceLang: string = 'auto'
+): Promise<TranslationResult | null> {
   try {
-    const LINGVA_API = `https://lingva.ml/api/v1/en/${targetLang}/${encodeURIComponent(text)}`;
+    const LINGVA_API = `https://lingva.ml/api/v1/${sourceLang}/${targetLang}/${encodeURIComponent(text)}`;
     
     const response = await fetch(LINGVA_API);
     if (!response.ok) {
@@ -69,7 +71,7 @@ async function fallbackTranslate(text: string, targetLang: string): Promise<Tran
     if (data.translation) {
       return {
         translatedText: data.translation,
-        detectedLanguage: 'en',
+        detectedLanguage: sourceLang,
         targetLanguage: targetLang
       };
     }
@@ -82,7 +84,8 @@ async function fallbackTranslate(text: string, targetLang: string): Promise<Tran
 
 export const translateLyrics = async (
   lyrics: string,
-  targetLang: string = 'it'
+  targetLang: string = 'it',
+  sourceLang: string = 'auto'
 ): Promise<string | null> => {
   if (!lyrics || lyrics.trim().length === 0) {
     return null;
@@ -93,7 +96,7 @@ export const translateLyrics = async (
     const translatedParagraphs: string[] = [];
 
     for (const paragraph of paragraphs) {
-      const result = await translateText(paragraph, targetLang);
+      const result = await translateText(paragraph, targetLang, sourceLang);
       if (result) {
         translatedParagraphs.push(result.translatedText);
       } else {
