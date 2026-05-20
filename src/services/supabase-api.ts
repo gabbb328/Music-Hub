@@ -346,3 +346,62 @@ export const deleteAdminFeedback = async (id: string): Promise<void> => {
     }
   }
 };
+
+export interface SupabaseTableCounts {
+  neuro_states: number;
+  admin_collab_users: number;
+  admin_feedbacks: number;
+  active: boolean;
+}
+
+export const getSupabaseTableCounts = async (): Promise<SupabaseTableCounts> => {
+  if (!isSupabaseConfigured()) {
+    return { neuro_states: 0, admin_collab_users: 0, admin_feedbacks: 0, active: false };
+  }
+  try {
+    const [ns, ac, af] = await Promise.all([
+      supabase.from("neuro_states").select("*", { count: "exact", head: true }),
+      supabase.from("admin_collab_users").select("*", { count: "exact", head: true }),
+      supabase.from("admin_feedbacks").select("*", { count: "exact", head: true }),
+    ]);
+    return {
+      neuro_states: ns.count ?? 0,
+      admin_collab_users: ac.count ?? 0,
+      admin_feedbacks: af.count ?? 0,
+      active: true,
+    };
+  } catch (e) {
+    console.error("Errore fetch counts Supabase:", e);
+    return { neuro_states: 0, admin_collab_users: 0, admin_feedbacks: 0, active: false };
+  }
+};
+
+export const getRecentNeuroStates = async (limit: number = 5): Promise<UserNeuroState[]> => {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase
+      .from("neuro_states")
+      .select("*")
+      .order("timestamp", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    console.error("Errore recupero recent neuro states:", e);
+    return [];
+  }
+};
+
+export const testSupabaseLatency = async (): Promise<number> => {
+  if (!isSupabaseConfigured()) return -1;
+  const start = performance.now();
+  try {
+    await supabase.from("admin_collab_users").select("id").limit(1);
+    const end = performance.now();
+    return Math.round(end - start);
+  } catch (e) {
+    console.error("Errore test latenza Supabase:", e);
+    return -1;
+  }
+};
+

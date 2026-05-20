@@ -12,6 +12,31 @@ export default function AdminPage() {
     setChecked(true);
   }, []);
 
+  // Background session validator (auto-logout on session expiration)
+  useEffect(() => {
+    if (!session) return;
+
+    const checkSession = () => {
+      const s = getAdminSession();
+      if (!s) {
+        setSession(null);
+      }
+    };
+
+    // Periodically validate session
+    const interval = setInterval(checkSession, 5000);
+
+    // Validate on user interaction / window focus
+    window.addEventListener("focus", checkSession);
+    document.addEventListener("visibilitychange", checkSession);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", checkSession);
+      document.removeEventListener("visibilitychange", checkSession);
+    };
+  }, [session]);
+
   useEffect(() => {
     const targets = [document.documentElement, document.body, document.getElementById("root")];
     const saved = targets.map(el => el ? { overflow: el.style.overflow, position: el.style.position, height: el.style.height } : null);

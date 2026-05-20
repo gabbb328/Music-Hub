@@ -7,8 +7,7 @@ import {
   TerminalSquare, User, XCircle, WifiOff, Music,
   TrendingUp, Radio, List, Heart, BarChart2,
   Mail, Users, Lock, Unlock, Trash2, Eye, EyeOff,
-  Keyboard, X,
-  MessageSquare,
+  Keyboard, X, MessageSquare, Database
 } from "lucide-react";
 import { getToken } from "@/services/spotify-auth";
 import { usePlaybackState } from "@/hooks/useSpotify";
@@ -48,7 +47,12 @@ async function sha256hex(text: string): Promise<string> {
 
 // ─── Users storage (localStorage, condiviso fra tab) ─────────────────────────
 const USERS_KEY = "admin_collab_users";
-import { CollabUser, getCollabUsers, saveCollabUsers, deleteCollabUser, AdminFeedback, deleteAdminFeedback, getAdminFeedbacks, saveAdminFeedbacks } from "@/services/supabase-api";
+import {
+  CollabUser, getCollabUsers, saveCollabUsers, deleteCollabUser,
+  AdminFeedback, deleteAdminFeedback, getAdminFeedbacks, saveAdminFeedbacks,
+  getSupabaseTableCounts, getRecentNeuroStates, testSupabaseLatency,
+  SupabaseTableCounts, UserNeuroState
+} from "@/services/supabase-api";
 
 // ─── Messages storage ─────────────────────────────────────────────────────────
 const MSGS_KEY = "admin_messages";
@@ -895,14 +899,316 @@ function SystemPanel() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PANEL: Vercel
 // ═══════════════════════════════════════════════════════════════════════════════
+function SupabasePanel() {
+  const [counts, setCounts] = useState<SupabaseTableCounts | null>(null);
+  const [recentStates, setRecentStates] = useState<UserNeuroState[]>([]);
+  const [latency, setLatency] = useState<number>(-1);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [activeTab, setActiveTab] = useState<"status" | "data" | "schema">("status");
+  const [showFullKey, setShowFullKey] = useState(false);
+
+  const url = import.meta.env.VITE_SUPABASE_URL ?? "";
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+  
+  const projectId = url ? url.replace("https://", "").split(".")[0] : "Sconosciuto";
+
+  const fetchSupabase = useCallback(async () => {
+    setLoading(true); setErr("");
+    try {
+      const [cData, sData, lData] = await Promise.all([
+        getSupabaseTableCounts(),
+        getRecentNeuroStates(5),
+        testSupabaseLatency(),
+      ]);
+      setCounts(cData);
+      setRecentStates(sData);
+      setLatency(lData);
+    } catch (e: any) {
+      setErr(e.message || "Errore nel caricamento dei dati Supabase");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchSupabase();
+  }, [fetchSupabase]);
+
+  const latencyColor = (l: number) => {
+    if (l < 0) return "#f87171";
+    if (l < 100) return "#34d399";
+    if (l < 250) return "#fbbf24";
+    return "#f87171";
+  };
+
+  const dbSchema = [
+    {
+      name: "neuro_states",
+      desc: "Registra gli stati neuro-frattali degli utenti",
+      columns: [
+        { name: "id", type: "uuid (PK)", desc: "Identificatore unico riga" },
+        { name: "user_id", type: "varchar", desc: "ID utente o 'anonimo'" },
+        { name: "state", type: "jsonb", desc: "Coordinate frattali e parametri UI" },
+        { name: "cognitive_metrics", type: "jsonb", desc: "Coerenza, Complessità, Adattabilità..." },
+        { name: "timestamp", type: "timestamptz", desc: "Data di rilevamento dello stato" },
+        { name: "session_id", type: "varchar", desc: "ID sessione audio associata" },
+        { name: "encrypted", type: "boolean", desc: "Se i parametri sono crittografati" },
+      ]
+    },
+    {
+      name: "admin_collab_users",
+      desc: "Utenti admin e collaboratori abilitati",
+      columns: [
+        { name: "id", type: "uuid (PK)", desc: "Identificatore unico utente" },
+        { name: "username", type: "varchar (UQ)", desc: "Nome utente unico" },
+        { name: "role", type: "varchar", desc: "Ruolo ('admin' | 'collaborator')" },
+        { name: "status", type: "varchar", desc: "Stato approvazione ('pending' | 'accepted')" },
+        { name: "permissions", type: "jsonb", desc: "Abilitazioni: canViewStats, canAccessAdmin..." },
+        { name: "credentials", type: "jsonb", desc: "Credenziali d'accesso (se non federate)" },
+        { name: "created_at", type: "timestamptz", desc: "Data creazione record" },
+      ]
+    },
+    {
+      name: "admin_feedbacks",
+      desc: "Feedback lasciati dagli utenti",
+      columns: [
+        { name: "id", type: "uuid (PK)", desc: "Identificatore unico feedback" },
+        { name: "user_id", type: "varchar", desc: "ID utente mittente" },
+        { name: "text", type: "text", desc: "Messaggio del feedback" },
+        { name: "rating", type: "int4", desc: "Punteggio di gradimento (1-5)" },
+        { name: "category", type: "varchar", desc: "Categoria ('bug' | 'suggestion' | 'other')" },
+        { name: "timestamp", type: "timestamptz", desc: "Data di invio del feedback" },
+      ]
+    }
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead 
+        icon={Database} 
+        label="Supabase DB & Analytics" 
+        color="#3ecf8e" 
+        right={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 9, fontFamily: "monospace", color: counts?.active ? "#3ecf8e" : "rgba(255,255,255,0.2)" }}>
+              {counts?.active ? "ONLINE" : "OFFLINE"}
+            </span>
+            <RefreshBtn onClick={fetchSupabase} loading={loading} />
+          </div>
+        } 
+      />
+
+      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)", gap: 10 }}>
+        {[
+          { id: "status", label: "config & stato" },
+          { id: "data", label: "dati & log" },
+          { id: "schema", label: "schema & chiavi" }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === tab.id ? "2px solid #3ecf8e" : "2px solid transparent",
+              color: activeTab === tab.id ? "#3ecf8e" : "rgba(255,255,255,0.35)",
+              fontFamily: "monospace",
+              fontSize: 10,
+              textTransform: "uppercase",
+              padding: "6px 4px",
+              cursor: "pointer",
+              fontWeight: activeTab === tab.id ? 700 : 400,
+              transition: "all 0.2s"
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && !counts ? (
+        <Empty icon={Spinner as any} text="caricamento…" />
+      ) : err ? (
+        <Empty icon={AlertCircle} text={err} />
+      ) : (
+        <>
+          {activeTab === "status" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <PLabel>impostazioni di connessione</PLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <KV k="Project Ref ID" v={projectId} />
+                <KV k="Supabase Endpoint" v={url || "Non configurato"} />
+                
+                <div style={{ background: "rgba(0,0,0,0.22)", borderRadius: 7, padding: "5px 8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>Chiave Anon (Client)</span>
+                    <button 
+                      onClick={() => setShowFullKey(!showFullKey)}
+                      style={{ background: "none", border: "none", color: "#3ecf8e", fontSize: 8, cursor: "pointer", fontFamily: "monospace", textTransform: "uppercase", padding: 0 }}
+                    >
+                      {showFullKey ? "nascondi" : "mostra"}
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                    <code style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.65)", wordBreak: "break-all", whiteSpace: "normal", flex: 1, paddingRight: 6 }}>
+                      {anonKey ? (showFullKey ? anonKey : `${anonKey.slice(0, 15)}••••••••${anonKey.slice(-10)}`) : "Non configurato"}
+                    </code>
+                    <CopyBtn text={anonKey} />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 6, background: "rgba(0,0,0,0.22)", borderRadius: 7, padding: "4px 8px" }}>
+                  <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>Latenza DB Ping</span>
+                  <span style={{ fontSize: 9, fontFamily: "monospace", color: latencyColor(latency), fontWeight: 700 }}>
+                    {latency >= 0 ? `${latency} ms` : "Offline/Nessuna risposta"}
+                  </span>
+                </div>
+              </div>
+
+              <PLabel>sicurezza & persistenza</PLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+                <div style={{ background: "rgba(0,0,0,0.22)", borderRadius: 8, padding: "6px 8px" }}>
+                  <p style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", margin: 0, textTransform: "uppercase" }}>Sicurezza RLS</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: "#3ecf8e", margin: "2px 0 0 0" }}>🔐 ABILITATO</p>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.22)", borderRadius: 8, padding: "6px 8px" }}>
+                  <p style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", margin: 0, textTransform: "uppercase" }}>Fallback Locale</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: counts?.active ? "#f87171" : "#3ecf8e", margin: "2px 0 0 0" }}>
+                    {counts?.active ? "OFF (DB Attivo)" : "ATTIVO (Offline)"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "data" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {counts && (
+                <div>
+                  <PLabel>tabelle & record</PLabel>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5 }}>
+                    <div style={{ background: "rgba(62,207,142,0.06)", border: "1px solid rgba(62,207,142,0.12)", borderRadius: 10, padding: "6px 8px", textAlign: "center" }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: "#3ecf8e", margin: 0 }}>{counts.neuro_states}</p>
+                      <p style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", margin: 0, textTransform: "uppercase" }}>stati neuro</p>
+                    </div>
+                    <div style={{ background: "rgba(192,132,252,0.06)", border: "1px solid rgba(192,132,252,0.12)", borderRadius: 10, padding: "6px 8px", textAlign: "center" }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: "#c084fc", margin: 0 }}>{counts.admin_collab_users}</p>
+                      <p style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", margin: 0, textTransform: "uppercase" }}>collab</p>
+                    </div>
+                    <div style={{ background: "rgba(251,146,60,0.06)", border: "1px solid rgba(251,146,60,0.12)", borderRadius: 10, padding: "6px 8px", textAlign: "center" }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: "#fb923c", margin: 0 }}>{counts.admin_feedbacks}</p>
+                      <p style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", margin: 0, textTransform: "uppercase" }}>feedback</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <PLabel>ultimi stati cognitivi (neuro_states)</PLabel>
+                  <span style={{ fontSize: 8, color: "rgba(255,255,255,0.15)" }}>realtime</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                  {recentStates.length === 0 ? (
+                    <Empty icon={Activity} text="Nessuno stato neuro loggato nel database" />
+                  ) : (
+                    recentStates.map(state => {
+                      const m = state.cognitive_metrics;
+                      return (
+                        <div key={state.id} style={{ background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 10, padding: "7px 9px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>
+                              ID: {state.user_id ? state.user_id.slice(0, 8) + "..." : "anonimo"}
+                            </span>
+                            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.22)" }}>
+                              {ago(state.timestamp)}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "2px 6px", marginTop: 4 }}>
+                            {[
+                              ["coh.", m?.coherence],
+                              ["comp.", m?.complexity],
+                              ["adap.", m?.adaptability],
+                              ["res.", m?.resilience],
+                              ["creat.", m?.creativity],
+                              ["bal.", m?.emotional_balance],
+                            ].map(([label, val]) => {
+                              const num = val !== undefined ? Number(val) : 0;
+                              return (
+                                <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 8, fontFamily: "monospace" }}>
+                                  <span style={{ color: "rgba(255,255,255,0.2)" }}>{label}</span>
+                                  <span style={{ color: num > 0.7 ? "#34d399" : num > 0.4 ? "#fbbf24" : "rgba(255,255,255,0.4)", fontWeight: num > 0.7 ? 700 : 400 }}>
+                                    {num.toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 5, borderTop: "1px solid rgba(255,255,255,0.03)", paddingTop: 4 }}>
+                            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.12)", fontFamily: "monospace" }}>
+                              SESS: {state.session_id ? state.session_id.slice(0, 10) + "..." : "—"}
+                            </span>
+                            {state.encrypted && (
+                              <span style={{ fontSize: 7, color: "#34d399", background: "rgba(52,211,153,0.08)", padding: "1px 4px", borderRadius: 4, fontWeight: 700 }}>
+                                🔐 CRITTOGRAFATO
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "schema" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+              {dbSchema.map(table => (
+                <div key={table.name} style={{ background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: 10, padding: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                    <code style={{ fontSize: 10, fontFamily: "monospace", color: "#3ecf8e", fontWeight: 700 }}>{table.name}</code>
+                    <span style={{ fontSize: 8, color: "rgba(255,255,255,0.3)" }}>tabella sql</span>
+                  </div>
+                  <p style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", margin: "0 0 6px 0" }}>{table.desc}</p>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {table.columns.map(col => (
+                      <div key={col.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", background: "rgba(255,255,255,0.015)", padding: "3px 6px", borderRadius: 4 }}>
+                        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, marginRight: 6 }}>
+                          <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{col.name}</span>
+                          <span style={{ fontSize: 7, color: "rgba(255,255,255,0.25)" }}>{col.desc}</span>
+                        </div>
+                        <code style={{ fontSize: 7, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", background: "rgba(0,0,0,0.15)", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>{col.type}</code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function VercelPanel() {
   const [deployments, setDeployments] = useState<any[]>([]);
   const [proj, setProj] = useState<any>(null);
+  const [domains, setDomains] = useState<any[]>([]);
+  const [envVars, setEnvVars] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [expandedSection, setExpandedSection] = useState<"deploy" | "env" | "domains">("deploy");
+
   const vToken = import.meta.env.VITE_VERCEL_TOKEN;
   const teamId = import.meta.env.VITE_VERCEL_TEAM_ID ?? "";
   const projectName = import.meta.env.VITE_VERCEL_PROJECT ?? "";
+
   const fetchVercel = useCallback(async () => {
     if (!vToken) { setLoading(false); return; }
     setLoading(true); setErr("");
@@ -910,57 +1216,174 @@ function VercelPanel() {
       const qs = new URLSearchParams({ limit: "8" });
       if (teamId) qs.set("teamId", teamId);
       if (projectName) qs.set("app", projectName);
-      const [depRes, projRes] = await Promise.all([
-        fetch(`https://api.vercel.com/v6/deployments?${qs}`, { headers: { Authorization: `Bearer ${vToken}` } }),
-        projectName ? fetch(`https://api.vercel.com/v9/projects/${projectName}${teamId ? `?teamId=${teamId}` : ""}`, { headers: { Authorization: `Bearer ${vToken}` } }) : Promise.resolve(null),
+      
+      const headers = { Authorization: `Bearer ${vToken}` };
+      const teamParam = teamId ? `?teamId=${teamId}` : "";
+      
+      const [depRes, projRes, domRes, envRes] = await Promise.all([
+        fetch(`https://api.vercel.com/v6/deployments?${qs}`, { headers }),
+        projectName ? fetch(`https://api.vercel.com/v9/projects/${projectName}${teamParam}`, { headers }) : Promise.resolve(null),
+        projectName ? fetch(`https://api.vercel.com/v9/projects/${projectName}/domains${teamParam}`, { headers }) : Promise.resolve(null),
+        projectName ? fetch(`https://api.vercel.com/v9/projects/${projectName}/env${teamParam}`, { headers }) : Promise.resolve(null),
       ]);
-      setDeployments((await depRes.json()).deployments ?? []);
-      if (projRes?.ok) setProj(await projRes.json());
+
+      if (depRes.ok) setDeployments((await depRes.json()).deployments ?? []);
+      if (projRes && projRes.ok) setProj(await projRes.json());
+      if (domRes && domRes.ok) setDomains((await domRes.json()).domains ?? []);
+      if (envRes && envRes.ok) setEnvVars((await envRes.json()).envs ?? []);
     } catch (e: any) { setErr(e.message); }
     setLoading(false);
   }, [vToken, teamId, projectName]);
+
   useEffect(() => { fetchVercel(); }, [fetchVercel]);
+
   const sc = (s: string) => {
     if (s === "READY") return { c: "#6ee7b7", bg: "rgba(16,185,129,0.1)" };
     if (s === "ERROR" || s === "CANCELED") return { c: "#fca5a5", bg: "rgba(239,68,68,0.1)" };
     if (s === "BUILDING") return { c: "#fcd34d", bg: "rgba(245,158,11,0.12)" };
     return { c: "rgba(255,255,255,0.3)", bg: "rgba(255,255,255,0.05)" };
   };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-      <PHead icon={Server} label="Vercel Deploy" color="#fbbf24" right={vToken ? <RefreshBtn onClick={fetchVercel} loading={loading} /> : undefined} />
+      <PHead icon={Server} label="Vercel Deploy & Config" color="#fbbf24" right={vToken ? <RefreshBtn onClick={fetchVercel} loading={loading} /> : undefined} />
+      
       {!vToken ? (
         <div style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.14)", borderRadius: 11, padding: "10px 13px" }}>
           <p style={{ fontSize: 11, color: "rgba(252,211,77,0.8)", margin: 0 }}>Aggiungi <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 5px", borderRadius: 4, fontSize: 9 }}>VITE_VERCEL_TOKEN</code> al .env</p>
         </div>
       ) : err ? <Empty icon={AlertCircle} text={err} /> : loading ? <Empty icon={Spinner as any} text="caricamento…" /> : (
         <>
-          {proj && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, marginBottom: 4 }}>
-            {[["framework", proj.framework ?? "—"], ["branch", proj.link?.productionBranch ?? "main"], ["alias", proj.alias?.[0] ?? "—"], ["creato", fmtDate(proj.createdAt)]].map(([k, v]) => <KV key={k} k={k} v={v} />)}
-          </div>}
-          <PLabel>ultimi deploy</PLabel>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {deployments.length === 0 ? <Empty icon={Server} text="nessun deploy trovato" /> : deployments.map(d => {
-              const s = sc(d.state);
-              return (
-                <div key={d.uid} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, background: s.bg, color: s.c, padding: "2px 7px", borderRadius: 5 }}>{d.state}</span>
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
-                    <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>{ago(new Date(d.createdAt).toISOString())}</span>
-                  </div>
-                  {d.meta?.githubCommitMessage && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
-                      <GitBranch size={9} color="rgba(255,255,255,0.18)" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{d.meta.githubCommitMessage}</span>
-                      {d.meta?.githubCommitSha && <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>{d.meta.githubCommitSha.slice(0, 7)}</span>}
-                    </div>
-                  )}
-                  {d.url && <a href={`https://${d.url}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 9, color: "rgba(96,165,250,0.5)", textDecoration: "none" }}><Globe size={9} /> {d.url}</a>}
-                </div>
-              );
-            })}
+          {proj && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 6, marginBottom: 8 }}>
+              {[
+                ["Framework", proj.framework ?? "React/Vite"],
+                ["Node Version", proj.nodeVersion ?? "20.x"],
+                ["Production Branch", proj.link?.productionBranch ?? "main"],
+                ["Alias Principale", proj.alias?.[0] ?? "—"],
+                ["Creato il", fmtDate(proj.createdAt)]
+              ].map(([k, v]) => <KV key={k} k={k} v={v} />)}
+            </div>
+          )}
+
+          <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8, gap: 10 }}>
+            {[
+              { id: "deploy", label: "deployments", count: deployments.length },
+              { id: "domains", label: "domini", count: domains.length },
+              { id: "env", label: "variabili env", count: envVars.length }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setExpandedSection(tab.id as any)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  borderBottom: expandedSection === tab.id ? "2px solid #fbbf24" : "2px solid transparent",
+                  color: expandedSection === tab.id ? "#fbbf24" : "rgba(255,255,255,0.35)",
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  padding: "6px 8px",
+                  cursor: "pointer",
+                  fontWeight: expandedSection === tab.id ? 700 : 400,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  transition: "all 0.2s"
+                }}
+              >
+                {tab.label}
+                <span style={{ fontSize: 8, background: expandedSection === tab.id ? "rgba(251,191,36,0.18)" : "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: 99, color: expandedSection === tab.id ? "#fbbf24" : "rgba(255,255,255,0.3)" }}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
+
+          {expandedSection === "deploy" && (
+            <div>
+              <PLabel>ultimi deploy</PLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+                {deployments.length === 0 ? <Empty icon={Server} text="nessun deploy trovato" /> : deployments.map(d => {
+                  const s = sc(d.state);
+                  return (
+                    <div key={d.uid} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px", border: "1px solid rgba(255,255,255,0.02)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, background: s.bg, color: s.c, padding: "2px 7px", borderRadius: 5 }}>{d.state}</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                        <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>{ago(new Date(d.createdAt).toISOString())}</span>
+                      </div>
+                      {d.meta?.githubCommitMessage && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
+                          <GitBranch size={9} color="rgba(255,255,255,0.18)" style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{d.meta.githubCommitMessage}</span>
+                          {d.meta?.githubCommitSha && <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>{d.meta.githubCommitSha.slice(0, 7)}</span>}
+                        </div>
+                      )}
+                      {d.url && <a href={`https://${d.url}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 9, color: "rgba(96,165,250,0.5)", textDecoration: "none" }}><Globe size={9} /> {d.url}</a>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {expandedSection === "domains" && (
+            <div>
+              <PLabel>domini configurati</PLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+                {domains.length === 0 ? <Empty icon={Globe} text="nessun dominio trovato" /> : domains.map(d => (
+                  <div key={d.name} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px", border: "1px solid rgba(255,255,255,0.02)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <a href={`https://${d.name}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#60a5fa", textDecoration: "none", fontWeight: 600 }}>
+                        <Globe size={11} /> {d.name}
+                      </a>
+                      <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+                        <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)" }}>Apex: {d.apexName}</span>
+                        {d.redirect && <span style={{ fontSize: 8, color: "rgba(251,191,36,0.7)" }}>Redirect to {d.redirect}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: d.verified ? "rgba(52,211,153,0.1)" : "rgba(239,68,68,0.1)", color: d.verified ? "#34d399" : "#f87171" }}>
+                        {d.verified ? "VERIFICATO" : "NON VERIFICATO"}
+                      </span>
+                      <CopyBtn text={d.name} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {expandedSection === "env" && (
+            <div>
+              <PLabel>variabili d'ambiente (configurate su vercel)</PLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 280, overflowY: "auto", paddingRight: 4 }}>
+                {envVars.length === 0 ? <Empty icon={Key} text="nessuna variabile env trovata" /> : envVars.map(ev => (
+                  <div key={ev.id} style={{ background: "rgba(0,0,0,0.22)", borderRadius: 9, padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.015)" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Lock size={10} color="rgba(255,255,255,0.25)" />
+                        <code style={{ fontSize: 10, fontFamily: "monospace", color: "#6ee7b7", fontWeight: 700 }}>{ev.key}</code>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.2)" }}>tipo: {ev.type}</span>
+                        {ev.target && ev.target.map((t: string) => (
+                          <span key={t} style={{ fontSize: 7, fontWeight: 700, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", padding: "1px 5px", borderRadius: 4 }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.22)" }}>••••••••</span>
+                      <CopyBtn text={ev.key} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1088,11 +1511,12 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
           </div>
         </div>
 
-        {/* ── SEZIONE 4: Sistema + Vercel ── */}
+        {/* ── SEZIONE 4: Sistema + Supabase + Vercel ── */}
         <div ref={sec4} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>④ Infrastruttura</p>
           <div className="admin-grid-4">
             <Panel delay={0.42}><SystemPanel /></Panel>
+            <Panel delay={0.44}><SupabasePanel /></Panel>
             <Panel delay={0.46}><VercelPanel /></Panel>
           </div>
         </div>
@@ -1154,7 +1578,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
         .admin-grid-4 {
           display: grid;
-          grid-template-columns: 1fr 2fr;
+          grid-template-columns: 1fr 1.2fr 1.8fr;
           gap: 11px;
           margin-bottom: 16px;
         }
