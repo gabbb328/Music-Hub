@@ -501,7 +501,7 @@ function UsersPermissionsPanel() {
                                 </div>
                                 <div style={{ borderTop: "1px solid rgba(52,211,153,0.15)", paddingTop: 8 }}>
                                   <p style={{ fontSize: 9, color: "rgba(52,211,153,0.7)", margin: "0 0 4px" }}>Credenziali generate per l'utente:</p>
-                                  <div style={{ display: "flex", gap: 6 }}>
+                                  <div className="admin-credentials-row">
                                     <input 
                                       type="text" 
                                       placeholder="Username" 
@@ -684,9 +684,6 @@ function FeedbackPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Top Tracks
-// ═══════════════════════════════════════════════════════════════════════════════
 function TopTracksPanel() {
   const [tracks, setTracks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -720,9 +717,7 @@ function TopTracksPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Top Artists
-// ═══════════════════════════════════════════════════════════════════════════════
+
 function TopArtistsPanel() {
   const [artists, setArtists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -983,15 +978,15 @@ function Topbar({ session, onLogout, onShowShortcuts, onRefreshAll }: {
   const [now, setNow] = useState(new Date().toLocaleTimeString("it-IT"));
   useEffect(() => { const t = setInterval(() => setNow(new Date().toLocaleTimeString("it-IT")), 1000); return () => clearInterval(t); }, []);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(8,12,20,0.92)", backdropFilter: "blur(16px)", position: "sticky", top: 0, zIndex: 20 }}>
+    <div className="admin-topbar">
       <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Shield size={13} color="#34d399" />
       </div>
       <div>
-        <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>Harmony Hub</p>
+        <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>Music Hub</p>
         <p style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.2 }}>Admin Panel</p>
       </div>
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+      <div className="admin-topbar-actions">
         <span style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.2)", letterSpacing: 1 }}>{now}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.28)" }}>
           <User size={10} color="rgba(52,211,153,0.6)" />
@@ -1059,12 +1054,12 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
       <Topbar session={session} onLogout={handleLogout} onShowShortcuts={() => setShowShortcuts(true)} onRefreshAll={() => setRefreshKey(v => v + 1)} />
 
-      <div key={refreshKey} style={{ position: "relative", padding: 14 }}>
+      <div key={refreshKey} className="admin-container" style={{ position: "relative", padding: 14 }}>
 
         {/* ── SEZIONE 1: Token + Riproduzione + Dispositivi connessi ── */}
         <div ref={sec1} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>① Autenticazione & Riproduzione</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1.2fr", gap: 11, marginBottom: 11 }}>
+          <div className="admin-grid-1">
             <Panel delay={0.04}><TokenPanel /></Panel>
             <Panel delay={0.08}><NowPlayingPanel /></Panel>
             <Panel delay={0.12}><ConnectedUsersPanel /></Panel>
@@ -1074,7 +1069,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         {/* ── SEZIONE 2: Stats Spotify ── */}
         <div ref={sec2} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>② Statistiche Spotify</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
+          <div className="admin-grid-2">
             <Panel delay={0.16}><TopTracksPanel /></Panel>
             <Panel delay={0.20}><TopArtistsPanel /></Panel>
             <Panel delay={0.24}><QueuePanel /></Panel>
@@ -1085,7 +1080,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         {/* ── SEZIONE 3: Utenti + Messaggi + Recenti ── */}
         <div ref={sec3} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>③ Utenti & Comunicazioni</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 11, marginBottom: 11 }}>
+          <div className="admin-grid-3">
             <Panel delay={0.30}><UsersPermissionsPanel /></Panel>
             <Panel delay={0.34}><MessagesPanel /></Panel>
             <Panel delay={0.36}><FeedbackPanel /></Panel>
@@ -1096,7 +1091,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         {/* ── SEZIONE 4: Sistema + Vercel ── */}
         <div ref={sec4} style={{ scrollMarginTop: 60 }}>
           <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>④ Infrastruttura</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 11, marginBottom: 16 }}>
+          <div className="admin-grid-4">
             <Panel delay={0.42}><SystemPanel /></Panel>
             <Panel delay={0.46}><VercelPanel /></Panel>
           </div>
@@ -1115,6 +1110,98 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+        .admin-topbar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 18px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          background: rgba(8,12,20,0.92);
+          backdrop-filter: blur(16px);
+          position: sticky;
+          top: 0;
+          z-index: 20;
+        }
+
+        .admin-topbar-actions {
+          margin-left: auto;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .admin-grid-1 {
+          display: grid;
+          grid-template-columns: 1.5fr 1fr 1.2fr;
+          gap: 11px;
+          margin-bottom: 11px;
+        }
+
+        .admin-grid-2 {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr 1fr 1fr;
+          gap: 11px;
+          margin-bottom: 11px;
+        }
+
+        .admin-grid-3 {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr 1fr 1fr;
+          gap: 11px;
+          margin-bottom: 11px;
+        }
+
+        .admin-grid-4 {
+          display: grid;
+          grid-template-columns: 1fr 2fr;
+          gap: 11px;
+          margin-bottom: 16px;
+        }
+
+        .admin-credentials-row {
+          display: flex;
+          gap: 6px;
+        }
+
+        @media (max-width: 1200px) {
+          .admin-grid-1, .admin-grid-2, .admin-grid-3, .admin-grid-4 {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+
+        @media (max-width: 960px) {
+          .admin-container {
+            padding: 10px !important;
+          }
+          .admin-grid-1, .admin-grid-2, .admin-grid-3, .admin-grid-4 {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+          .admin-topbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            padding: 12px 14px;
+          }
+          .admin-topbar-actions {
+            margin-left: 0;
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .admin-credentials-row {
+            flex-direction: column;
+            gap: 8px;
+          }
+          .admin-topbar-actions {
+            justify-content: space-between;
+          }
+        }
       `}</style>
     </div>
   );

@@ -1,8 +1,8 @@
-# 🎵 Harmony Hub
+# 🎵 Music Hub
 
 Un moderno music player web integrato con Spotify, costruito con React, TypeScript e TailwindCSS.
 
-![Harmony Hub](https://img.shields.io/badge/Spotify-Integrated-1DB954?style=for-the-badge&logo=spotify)
+![Music Hub](https://img.shields.io/badge/Spotify-Integrated-1DB954?style=for-the-badge&logo=spotify)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript)
 
@@ -65,7 +65,7 @@ Vedi [SETUP_COMPLETO.md](SETUP_COMPLETO.md) per istruzioni dettagliate.
 ## 📁 Struttura Progetto
 
 ```
-harmony-hub-84/
+music-hub-84/
 ├── src/
 │   ├── components/       # Componenti UI
 │   ├── hooks/           # Custom hooks

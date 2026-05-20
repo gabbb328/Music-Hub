@@ -1333,9 +1333,9 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
         "template_collab",
         {
           from_name: userName,
-          message: `Nuova richiesta di collaborazione da "${userName}" su Harmony Hub.\n\nPer approvare clicca qui:\n${acceptLink}\n\nPer rifiutare clicca qui:\n${rejectLink}`,
+          message: `Nuova richiesta di collaborazione da "${userName}" su Music Hub.\n\nPer approvare clicca qui:\n${acceptLink}\n\nPer rifiutare clicca qui:\n${rejectLink}`,
           to_name: "Admin",
-          reply_to: "noreply@harmonyhub.app",
+          reply_to: "noreply@musichub.app",
         },
         "j3z-hU3f_1v_x-b1E",
       );

@@ -51,8 +51,8 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackAllowlist: [/^\/$/]
       },
       manifest: {
-        name: "Harmony Hub",
-        short_name: "Harmony",
+        name: "Music Hub",
+        short_name: "Music",
         description: "Stream, discover, and enjoy your favorite music with AI-powered recommendations",
         theme_color: "#0a0e27",
         background_color: "#0a0e27",

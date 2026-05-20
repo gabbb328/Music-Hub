@@ -21,7 +21,7 @@ export function useMediaSession(
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist,
-        album: currentTrack.album || "Harmony Hub",
+        album: currentTrack.album || "Music Hub",
         artwork: [
           {
             src: currentTrack.cover || "/placeholder.svg",

@@ -63,7 +63,7 @@ export const useSpotifyPlayer = () => {
       if (!token) return;
 
       const playerInstance = new window.Spotify.Player({
-        name: "Harmony Hub Web Player",
+        name: "Music Hub Web Player",
         getOAuthToken: (cb: (token: string) => void) => {
           const t = getToken();
           if (t) cb(t);

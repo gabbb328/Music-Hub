@@ -42,7 +42,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [playbackState, webPlayer.isPaused]);
 
   // ── iOS: trasferisce automaticamente il playback al primo dispositivo ────────
-  // Su iOS il Web Playback SDK non è disponibile, quindi "Harmony Hub Web Player"
+  // Su iOS il Web Playback SDK non è disponibile, quindi "Music Hub Web Player"
   // non viene mai registrato. Tentiamo di trasferire il playback verso l'app
   // Spotify nativa sul dispositivo non appena un dispositivo è disponibile.
   useEffect(() => {

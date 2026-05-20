@@ -124,7 +124,7 @@ const changelogData: ChangelogEntry[] = [
     date: "17 Marzo 2026",
     version: "v1.0.0",
     commits: [
-      "Setup iniziale dell'architettura Harmony Hub",
+      "Setup iniziale dell'architettura Music Hub",
       "Integrazione base con Spotify Web API",
       "Configurazione del sistema di temi e layout core"
     ]
@@ -146,7 +146,7 @@ export default function ChangelogContent() {
             Changelog
           </h1>
           <p className="text-muted-foreground">
-            Cronologia delle modifiche e degli aggiornamenti di Harmony Hub
+            Cronologia delle modifiche e degli aggiornamenti di Music Hub
           </p>
         </div>
 
@@ -191,7 +191,7 @@ export default function ChangelogContent() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">
-          Harmony Hub v1.4.0 • Sviluppato con ❤️
+          Music Hub v1.4.0 • Sviluppato con ❤️
         </p>
       </motion.div>
     </div>

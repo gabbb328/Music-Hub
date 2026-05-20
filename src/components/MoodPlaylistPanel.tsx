@@ -55,7 +55,7 @@ export default function MoodPlaylistPanel({ isOpen, onClose, tracks, moodName }:
   const handleSaveToSpotify = async () => {
     setIsSaving(true);
     try {
-      const playlist = await spotifyApi.createPlaylist(`Mood: ${moodName}`, `Generata con Harmony Hub in base al mood: ${moodName}`);
+      const playlist = await spotifyApi.createPlaylist(`Mood: ${moodName}`, `Generata con Music Hub in base al mood: ${moodName}`);
       if (!playlist?.id) throw new Error("Creazione playlist fallita");
       
       await spotifyApi.addTracksToPlaylist(playlist.id, uris);

@@ -85,7 +85,7 @@ export default function ListenAlongContent() {
               </div>
 
               <div className="flex flex-col items-center gap-6 bg-white p-6 rounded-2xl">
-                <QRCodeSVG value={`harmonyhub://join/${sessionId}`} size={200} />
+                <QRCodeSVG value={`musichub://join/${sessionId}`} size={200} />
                 <div className="flex items-center gap-3 px-4 py-2 bg-secondary rounded-lg font-mono text-xl font-bold text-black">
                   {sessionId}
                   <button onClick={copyToClipboard} className="text-muted-foreground hover:text-black">

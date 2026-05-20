@@ -31,7 +31,7 @@ export default function WrappedExport({ topArtist, topTrack, topGenre, minutesLi
       });
       
       const link = document.createElement("a");
-      link.download = "harmony-hub-wrapped.png";
+      link.download = "music-hub-wrapped.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
       
@@ -58,7 +58,7 @@ export default function WrappedExport({ topArtist, topTrack, topGenre, minutesLi
           <div className="relative z-10 space-y-8">
             <div className="space-y-1">
               <h1 className="text-white text-3xl font-black italic tracking-tighter">WRAPPED</h1>
-              <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Harmony Hub • 2026</p>
+              <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Music Hub • 2026</p>
             </div>
 
             <div className="space-y-6">
@@ -95,7 +95,7 @@ export default function WrappedExport({ topArtist, topTrack, topGenre, minutesLi
               <p className="text-white text-4xl font-black tracking-tight">{minutesListened.toLocaleString()}</p>
             </div>
             <div className="text-center">
-              <p className="text-white/40 text-[8px] font-bold tracking-widest uppercase">Creato con Harmony Hub</p>
+              <p className="text-white/40 text-[8px] font-bold tracking-widest uppercase">Creato con Music Hub</p>
             </div>
           </div>
         </div>

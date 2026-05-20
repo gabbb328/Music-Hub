@@ -40,7 +40,7 @@ const PlayMusicIntentHandler = {
       && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PlayMusicIntent';
   },
   handle(handlerInput) {
-    const speakOutput = 'Sto riproducendo la tua musica su Harmony Hub.';
+    const speakOutput = 'Sto riproducendo la tua musica su Music Hub.';
     
     // In a real scenario, here we would integrate with Spotify API
     // and update the APL datasource with current track info.
@@ -59,7 +59,7 @@ const HelpIntentHandler = {
       && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.HelpIntent';
   },
   handle(handlerInput) {
-    const speakOutput = 'Puoi dire apri Harmony Hub o chiedimi di riprodurre una canzone.';
+    const speakOutput = 'Puoi dire apri Music Hub o chiedimi di riprodurre una canzone.';
     return handlerInput.responseBuilder
       .speak(speakOutput)
       .reprompt(speakOutput)

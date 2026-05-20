@@ -3,7 +3,7 @@ import { Github, Globe, Heart, Music2, Code2, Sparkles, Coffee } from "lucide-re
 
 const TEAM = [
   {
-    name: "Harmony Hub",
+    name: "Music Hub",
     role: "App di musica personale",
     avatar: "🎵",
     bio: "Un player musicale moderno con integrazione Spotify, AI DJ, Neural Space Mixer e molto altro.",
@@ -45,7 +45,7 @@ export default function AboutContent() {
           className="text-center space-y-4 py-6">
           <div className="text-6xl">🎵</div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-violet-400 to-pink-400 bg-clip-text text-transparent">
-            Harmony Hub
+            Music Hub
           </h1>
           <p className="text-muted-foreground max-w-sm mx-auto text-sm leading-relaxed">
             Il tuo player musicale personale, costruito con amore e tanta musica.
@@ -111,7 +111,7 @@ export default function AboutContent() {
         {/* Footer */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
           className="text-center text-xs text-muted-foreground/50 pb-8 space-y-1">
-          <p>Harmony Hub non è affiliata con Spotify AB.</p>
+          <p>Music Hub non è affiliata con Spotify AB.</p>
           <p>Spotify® è un marchio registrato di Spotify AB.</p>
           <div className="flex items-center justify-center gap-1 mt-2">
             <Coffee className="w-3 h-3" />

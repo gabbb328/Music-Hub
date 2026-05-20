@@ -146,7 +146,7 @@ function Sleeve({
 
       <div className="absolute bottom-6 w-full text-center">
         <p className="text-white/20 text-[8px] tracking-[0.4em] font-black uppercase">
-          Harmony Hub
+          Music Hub
         </p>
       </div>
     </motion.div>

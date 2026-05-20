@@ -112,7 +112,7 @@ export default function Sidebar({
 
       <div className="px-6 py-5 shrink-0">
         <h1 className="text-xl font-bold tracking-tight">
-          <span className="text-gradient-primary">Harmony</span>
+          <span className="text-gradient-primary">Music</span>
           <span className="text-foreground"> Hub</span>
         </h1>
       </div>

@@ -68,7 +68,7 @@ function SaveToSpotifyPanel({
       const uri = await resolveTrackUri();
       await createMutation.mutateAsync({
         name: newName.trim(),
-        description: `Creata da Harmony Hub – Neural Space Mixer`,
+        description: `Creata da Music Hub – Neural Space Mixer`,
         trackUris: uri ? [uri] : [],
       });
       setDone(true);
