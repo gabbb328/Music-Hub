@@ -8,17 +8,17 @@ Un moderno music player web integrato con Spotify, costruito con React, TypeScri
 
 ## Caratteristiche
 
--**Riproduzione Spotify** - Player integrato con Web Playback SDK
--**Ricerca Avanzata** - Cerca brani, artisti, album e playlist
--**Gestione Libreria** - Accedi alle tue playlist e brani salvati
--**Statistiche** - Visualizza le tue abitudini di ascolto
--**Visualizzatore Audio** - Animazioni sincronizzate con la musica
--**Multi-Device** - Controlla la riproduzione su tutti i tuoi dispositivi
--**Queue Management** - Gestisci la coda di riproduzione
--**AI DJ** - Raccomandazioni musicali intelligenti
--**Testi Sincronizzati** - Visualizza i testi mentre ascolti
--**Controlli Completi** - Play, pause, skip, volume, shuffle, repeat
--**Raggruppamento Recenti** - Visualizza i brani ascoltati più volte con un moltiplicatore (es. x2)
+- **Riproduzione Spotify** - Player integrato con Web Playback SDK
+- **Ricerca Avanzata** - Cerca brani, artisti, album e playlist
+- **Gestione Libreria** - Accedi alle tue playlist e brani salvati
+- **Statistiche** - Visualizza le tue abitudini di ascolto
+- **Visualizzatore Audio** - Animazioni sincronizzate con la musica
+- **Multi-Device** - Controlla la riproduzione su tutti i tuoi dispositivi
+- **Queue Management** - Gestisci la coda di riproduzione
+- **AI DJ** - Raccomandazioni musicali intelligenti
+- **Testi Sincronizzati** - Visualizza i testi mentre ascolti
+- **Controlli Completi** - Play, pause, skip, volume, shuffle, repeat
+- **Raggruppamento Recenti** - Visualizza i brani ascoltati più volte con un moltiplicatore (es. x2)
 
 ## Prerequisiti
 
