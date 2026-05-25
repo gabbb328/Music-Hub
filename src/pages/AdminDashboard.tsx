@@ -13,7 +13,6 @@ import { getToken } from "@/services/spotify-auth";
 import { usePlaybackState } from "@/hooks/useSpotify";
 import { clearAdminSession, AdminSession } from "./AdminLogin";
 
-// ─── utils ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | string | undefined) {
   if (!ts) return "—";
   return new Date(Number(ts)).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
@@ -45,7 +44,6 @@ async function sha256hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// ─── Users storage (localStorage, condiviso fra tab) ─────────────────────────
 const USERS_KEY = "admin_collab_users";
 import {
   CollabUser, getCollabUsers, saveCollabUsers, deleteCollabUser,
@@ -54,7 +52,6 @@ import {
   SupabaseTableCounts, UserNeuroState
 } from "@/services/supabase-api";
 
-// ─── Messages storage ─────────────────────────────────────────────────────────
 const MSGS_KEY = "admin_messages";
 interface AdminMessage {
   id: string;
@@ -68,7 +65,6 @@ function loadMessages(): AdminMessage[] {
   try { return JSON.parse(localStorage.getItem(MSGS_KEY) ?? "[]"); } catch { return []; }
 }
 
-// ─── micro components ─────────────────────────────────────────────────────────
 function CopyBtn({ text }: { text: string }) {
   const [ok, setOk] = useState(false);
   return (
@@ -138,9 +134,6 @@ function RefreshBtn({ onClick, loading }: { onClick: () => void; loading: boolea
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KEYBOARD SHORTCUTS OVERLAY
-// ═══════════════════════════════════════════════════════════════════════════════
 function ShortcutsModal({ onClose }: { onClose: () => void }) {
   const shortcuts = [
     ["R", "Refresh tutti i pannelli"],
@@ -179,9 +172,6 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Token
-// ═══════════════════════════════════════════════════════════════════════════════
 function TokenPanel() {
   const token = getToken();
   const expiresAt = localStorage.getItem("spotify_token_expires_at");
@@ -236,9 +226,6 @@ function TokenPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Now Playing
-// ═══════════════════════════════════════════════════════════════════════════════
 function NowPlayingPanel() {
   const { data: pb } = usePlaybackState();
   const track = pb?.item;
@@ -278,9 +265,6 @@ function NowPlayingPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Dispositivi Spotify (tutti gli utenti connessi all'account)
-// ═══════════════════════════════════════════════════════════════════════════════
 function ConnectedUsersPanel() {
   const [devices, setDevices] = useState<any[]>([]);
   const [playbacks, setPlaybacks] = useState<Record<string, any>>({});
@@ -292,7 +276,6 @@ function ConnectedUsersPanel() {
       const d = await spotifyGet("/me/player/devices");
       const devs = d.devices ?? [];
       setDevices(devs);
-      // Per ogni dispositivo attivo, prova a prendere lo stato di riproduzione
       const pb = await spotifyGet("/me/player").catch(() => null);
       if (pb) {
         const map: Record<string, any> = {};
@@ -366,10 +349,6 @@ function ConnectedUsersPanel() {
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Users / Permessi collaboratori
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function EnvString({ u, p }: { u?: string; p?: string }) {
   const [str, setStr] = useState("");
@@ -554,9 +533,6 @@ function UsersPermissionsPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Messaggi ricevuti
-// ═══════════════════════════════════════════════════════════════════════════════
 function MessagesPanel() {
   const [messages, setMessages] = useState<AdminMessage[]>(loadMessages);
   const [selected, setSelected] = useState<AdminMessage | null>(null);
@@ -750,9 +726,6 @@ function TopArtistsPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Queue
-// ═══════════════════════════════════════════════════════════════════════════════
 function QueuePanel() {
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -785,9 +758,7 @@ function QueuePanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Libreria
-// ═══════════════════════════════════════════════════════════════════════════════
+
 function LibraryPanel() {
   const [liked, setLiked] = useState<number | null>(null);
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -828,9 +799,7 @@ function LibraryPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Recenti
-// ═══════════════════════════════════════════════════════════════════════════════
+
 function RecentPanel() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -861,9 +830,7 @@ function RecentPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Sistema
-// ═══════════════════════════════════════════════════════════════════════════════
+
 function SystemPanel() {
   const lsKeys = Object.keys(localStorage).filter(k => k.startsWith("spotify_"));
   const lsSize = lsKeys.reduce((acc, k) => acc + (localStorage.getItem(k)?.length ?? 0), 0);
@@ -896,9 +863,6 @@ function SystemPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PANEL: Vercel
-// ═══════════════════════════════════════════════════════════════════════════════
 function SupabasePanel() {
   const [counts, setCounts] = useState<SupabaseTableCounts | null>(null);
   const [recentStates, setRecentStates] = useState<UserNeuroState[]>([]);

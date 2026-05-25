@@ -92,7 +92,7 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
   const pauseMutation2 = usePauseMutation();
   const sleepTimer = useSleepTimer(async () => {
     await pauseMutation2.mutateAsync();
-    toast({ title: "⏱ Sleep timer", description: "Riproduzione fermata" });
+    toast({ title: "Sleep timer", description: "Riproduzione fermata" });
   }, onStateChange);
 
   const isPlaying   = playbackState?.is_playing || false;
