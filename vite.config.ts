@@ -133,10 +133,18 @@ export default defineConfig(({ mode }) => ({
     assetsDir: "assets",
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          framer: ["framer-motion"],
-          query: ["@tanstack/react-query"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react-dom") || id.includes("react/")) {
+              return "vendor";
+            }
+            if (id.includes("framer-motion")) {
+              return "framer";
+            }
+            if (id.includes("@tanstack/react-query")) {
+              return "query";
+            }
+          }
         },
       },
     },
