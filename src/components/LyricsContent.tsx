@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft } from "lucide-react";
+import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft, Sparkles, Brain, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Track } from "@/lib/mock-data";
@@ -121,7 +121,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     if (!container || !line) return;
 
     // Recursively accumulate offsets relative to the scrolling container to ensure dead-center placement
-    let actualOffsetTop = 0;
+    let actualOffsetTop = 120;
     let currentEl: HTMLElement | null = line;
     while (currentEl && currentEl !== container) {
       actualOffsetTop += currentEl.offsetTop;
@@ -275,7 +275,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
           {([
             { id: "lyrics"   as Mode, label: "Lyrics",   icon: Mic2      },
-            { id: "trivia"   as Mode, label: "Trivia",   icon: Lightbulb },
+            { id: "trivia"   as Mode  , label: "About",   icon: Lightbulb },
             { id: "info"     as Mode, label: "Info",     icon: Disc      },
             { id: "analysis" as Mode, label: "Analysis", icon: Music },
           ]).map(tab => (
@@ -528,34 +528,119 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
         {/* ── TRIVIA ── */}
         {mode === "trivia" && (
-          <div className="absolute inset-0 overflow-y-auto p-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-2xl mx-auto">
+          <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-2xl mx-auto pb-10">
+              
+              {/* Header Banner */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-inner shrink-0 relative">
+                  <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                  <motion.div 
+                    animate={{ rotate: 360 }} 
+                    transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                    className="absolute -inset-1 border border-dashed border-primary/30 rounded-2xl pointer-events-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-center md:justify-start gap-2">
+                    <h2 className="text-xl font-bold tracking-tight">AI Insights & Curiosità</h2>
+                    <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
+                      Live
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
+                    Analisi intelligente in tempo reale per scoprire fatti incredibili, aneddoti storici e dettagli di produzione su questa canzone e sul suo interprete.
+                  </p>
+                </div>
+              </div>
+
               {loadingTrivia ? (
-                <div className="flex flex-col items-center justify-center h-40">
-                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                  <p className="text-sm text-muted-foreground">Loading trivia…</p>
+                <div className="flex flex-col items-center justify-center h-52 space-y-4">
+                  <div className="relative flex items-center justify-center">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                    <Sparkles className="w-5 h-5 text-cyan-400 absolute animate-pulse" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Elaborazione in corso...</p>
+                    <p className="text-xs text-muted-foreground animate-pulse">Sintesi dei dati musicali in tempo reale...</p>
+                  </div>
                 </div>
               ) : trivia.length > 0 ? (
-                <div className="space-y-6">
-                  {trivia.map((item, idx) => (
-                    <Card key={idx} className="p-6 border-border/40 bg-card/30 backdrop-blur-sm space-y-3">
-                      <div className="flex items-center gap-2 text-primary">
-                        <Lightbulb className="w-5 h-5" />
-                        <h3 className="font-bold">{item.title}</h3>
-                      </div>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {item.extract}
-                      </p>
-                      <div className="pt-2 text-[10px] text-muted-foreground/50 italic">
-                        Fonte: {item.source}
-                      </div>
-                    </Card>
-                  ))}
+                <div className="grid grid-cols-1 gap-5">
+                  {trivia.map((item, idx) => {
+                    const isAI = item.type === 'ai';
+                    return (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: idx * 0.08 }}
+                      >
+                        <Card className="p-6 border border-border/30 hover:border-primary/30 bg-card/25 backdrop-blur-md hover:bg-card/35 transition-all duration-300 relative group overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                          
+                          {/* Top accent line */}
+                          <div className={`absolute top-0 inset-x-0 h-[2px] transition-all duration-300 ${
+                            isAI ? "bg-gradient-to-r from-violet-500 via-primary to-cyan-400" : "bg-gradient-to-r from-muted-foreground/20 to-muted-foreground/10"
+                          }`} />
+                          
+                          {/* Corner glow */}
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                          
+                          <div className="flex items-start gap-4">
+                            <div className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
+                              isAI 
+                                ? "bg-violet-500/10 border-violet-500/20 text-violet-400" 
+                                : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                            }`}>
+                              {isAI ? <Brain className="w-4.5 h-4.5" /> : <BookOpen className="w-4.5 h-4.5" />}
+                            </div>
+                            
+                            <div className="space-y-2.5 flex-1 min-w-0">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                <h3 className="font-bold text-base leading-snug group-hover:text-primary transition-colors pr-2">
+                                  {item.title}
+                                </h3>
+                                
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border tracking-wide w-fit uppercase shrink-0 ${
+                                  isAI 
+                                    ? "bg-violet-500/10 text-violet-400 border-violet-500/20" 
+                                    : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                                }`}>
+                                  {isAI ? "AI Synthesized" : "Official Bio"}
+                                </span>
+                              </div>
+                              
+                              <p className="text-sm leading-relaxed text-muted-foreground font-normal">
+                                {item.extract}
+                              </p>
+                              
+                              <div className="pt-2 flex items-center justify-between text-[10px] text-muted-foreground/60 border-t border-border/10">
+                                <span className="flex items-center gap-1">
+                                  <Lightbulb className="w-3.5 h-3.5 text-yellow-500/70" />
+                                  <span>Fonte verificata</span>
+                                </span>
+                                <span className="font-medium italic text-primary/70">
+                                  {item.source}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <Music className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">Trivia non disponibile</p>
+                <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+                  <div className="p-4 bg-muted/40 rounded-full">
+                    <Music className="w-10 h-10 text-muted-foreground/30" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">Nessuna curiosità trovata</p>
+                    <p className="text-xs text-muted-foreground">Trivia non disponibile per questo brano in questo momento.</p>
+                  </div>
                 </div>
               )}
             </motion.div>
