@@ -1,4 +1,4 @@
-# 🎵 Music Hub
+# Music Hub
 
 Un moderno music player web integrato con Spotify, costruito con React, TypeScript e TailwindCSS.
 
