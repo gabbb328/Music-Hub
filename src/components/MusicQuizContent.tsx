@@ -35,8 +35,7 @@ export default function MusicQuizContent({ onStateChange }: { onStateChange?: (a
     const tracks = [...topTracksData.items].sort(() => Math.random() - 0.5);
     const newQuestions: Question[] = [];
 
-    for (let i = 0; i < 10
-      ; i++) {
+    for (let i = 0; i < 10; i++) {
       const correctTrack = tracks[i];
       const otherOptions = tracks.filter(t => t.id !== correctTrack.id).sort(() => Math.random() - 0.5).slice(0, 3);
       const options = [correctTrack, ...otherOptions].sort(() => Math.random() - 0.5);
@@ -111,7 +110,6 @@ export default function MusicQuizContent({ onStateChange }: { onStateChange?: (a
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Music Quiz</h1>
-              <p className="text-muted-foreground">Metti alla prova la tua conoscenza musicale!</p>
             </div>
           </div>
           {gameState === "playing" && (

@@ -110,7 +110,7 @@ function Panel({ children, delay = 0, style = {} }: { children: React.ReactNode;
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-      style={{ background: "rgba(13,19,34,0.9)", backdropFilter: "blur(14px)", border: "1px solid rgba(255,255,255,0.065)", borderRadius: 20, padding: 16, ...style }}>
+      style={{ background: "rgba(10,18,40,0.85)", backdropFilter: "blur(16px)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 20, padding: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.2)", ...style }}>
       {children}
     </motion.div>
   );
@@ -1436,8 +1436,8 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
   }, []);
 
   return (
-    <div style={{ height: "100vh", overflowY: "auto", background: "#080c14" }}>
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", opacity: 0.018, backgroundImage: "linear-gradient(#00ff88 1px,transparent 1px),linear-gradient(90deg,#00ff88 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
+    <div style={{ height: "100vh", overflowY: "auto", background: "radial-gradient(circle at top right, #0a1930 0%, #030816 100%)" }}>
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", opacity: 0.03, backgroundImage: "linear-gradient(#38bdf8 1px,transparent 1px),linear-gradient(90deg,#38bdf8 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
 
       <Topbar session={session} onLogout={handleLogout} onShowShortcuts={() => setShowShortcuts(true)} onRefreshAll={() => setRefreshKey(v => v + 1)} />
 
@@ -1504,12 +1504,13 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
           align-items: center;
           gap: 12px;
           padding: 10px 18px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          background: rgba(8,12,20,0.92);
-          backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(56,189,248,0.2);
+          background: rgba(5,10,25,0.85);
+          backdrop-filter: blur(20px);
           position: sticky;
           top: 0;
           z-index: 20;
+          box-shadow: 0 4px 30px rgba(0,0,0,0.5);
         }
 
         .admin-topbar-actions {

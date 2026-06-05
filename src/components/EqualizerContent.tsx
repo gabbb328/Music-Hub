@@ -396,25 +396,13 @@ export default function EqualizerContent() {
         {/* Info box */}
         {!isActive && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className={`glass-surface rounded-xl p-4 flex items-start gap-3 border ${IS_MOBILE ? "border-amber-500/20 bg-amber-500/5" : "border-primary/20 bg-primary/5"}`}>
-            {IS_MOBILE
-              ? <Smartphone className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              : <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-            }
+            className={`glass-surface rounded-xl p-4 flex items-start gap-3 border border-amber-500/20 bg-amber-500/5`}>
+            <Smartphone className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
-              {IS_MOBILE ? (
-                <>
-                  <p className="text-amber-400 font-medium">Modalità preferenze — su mobile</p>
-                  <p>Gli slider e i preset si salvano normalmente. Il processing audio in tempo reale non è disponibile su mobile (limitazione del browser) — funziona su desktop.</p>
-                </>
-              ) : statusMsg ? (
-                <p className="text-amber-400">{statusMsg}</p>
-              ) : (
-                <>
-                  <p>Premi <strong className="text-foreground">Attiva</strong> per collegare l'EQ direttamente al player Spotify.</p>
-                  <p className="text-xs opacity-70">Nessun microfono — l'audio viene processato internamente tramite Web Audio API.</p>
-                </>
-              )}
+              <p className="text-amber-400 font-medium">Limitazioni DRM Spotify & Web Audio</p>
+              <p>Il player di Spotify protegge l'audio con DRM. L'equalizzatore Web potrebbe non riuscire a intercettare l'audio a causa di blocchi CORS del browser.</p>
+              <p className="text-xs opacity-70 mt-2">I preset vengono comunque salvati. Per un'esperienza ottimale, si consiglia di usare l'equalizzatore di sistema o dell'app delle proprie cuffie Bluetooth (Sony, AirPods, Samsung).</p>
+              {statusMsg && <p className="text-red-400 mt-2 text-xs font-bold">Stato: {statusMsg}</p>}
             </div>
           </motion.div>
         )}

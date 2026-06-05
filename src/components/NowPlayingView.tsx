@@ -5,7 +5,7 @@ import {
   Info, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Clock, Timer, Volume2, Headphones, Music2, ChevronUp, Radio,
   Zap, Star, TrendingUp, Eye, EyeOff, Disc3, Layers, Users,
-  Home, Search, Library, Gamepad2
+  Home, Search, Library, Gamepad2, Video, Copy, CheckCircle2
 } from "lucide-react";
 import VinylNowPlayingView from "./VinylNowPlayingView";
 import IpodNowPlayingView from "./IpodNowPlayingView";
@@ -25,7 +25,7 @@ import { useIpodPersistence } from "@/hooks/useIpodPersistence";
 import type { usePlayerStore } from "@/hooks/usePlayerStore";
 
 type NowPlayingProps = ReturnType<typeof usePlayerStore> & { onClose: () => void; onNavigate?: (s: string) => void; onStateChange?: (active: boolean) => void; };
-type PanelType = "lyrics" | "queue" | "analysis" | "info" | "timer" | "mood" | "listen-along" | null;
+type PanelType = "lyrics" | "queue" | "analysis" | "info" | "timer" | "mood" | "listen-along" | "video" | null;
 
 // ── Sleep timer ────────────────────────────────────────────────────────────────
 function useSleepTimer(onEnd: () => void, onStateChange?: (active: boolean) => void) {
@@ -493,12 +493,13 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
           </div>
 
           {/* Quick panel buttons */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {[
               { id: "lyrics" as PanelType, icon: Mic2, label: "Testi", action: undefined },
-              { id: "queue" as PanelType, icon: ListMusic, label: "Coda", action: () => { onNavigate?.("queue"); onClose(); } },
-              { id: "mood" as PanelType, icon: Sparkles, label: "Mood Gen", action: undefined },
+              { id: "mood" as PanelType, icon: Sparkles, label: "Mood", action: undefined },
               { id: "listen-along" as PanelType, icon: Users, label: "Listen", action: undefined },
+              { id: "video" as PanelType, icon: Video, label: "Video", action: undefined },
+              { id: "queue" as PanelType, icon: ListMusic, label: "Coda", action: () => { onNavigate?.("queue"); onClose(); } },
             ].map(({ id, icon: Icon, label, action }) => (
               <button key={id} onClick={action ?? (() => togglePanel(id))}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors min-h-[56px] ${activePanel === id ? "bg-primary/15 text-primary" : "bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>
@@ -615,6 +616,61 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
                     <span className="text-sm font-medium text-right">{value}</span>
                   </div>
                 ))}
+              </motion.div>
+            )}
+
+            {activePanel === "mood" && audioFeatures && (
+              <motion.div key="mood" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
+                className="rounded-xl bg-secondary/30 p-4 space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Mood & Vibe (AI Gen)</p>
+                <div className="bg-background/40 p-3 rounded-lg border border-border/50 text-sm text-muted-foreground italic leading-relaxed">
+                  {audioFeatures.energy > 0.7 && audioFeatures.valence > 0.6 ? "Questa traccia ha un'energia vibrante e positiva. Ideale per allenarsi o per darti la carica al mattino!" : 
+                   audioFeatures.energy > 0.6 && audioFeatures.valence < 0.5 ? "Un'energia intensa ma malinconica, perfetta per i momenti di forte espressione o corse notturne." :
+                   audioFeatures.energy < 0.5 && audioFeatures.valence > 0.6 ? "Tranquilla, rilassata e felice. Ideale per una passeggiata al sole o un pomeriggio in relax." :
+                   audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.6 ? "Molto intima e acustica, consigliata per la lettura o per rilassarsi prima di dormire." :
+                   "Un mix bilanciato di emozioni. Ottima come sottofondo per le tue attività quotidiane o per lo studio."}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <span className="text-[10px] px-2 py-1 rounded bg-primary/20 text-primary font-bold">{audioFeatures.energy > 0.6 ? "⚡ Alta Energia" : "☕ Relax"}</span>
+                  <span className="text-[10px] px-2 py-1 rounded bg-secondary text-foreground">{audioFeatures.danceability > 0.6 ? "🕺 Ballabile" : "🎧 Ascolto"}</span>
+                </div>
+              </motion.div>
+            )}
+
+            {activePanel === "listen-along" && (
+              <motion.div key="listen" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
+                className="rounded-xl bg-secondary/30 p-4 space-y-3 text-center">
+                <Users className="w-8 h-8 text-primary mx-auto mb-2" />
+                <p className="text-sm font-semibold">Listen Along</p>
+                <p className="text-xs text-muted-foreground">Condividi la tua sessione musicale con gli amici e ascoltate in sincrono.</p>
+                
+                <div className="bg-background/50 border border-border p-2 rounded-lg flex items-center justify-between mt-2">
+                  <span className="text-xs font-mono text-muted-foreground truncate flex-1 text-left px-2">
+                    {typeof window !== 'undefined' ? `${window.location.origin}/listen?session=user-${Date.now().toString().slice(-6)}` : 'Generazione link...'}
+                  </span>
+                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/listen?session=user-123456`); alert('Link copiato!'); }} 
+                    className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0">
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-[10px] text-green-400 font-semibold flex items-center justify-center gap-1 mt-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sessione attiva (Sei l'host)
+                </div>
+              </motion.div>
+            )}
+
+            {activePanel === "video" && (
+              <motion.div key="video" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
+                className="rounded-xl bg-secondary/30 overflow-hidden relative" style={{ aspectRatio: '16/9' }}>
+                <iframe 
+                  className="w-full h-full border-0 absolute top-0 left-0"
+                  src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentTrack.name + " " + (currentTrack.artists[0]?.name || "") + " official music video")}`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen
+                ></iframe>
               </motion.div>
             )}
 
