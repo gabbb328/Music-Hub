@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft, Sparkles, Brain, BookOpen } from "lucide-react";
+import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft, Sparkles, Brain, BookOpen, Zap, Heart, Gauge, Waves, BarChart3, Radio, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Track } from "@/lib/mock-data";
-import { usePlaybackState, useAudioFeatures, useSeekMutation } from "@/hooks/useSpotify";
+import { usePlaybackState, useSeekMutation } from "@/hooks/useSpotify";
 import { formatTime } from "@/lib/mock-data";
 import { fetchSyncedLyrics, getCurrentLineIndex, type LyricLine } from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
 import { useToast } from "@/hooks/use-toast";
 import { useVocalRemover } from "@/hooks/useVocalRemover";
-import { fetchSongTrivia, type TriviaResult } from "@/services/trivia-api";
+import { fetchSongTrivia, type TriviaResult, fetchSongAnalysis, type AIAnalysisResult } from "@/services/trivia-api";
+import { AlertCircle } from "lucide-react";
 
 interface LyricsContentProps { currentTrack: Track | null; }
 type Mode = "lyrics" | "info" | "analysis" | "trivia";
@@ -28,6 +29,8 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const [userScrolling, setUserScrolling]       = useState(false);
   const [trivia, setTrivia]                     = useState<TriviaResult[]>([]);
   const [loadingTrivia, setLoadingTrivia]       = useState(false);
+  const [analysis, setAnalysis]                 = useState<AIAnalysisResult | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis]   = useState(false);
 
   const { isKaraokeActive, toggleKaraoke } = useVocalRemover();
 
@@ -38,7 +41,6 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
   const { data: playbackState }                          = usePlaybackState();
   const currentTrack                                     = playbackState?.item || localTrack;
-  const { data: audioFeatures, isLoading: loadingFeat }  = useAudioFeatures((currentTrack as any)?.id || "");
   const seekMutation = useSeekMutation();
   const { toast }    = useToast();
 
@@ -102,6 +104,12 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
     fetchSongTrivia(artist, title).then(res => {
       setTrivia(res);
       setLoadingTrivia(false);
+    });
+
+    setLoadingAnalysis(true);
+    fetchSongAnalysis(artist, title).then(res => {
+      setAnalysis(res);
+      setLoadingAnalysis(false);
     });
   }, [(currentTrack as any)?.id]);
 
@@ -472,54 +480,73 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
         {/* ── ANALYSIS ── */}
         {mode === "analysis" && (
-          <div className="absolute inset-0 overflow-y-auto p-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-2xl mx-auto">
-              {loadingFeat ? (
-                <div className="flex flex-col items-center justify-center h-40">
-                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                  <p className="text-sm text-muted-foreground">Loading analysis…</p>
+          <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-2xl mx-auto pb-10">
+              
+              {/* Titolo sezione */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-inner shrink-0 relative">
+                  <Sparkles className="w-8 h-8 text-primary animate-pulse" />
                 </div>
-              ) : audioFeatures ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { label: "Energy",          value: audioFeatures.energy,          color: "bg-red-500" },
-                      { label: "Danceability",     value: audioFeatures.danceability,     color: "bg-blue-500" },
-                      { label: "Valence",          value: audioFeatures.valence,          color: "bg-green-500" },
-                      { label: "Acousticness",     value: audioFeatures.acousticness,     color: "bg-yellow-500" },
-                      { label: "Instrumentalness", value: audioFeatures.instrumentalness, color: "bg-purple-500" },
-                      { label: "Speechiness",      value: audioFeatures.speechiness,      color: "bg-pink-500" },
-                    ].map(f => (
-                      <div key={f.label} className="p-3 rounded-xl bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1.5">{f.label}</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${f.value * 100}%` }}
-                              transition={{ duration: 1, delay: 0.1 }} className={`h-full ${f.color} rounded-full`} />
-                          </div>
-                          <span className="text-xs font-bold w-8 text-right">{Math.round(f.value * 100)}%</span>
-                        </div>
-                      </div>
-                    ))}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-center md:justify-start gap-2">
+                    <h2 className="text-xl font-bold tracking-tight">Analisi Musicale AI</h2>
+                    <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
+                      Live
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: "Tempo",          value: `${Math.round(audioFeatures.tempo)} BPM` },
-                      { label: "Key",            value: `${["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key]} ${audioFeatures.mode === 1 ? "Major" : "Minor"}` },
-                      { label: "Time Signature", value: `${audioFeatures.time_signature}/4` },
-                      { label: "Loudness",       value: `${Math.round(audioFeatures.loudness)} dB` },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="p-3 rounded-xl bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                        <p className="text-lg font-bold">{value}</p>
-                      </div>
-                    ))}
+                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
+                    Analisi armonica, strutturale e strumentale elaborata dall'intelligenza artificiale in tempo reale.
+                  </p>
+                </div>
+              </div>
+
+              {loadingAnalysis ? (
+                <div className="flex flex-col items-center justify-center h-40">
+                  <div className="relative">
+                    <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+                    <Sparkles className="w-4 h-4 text-cyan-400 absolute top-0 right-0 animate-ping" />
                   </div>
-                </>
-              ) : (
+                  <p className="text-sm text-muted-foreground font-semibold">Elaborazione analisi in corso…</p>
+                </div>
+              ) : !analysis ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <Music className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">Audio analysis not available</p>
+                  <AlertCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Analisi non disponibile.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Pill metriche principali */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {([
+                      { label: "BPM Stimato", value: analysis.bpm, icon: Gauge,  color: "#f97316" },
+                      { label: "Tonalità", value: analysis.key,               icon: Music2, color: "#a78bfa"   },
+                      { label: "Umore",   value: analysis.mood,               icon: Heart,  color: "#facc15"   },
+                      { label: "Stile",  value: analysis.style,               icon: Zap,    color: "#34d399"   },
+                    ] as const).map(({ label, value, icon: Icon, color }) => (
+                      <Card key={label} className="flex flex-col items-center justify-center gap-2 p-4 border border-border/30 bg-card/25 hover:bg-card/40 transition-colors text-center">
+                        <Icon className="w-6 h-6 shrink-0" style={{ color }} />
+                        <p className="font-bold text-sm leading-tight line-clamp-2" style={{ color }}>{value}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
+                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Disc className="w-4 h-4" /> Descrizione Sonora</h4>
+                      <p className="text-sm text-foreground/90 leading-relaxed font-medium">
+                        {analysis.description}
+                      </p>
+                    </Card>
+                    <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
+                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Radio className="w-4 h-4" /> Strumentazione</h4>
+                      <p className="text-sm text-foreground/90 leading-relaxed">
+                        {analysis.instruments}
+                      </p>
+                    </Card>
+                  </div>
                 </div>
               )}
             </motion.div>

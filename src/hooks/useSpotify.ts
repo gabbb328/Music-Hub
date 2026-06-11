@@ -126,9 +126,13 @@ export const useQueue = () => useQuery({
 });
 
 export const useAudioFeatures = (trackId: string) => useQuery({
-  queryKey: ["audioFeatures", trackId],
-  queryFn: () => spotifyApi.getAudioFeatures(trackId),
-  enabled: !!getToken() && !!trackId, staleTime: Infinity,
+  queryKey: ["audio-features", trackId],
+  queryFn: async () => {
+    // SPOTIFY DEPRECATED THIS ENDPOINT FOR NON-ENTERPRISE APPS IN 2024.
+    // Returning null directly to prevent 403 Forbidden errors in the console.
+    return null;
+  },
+  enabled: false,
 });
 
 export const useCheckSavedTracks = (trackIds: string[]) => useQuery({

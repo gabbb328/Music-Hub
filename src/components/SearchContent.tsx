@@ -2,7 +2,10 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Play, User, AlertCircle, Loader2, MoreVertical, Plus, Sparkles } from "lucide-react";
+import {
+  Search, Play, User, AlertCircle, Loader2, MoreVertical, Plus, Sparkles,
+  Music2, Zap, Heart, Gauge, Waves, X, BarChart3, Radio, Disc
+} from "lucide-react";
 import { Track } from "@/lib/mock-data";
 import { useSearch, usePlayMutation, useAddToQueueMutation } from "@/hooks/useSpotify";
 import { SpotifyTrack } from "@/types/spotify";
@@ -12,10 +15,123 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { detectEasterEgg, type EasterEggType } from "@/hooks/useEasterEgg";
 import { AnimatePresence, motion } from "framer-motion";
+import { fetchSongAnalysis, type AIAnalysisResult } from "@/services/trivia-api";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente: pannello analisi audio features di un brano (via AI)
+// ─────────────────────────────────────────────────────────────────────────────
+function TrackAnalyticsPanel({ track, onClose }: { track: SpotifyTrack; onClose: () => void }) {
+  const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    const artistName = track.artists[0]?.name || "Sconosciuto";
+    fetchSongAnalysis(artistName, track.name).then(res => {
+      if (isMounted) {
+        setAnalysis(res);
+        setIsLoading(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, [track.id, track.name, track.artists]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 12 }}
+      transition={{ duration: 0.22 }}
+      className="rounded-2xl border border-primary/20 bg-card/70 backdrop-blur-md overflow-hidden relative shadow-lg"
+    >
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-primary to-cyan-500" />
+      {/* Header */}
+      <div className="flex items-center gap-3 p-4 border-b border-border/30">
+        <div className="w-11 h-11 rounded-xl overflow-hidden bg-muted shrink-0 relative shadow-sm">
+          {track.album.images[0]?.url && (
+            <img src={track.album.images[0].url} alt="" className="w-full h-full object-cover" />
+          )}
+          <div className="absolute inset-0 bg-primary/10 mix-blend-overlay"></div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">{track.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{track.artists.map(a => a.name).join(", ")}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
+          <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
+          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI Analysis</span>
+          <button
+            onClick={onClose}
+            className="ml-1 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-primary/20 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+          <div className="relative">
+             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+             <Sparkles className="w-3 h-3 text-cyan-400 absolute top-0 right-0 animate-ping" />
+          </div>
+          <div className="text-center">
+            <span className="text-sm font-semibold text-foreground">Elaborazione AI in corso...</span>
+            <p className="text-[10px] text-muted-foreground">Analisi armonica e strutturale del brano</p>
+          </div>
+        </div>
+      ) : !analysis ? (
+        <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+          <AlertCircle className="w-7 h-7 text-muted-foreground/40 mb-2" />
+          <p className="text-sm text-muted-foreground">Analisi AI fallita o non disponibile.</p>
+        </div>
+      ) : (
+        <div className="p-4 space-y-4">
+          {/* Metriche pill */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {([
+              { label: "BPM Stimato", value: analysis.bpm, icon: Gauge, color: "#f97316" },
+              { label: "Tonalità", value: analysis.key, icon: Music2, color: "#a78bfa"   },
+              { label: "Umore", value: analysis.mood, icon: Heart, color: "#facc15"   },
+              { label: "Stile", value: analysis.style, icon: Zap, color: "#34d399" },
+            ] as const).map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-secondary/30 text-center border border-border/20">
+                <Icon className="w-4 h-4 shrink-0" style={{ color }} />
+                <p className="font-bold text-xs leading-tight line-clamp-2" style={{ color }}>{value}</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-border/30">
+             <div className="space-y-1">
+               <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Disc className="w-3.5 h-3.5" /> Descrizione Sonora</h4>
+               <p className="text-sm text-foreground/90 leading-relaxed font-medium">
+                 {analysis.description}
+               </p>
+             </div>
+             
+             <div className="space-y-1">
+               <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Radio className="w-3.5 h-3.5" /> Strumentazione</h4>
+               <p className="text-xs text-muted-foreground">
+                 {analysis.instruments}
+               </p>
+             </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interfacce e helper
+// ─────────────────────────────────────────────────────────────────────────────
 interface SearchContentProps {
   onPlayTrack: (track: Track) => void;
-  onActivateEgg?: (egg: EasterEggType) => void; // ← sollevato a Index
+  onActivateEgg?: (egg: EasterEggType) => void;
 }
 
 const toTrack = (t: SpotifyTrack): Track => ({
@@ -45,16 +161,20 @@ const EXACT_KEYWORDS = [
   "music","musica","🎵",
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente principale
+// ─────────────────────────────────────────────────────────────────────────────
 const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
   const [query, setQuery]             = useState("");
   const [activeMenu, setActiveMenu]   = useState<string | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
+  const [analyticsTrack, setAnalyticsTrack] = useState<SpotifyTrack | null>(null);
+
   const debouncedQuery = useDebounce(query, 400);
   const playMutation   = usePlayMutation();
   const addMutation    = useAddToQueueMutation();
   const { toast }      = useToast();
-
-  const detectedEgg = detectEasterEgg(query);
+  const detectedEgg    = detectEasterEgg(query);
 
   // Hint dopo 600ms
   useEffect(() => {
@@ -71,7 +191,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
     const exact = EXACT_KEYWORDS.includes(query.trim().toLowerCase());
     if (!exact) return;
     const t = setTimeout(() => {
-      setQuery(""); // Clear query BEFORE activating to prevent re-trigger
+      setQuery("");
       setHintVisible(false);
       onActivateEgg?.(detectedEgg);
     }, 1200);
@@ -81,7 +201,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && detectedEgg) {
       e.preventDefault();
-      setQuery(""); // Clear query BEFORE activating to prevent re-trigger
+      setQuery("");
       setHintVisible(false);
       onActivateEgg?.(detectedEgg);
     }
@@ -124,37 +244,76 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
   const hasResults = tracks.length > 0 || artists.length > 0 || albums.length > 0 || playlists.length > 0;
   const showSearch = !detectedEgg && debouncedQuery.trim().length >= 2;
 
+  // ── TrackRow ────────────────────────────────────────────────────────────────
   const TrackRow = ({ track }: { track: SpotifyTrack }) => {
-    const isOpen = activeMenu === track.id;
+    const isOpen      = activeMenu === track.id;
+    const isAnalyzing = analyticsTrack?.id === track.id;
+
     return (
       <div className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary/40 active:bg-secondary/60 transition-colors">
-        <button className="w-11 h-11 rounded-lg overflow-hidden bg-muted shrink-0 focus:outline-none"
-          onClick={() => handlePlay(track)}>
-          {track.album.images[0]?.url && <img src={track.album.images[0].url} alt="" className="object-cover w-full h-full" loading="lazy" />}
+        {/* Cover → play */}
+        <button
+          className="w-11 h-11 rounded-lg overflow-hidden bg-muted shrink-0 focus:outline-none"
+          onClick={() => handlePlay(track)}
+        >
+          {track.album.images[0]?.url && (
+            <img src={track.album.images[0].url} alt="" className="object-cover w-full h-full" loading="lazy" />
+          )}
         </button>
+
+        {/* Titolo → play */}
         <button className="flex-1 min-w-0 text-left focus:outline-none" onClick={() => handlePlay(track)}>
           <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artists.map(a => a.name).join(", ")}</p>
         </button>
+
+        {/* Durata */}
         <span className="text-xs text-muted-foreground tabular-nums hidden sm:block shrink-0">
           {formatTime(Math.floor(track.duration_ms / 1000))}
         </span>
+
+        {/* Bottone analisi musicale */}
+        <button
+          onClick={() => setAnalyticsTrack(isAnalyzing ? null : track)}
+          title="Analisi musicale"
+          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors shrink-0 ${
+            isAnalyzing
+              ? "bg-primary/20 text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+        </button>
+
+        {/* Menu ⋮ */}
         <div className="relative shrink-0">
-          <button onClick={() => setActiveMenu(isOpen ? null : track.id)}
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors">
+          <button
+            onClick={() => setActiveMenu(isOpen ? null : track.id)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+          >
             <MoreVertical className="w-4 h-4" />
           </button>
           {isOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
-              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden min-w-[180px]">
-                <button onClick={() => handlePlay(track)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/60 text-left">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden min-w-[190px]">
+                <button
+                  onClick={() => handlePlay(track)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/60 text-left"
+                >
                   <Play className="w-4 h-4 fill-current" /> Riproduci
                 </button>
-                <button onClick={() => handleAddToQueue(track)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/60 text-left">
+                <button
+                  onClick={() => handleAddToQueue(track)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/60 text-left"
+                >
                   <Plus className="w-4 h-4" /> Aggiungi alla coda
+                </button>
+                <button
+                  onClick={() => { setAnalyticsTrack(isAnalyzing ? null : track); setActiveMenu(null); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/60 text-left"
+                >
+                  <BarChart3 className="w-4 h-4" /> Analisi musicale
                 </button>
               </div>
             </>
@@ -164,8 +323,11 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
     );
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+
+      {/* Barra di ricerca */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Cerca</h1>
 
@@ -186,8 +348,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
             {(isLoading || isFetching) && showSearch ? (
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             ) : detectedEgg ? (
-              <motion.div animate={{ rotate: 360, scale: [1, 1.3, 1] }}
-                transition={{ duration: 0.8, repeat: Infinity }}>
+              <motion.div animate={{ rotate: 360, scale: [1, 1.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>
                 <Sparkles className="h-5 w-5 text-primary" />
               </motion.div>
             ) : null}
@@ -217,6 +378,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
         )}
       </div>
 
+      {/* Errore ricerca */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -224,6 +386,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
         </Alert>
       )}
 
+      {/* Stato vuoto / nessun risultato */}
       {!showSearch && !detectedEgg ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Search className="h-16 w-16 text-muted-foreground/25 mb-4" />
@@ -236,7 +399,21 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
           <h2 className="text-xl font-semibold mb-2">Nessun risultato</h2>
           <p className="text-sm text-muted-foreground">Prova parole chiave diverse</p>
         </div>
-      ) : hasResults && showSearch ? (
+      ) : null}
+
+      {/* ── Pannello analisi musicale ── */}
+      <AnimatePresence>
+        {analyticsTrack && (
+          <TrackAnalyticsPanel
+            key={analyticsTrack.id}
+            track={analyticsTrack}
+            onClose={() => setAnalyticsTrack(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Tabs risultati ── */}
+      {hasResults && showSearch && (
         <Tabs defaultValue="all">
           <TabsList className="grid grid-cols-5 w-full max-w-sm">
             <TabsTrigger value="all">Tutti</TabsTrigger>
@@ -324,7 +501,7 @@ const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
             </div>
           </TabsContent>
         </Tabs>
-      ) : null}
+      )}
     </div>
   );
 };
