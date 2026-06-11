@@ -12,6 +12,55 @@ TELEGRAM_TOKEN = os.getenv("VITE_TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("VITE_TELEGRAM_CHAT_ID")
 APP_URL = "https://music-hub-three.vercel.app/"
 
+def is_chat_authorized(chat_id: int) -> bool:
+    """Check if the given Telegram chat ID is authorized in Supabase or matches env."""
+    if TELEGRAM_CHAT_ID and str(chat_id).strip() == str(TELEGRAM_CHAT_ID).strip():
+        return True
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    # Query users with matching telegramChatId and enabled flag
+    url = f"{SUPABASE_URL}/rest/v1/admin_collab_users?telegramChatId=eq.{chat_id}&telegramEnabled=eq.true"
+    try:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        users = resp.json()
+        return len(users) > 0
+    except Exception as e:
+        print(f"Errore nella verifica Telegram chat ID: {e}")
+        return False
+
+def get_all_authorized_chat_ids() -> list:
+    """Retrieve all authorized chat IDs from Supabase and .env."""
+    chat_ids = set()
+    if TELEGRAM_CHAT_ID:
+        chat_ids.add(str(TELEGRAM_CHAT_ID).strip())
+        
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return list(chat_ids)
+        
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    url = f"{SUPABASE_URL}/rest/v1/admin_collab_users?telegramEnabled=eq.true"
+    try:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        users = resp.json()
+        for u in users:
+            cid = u.get("telegramChatId")
+            if cid:
+                chat_ids.add(str(cid).strip())
+    except Exception as e:
+        print(f"Errore nel recupero dei chat ID abilitati: {e}")
+    return list(chat_ids)
+
 STATE_FILE = "last_notified.txt"
 
 def get_last_notified():
@@ -26,23 +75,34 @@ def set_last_notified(timestamp):
 
 LAST_UPDATE_ID = 0
 
-def send_telegram_message(text):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("ATTENZIONE: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID mancanti nel file .env")
+def send_telegram_message(text, chat_id=None):
+    if not TELEGRAM_TOKEN:
+        print("ATTENZIONE: TELEGRAM_BOT_TOKEN mancante nel file .env")
         return
+    
+    if chat_id:
+        chat_ids = [str(chat_id).strip()]
+    else:
+        chat_ids = get_all_authorized_chat_ids()
+        
+    if not chat_ids:
+        print("ATTENZIONE: Nessun Chat ID Telegram configurato o abilitato.")
+        return
+
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        print("Messaggio Telegram inviato con successo!")
-    except Exception as e:
-        print(f"Errore nell'invio del messaggio Telegram: {e}")
+    for cid in chat_ids:
+        payload = {
+            "chat_id": cid,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+            print(f"Messaggio Telegram inviato con successo a {cid}!")
+        except Exception as e:
+            print(f"Errore nell'invio del messaggio Telegram a {cid}: {e}")
 
 def set_bot_commands():
     """Register bot commands for Telegram client suggestions."""
@@ -116,9 +176,13 @@ if __name__ == "__main__":
                     chat_id = message.get("chat", {}).get("id")
                     if not text or not chat_id:
                         continue
+                    if not is_chat_authorized(chat_id):
+                        # Optionally notify user about lack of permission
+                        send_telegram_message("❌ Accesso non autorizzato.", chat_id=chat_id)
+                        continue
                     if text.startswith("/help"):
                         help_text = "Comandi disponibili:\n/help – Questa guida\n/status – Numero richieste di accesso pendenti\n/list – Elenca tutte le richieste pendenti\n/delete <id> – Cancella una richiesta specifica"
-                        send_telegram_message(help_text)
+                        send_telegram_message(help_text, chat_id=chat_id)
                     elif text.startswith("/list"):
                         try:
                             resp = requests.get(f"{SUPABASE_URL}/rest/v1/admin_collab_users?status=eq.pending", headers={
@@ -129,7 +193,7 @@ if __name__ == "__main__":
                             resp.raise_for_status()
                             pending = resp.json()
                             if not pending:
-                                send_telegram_message("✅ Nessuna richiesta pendente.")
+                                send_telegram_message("✅ Nessuna richiesta pendente.", chat_id=chat_id)
                             else:
                                 lines = ["📋 Richieste pendenti:"]
                                 for u in pending:
@@ -137,9 +201,9 @@ if __name__ == "__main__":
                                     name = u.get("name")
                                     email = u.get("email")
                                     lines.append(f"{uid}: {name} ({email})")
-                                send_telegram_message("\n".join(lines))
+                                send_telegram_message("\n".join(lines), chat_id=chat_id)
                         except Exception as e:
-                            send_telegram_message(f"⚠️ Errore nel recupero delle richieste: {e}")
+                            send_telegram_message(f"⚠️ Errore nel recupero delle richieste: {e}", chat_id=chat_id)
                     elif text.startswith("/delete"):
                         parts = text.split()
                         if len(parts) >= 2:
@@ -154,11 +218,11 @@ if __name__ == "__main__":
                                     }
                                 )
                                 del_resp.raise_for_status()
-                                send_telegram_message(f"✅ Richiesta {del_id} cancellata.")
+                                send_telegram_message(f"✅ Richiesta {del_id} cancellata.", chat_id=chat_id)
                             except Exception as e:
-                                send_telegram_message(f"❌ Errore nella cancellazione: {e}")
+                                send_telegram_message(f"❌ Errore nella cancellazione: {e}", chat_id=chat_id)
                         else:
-                            send_telegram_message("❗ Usa /delete <id> per cancellare una richiesta.")
+                            send_telegram_message("❗ Usa /delete <id> per cancellare una richiesta.", chat_id=chat_id)
                     elif text.startswith("/status"):
                         try:
                             resp = requests.get(f"{SUPABASE_URL}/rest/v1/admin_collab_users?status=eq.pending&select=count", headers={
@@ -171,7 +235,7 @@ if __name__ == "__main__":
                             count = resp.headers.get("content-range", "0/0").split("/")[1]
                         except Exception:
                             count = "?"
-                        send_telegram_message(f"⚡ Ci sono {count} richieste di accesso pendenti.")
+                        send_telegram_message(f"⚡ Ci sono {count} richieste di accesso pendenti.", chat_id=chat_id)
         except Exception as e:
             print(f"Errore nei comandi Telegram: {e}")
         poll_supabase()

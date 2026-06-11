@@ -1,11 +1,44 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup, Variants } from "framer-motion";
 import {
-  X, Heart, Share2, MoreHorizontal, Sparkles, BarChart3, Mic2, ListMusic,
-  Info, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
-  Clock, Timer, Volume2, Headphones, Music2, ChevronUp, Radio,
-  Zap, Star, TrendingUp, Eye, EyeOff, Disc3, Layers, Users,
-  Home, Search, Library, Gamepad2, Video, Copy, CheckCircle2
+  X,
+  Heart,
+  Share2,
+  MoreHorizontal,
+  Sparkles,
+  BarChart3,
+  Mic2,
+  ListMusic,
+  Info,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Shuffle,
+  Repeat,
+  Repeat1,
+  Clock,
+  Timer,
+  Volume2,
+  Headphones,
+  Music2,
+  ChevronUp,
+  Radio,
+  Zap,
+  Star,
+  TrendingUp,
+  Eye,
+  EyeOff,
+  Disc3,
+  Layers,
+  Users,
+  Home,
+  Search,
+  Library,
+  Gamepad2,
+  Video,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 import VinylNowPlayingView from "./VinylNowPlayingView";
 import IpodNowPlayingView from "./IpodNowPlayingView";
@@ -13,10 +46,19 @@ import WaveformProgress from "./WaveformProgress";
 import VisualizerCanvas from "./VisualizerCanvas";
 import { formatTime } from "@/lib/mock-data";
 import {
-  usePlaybackState, useSaveTrackMutation, useRemoveTrackMutation,
-  useQueue, usePlayMutation, usePauseMutation, useNextMutation,
-  usePreviousMutation, useShuffleMutation, useRepeatMutation,
-  useSeekMutation, useAudioFeatures, useCheckSavedTracks
+  usePlaybackState,
+  useSaveTrackMutation,
+  useRemoveTrackMutation,
+  useQueue,
+  usePlayMutation,
+  usePauseMutation,
+  useNextMutation,
+  usePreviousMutation,
+  useShuffleMutation,
+  useRepeatMutation,
+  useSeekMutation,
+  useAudioFeatures,
+  useCheckSavedTracks,
 } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
 import { lyricsStore } from "@/hooks/useLyricsStore";
@@ -24,11 +66,27 @@ import { getCurrentLineIndex } from "@/services/lyrics-api";
 import { useIpodPersistence } from "@/hooks/useIpodPersistence";
 import type { usePlayerStore } from "@/hooks/usePlayerStore";
 
-type NowPlayingProps = ReturnType<typeof usePlayerStore> & { onClose: () => void; onNavigate?: (s: string) => void; onStateChange?: (active: boolean) => void; };
-type PanelType = "lyrics" | "queue" | "analysis" | "info" | "timer" | "mood" | "listen-along" | "video" | null;
+type NowPlayingProps = ReturnType<typeof usePlayerStore> & {
+  onClose: () => void;
+  onNavigate?: (s: string) => void;
+  onStateChange?: (active: boolean) => void;
+};
+type PanelType =
+  | "lyrics"
+  | "queue"
+  | "analysis"
+  | "info"
+  | "timer"
+  | "mood"
+  | "listen-along"
+  | "video"
+  | null;
 
 // ── Sleep timer ────────────────────────────────────────────────────────────────
-function useSleepTimer(onEnd: () => void, onStateChange?: (active: boolean) => void) {
+function useSleepTimer(
+  onEnd: () => void,
+  onStateChange?: (active: boolean) => void,
+) {
   const [minutes, setMinutes] = useState(0);
   const [remaining, setRemaining] = useState(0);
   const [active, setActive] = useState(false);
@@ -37,11 +95,19 @@ function useSleepTimer(onEnd: () => void, onStateChange?: (active: boolean) => v
   const start = (mins: number) => {
     if (ref.current) clearInterval(ref.current);
     const secs = mins * 60;
-    setMinutes(mins); setRemaining(secs); setActive(true);
+    setMinutes(mins);
+    setRemaining(secs);
+    setActive(true);
     onStateChange?.(true);
     ref.current = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) { clearInterval(ref.current!); setActive(false); onEnd(); onStateChange?.(false); return 0; }
+      setRemaining((r) => {
+        if (r <= 1) {
+          clearInterval(ref.current!);
+          setActive(false);
+          onEnd();
+          onStateChange?.(false);
+          return 0;
+        }
         return r - 1;
       });
     }, 1000);
@@ -49,20 +115,33 @@ function useSleepTimer(onEnd: () => void, onStateChange?: (active: boolean) => v
 
   const cancel = () => {
     if (ref.current) clearInterval(ref.current);
-    setActive(false); setRemaining(0);
+    setActive(false);
+    setRemaining(0);
     onStateChange?.(false);
   };
 
-  useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
+  useEffect(
+    () => () => {
+      if (ref.current) clearInterval(ref.current);
+    },
+    [],
+  );
   return { active, remaining, minutes, start, cancel };
 }
 
-export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?: boolean }) {
+export default function NowPlayingView(
+  props: NowPlayingProps & { isQuizActive?: boolean },
+) {
   const { onClose, onNavigate, onStateChange, isQuizActive = false } = props;
-  const { vinylMode, setVinylMode, ipodMode, setIpodMode } = useIpodPersistence();
+  const { vinylMode, setVinylMode, ipodMode, setIpodMode } =
+    useIpodPersistence();
   const [showVisualizer, setShowVisualizer] = useState(false);
   // Default panel: lyrics su desktop, null su mobile
-  const [activePanel, setActivePanel] = useState<PanelType>(typeof window !== 'undefined' && window.innerWidth >= 768 ? 'lyrics' : null);
+  const [activePanel, setActivePanel] = useState<PanelType>(
+    typeof window !== "undefined" && window.innerWidth >= 768 ? "lyrics" : null,
+  );
+  // State to hold video URL fetched via Claude
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -73,21 +152,25 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
 
   const { data: playbackState } = usePlaybackState();
   const { data: queueData } = useQueue();
-  const saveTrackMutation    = useSaveTrackMutation();
-  const removeTrackMutation  = useRemoveTrackMutation();
-  const playMutation         = usePlayMutation();
-  const pauseMutation        = usePauseMutation();
-  const nextMutation         = useNextMutation();
-  const previousMutation     = usePreviousMutation();
-  const shuffleMutation      = useShuffleMutation();
-  const repeatMutation       = useRepeatMutation();
-  const seekMutation         = useSeekMutation();
+  const saveTrackMutation = useSaveTrackMutation();
+  const removeTrackMutation = useRemoveTrackMutation();
+  const playMutation = usePlayMutation();
+  const pauseMutation = usePauseMutation();
+  const nextMutation = useNextMutation();
+  const previousMutation = usePreviousMutation();
+  const shuffleMutation = useShuffleMutation();
+  const repeatMutation = useRepeatMutation();
+  const seekMutation = useSeekMutation();
 
   const currentTrack = playbackState?.item;
   const { data: audioFeatures } = useAudioFeatures(currentTrack?.id || "");
-  const { data: savedStatus }   = useCheckSavedTracks(currentTrack ? [currentTrack.id] : []);
+  const { data: savedStatus } = useCheckSavedTracks(
+    currentTrack ? [currentTrack.id] : [],
+  );
 
-  useEffect(() => { if (savedStatus?.[0] !== undefined) setIsLiked(savedStatus[0]); }, [savedStatus]);
+  useEffect(() => {
+    if (savedStatus?.[0] !== undefined) setIsLiked(savedStatus[0]);
+  }, [savedStatus]);
 
   const pauseMutation2 = usePauseMutation();
   const sleepTimer = useSleepTimer(async () => {
@@ -95,15 +178,31 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
     toast({ title: "Sleep timer", description: "Riproduzione fermata" });
   }, onStateChange);
 
-  const isPlaying   = playbackState?.is_playing || false;
-  const progress    = playbackState ? (playbackState.progress_ms / (playbackState.item?.duration_ms || 1)) * 100 : 0;
-  const shuffle     = playbackState?.shuffle_state || false;
-  const repeat      = playbackState?.repeat_state === "track" ? "one" : playbackState?.repeat_state === "context" ? "all" : "off";
-  const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
+  const isPlaying = playbackState?.is_playing || false;
+  const progress = playbackState
+    ? (playbackState.progress_ms / (playbackState.item?.duration_ms || 1)) * 100
+    : 0;
+  const shuffle = playbackState?.shuffle_state || false;
+  const repeat =
+    playbackState?.repeat_state === "track"
+      ? "one"
+      : playbackState?.repeat_state === "context"
+        ? "all"
+        : "off";
+  // Extract basic track info for Claude video fetch
+  const trackName = currentTrack?.name || "";
+  const trackArtist = currentTrack?.artists?.[0]?.name || "";
 
-  const cachedLyrics = currentTrack ? lyricsStore.getLyrics(currentTrack.id) : null;
+  const currentTime = playbackState?.progress_ms
+    ? playbackState.progress_ms / 1000
+    : 0;
+
+  const cachedLyrics = currentTrack
+    ? lyricsStore.getLyrics(currentTrack.id)
+    : null;
+  const bpm = audioFeatures?.tempo ? Math.round(audioFeatures.tempo) : null;
   const lyrics = cachedLyrics?.lines || [];
-  const elapsed  = Math.floor((playbackState?.progress_ms || 0) / 1000);
+  const elapsed = Math.floor((playbackState?.progress_ms || 0) / 1000);
   const duration = Math.floor((currentTrack?.duration_ms || 0) / 1000);
 
   // ── Lyrics sync ────────────────────────────────────────────────────────────
@@ -118,23 +217,72 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
     const container = lyricsContainerRef.current;
     const line = lineRefs.current[currentLineIndex];
     if (!container || !line) return;
-    const target = line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
+    const target =
+      line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
     container.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }, [currentLineIndex]);
 
   if (!currentTrack) return null;
 
   const coverUrl = currentTrack.album.images[0]?.url;
-  const bpm = audioFeatures?.tempo ? Math.round(audioFeatures.tempo) : null;
+
+  // Fetch original video via Claude when track changes
+  useEffect(() => {
+    if (!trackName) {
+      setVideoUrl(null);
+      return;
+    }
+    const fetchVideo = async () => {
+      try {
+        const resp = await fetch("/api/claude-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trackName, artist: trackArtist }),
+        });
+        if (!resp.ok) throw new Error("Claude video fetch failed");
+        const data = await resp.json();
+        setVideoUrl(data.videoUrl || null);
+      } catch (e) {
+        console.warn(
+          "Claude video fetch error, falling back to YouTube search",
+          e,
+        );
+        setVideoUrl(null);
+      }
+    };
+    fetchVideo();
+  }, [trackName, trackArtist]);
+  // Define unified animation variants for panel sections
+  const panelVariants: Variants = {
+    hidden: { opacity: 0, scale: 0.8, y: 10 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: { duration: 0.28, ease: [0.45, 0, 0.55, 1] },
+    },
+    exit: { opacity: 0, scale: 0.8, y: 10, transition: { duration: 0.2 } },
+  };
+
+  // Removed auto-switch to Mood panel on track change
+  // useEffect(() => {
+  //   if (trackName) {
+  //     setActivePanel('mood');
+  //   }
+  // }, [trackName]);
 
   // Easter egg: 7 tap sulla copertina
   const handleCoverTap = () => {
     const next = coverTaps + 1;
     setCoverTaps(next);
-    if (next >= 7) { setShowEasterEgg(true); setCoverTaps(0); }
+    if (next >= 7) {
+      setShowEasterEgg(true);
+      setCoverTaps(0);
+    }
   };
 
-  const togglePanel = (p: PanelType) => setActivePanel(prev => prev === p ? null : p);
+  const togglePanel = (p: PanelType) =>
+    setActivePanel((prev) => (prev === p ? null : p));
 
   // ── iPod Mode ──────────────────────────────────────────────────────────────
   if (ipodMode) {
@@ -225,25 +373,51 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
         className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
       >
         {/* Header con toggle (Trasparente con blur per accessibilità) */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 z-50 bg-background/25 backdrop-blur-2xl border-b border-white/5"
-          style={{ paddingTop: "max(10px, env(safe-area-inset-top))", paddingBottom: "10px" }}>
-          <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+        <div
+          className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 z-50 bg-background/25 backdrop-blur-2xl border-b border-white/5"
+          style={{
+            paddingTop: "max(10px, env(safe-area-inset-top))",
+            paddingBottom: "10px",
+          }}
+        >
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          >
             <X className="w-6 h-6" />
           </button>
-          <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">Vinyl Mode</p>
+          <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">
+            Vinyl Mode
+          </p>
           <div className="flex items-center gap-1">
             {/* Switch to iPod */}
-            <button onClick={() => { setVinylMode(false); setIpodMode(true); }}
+            <button
+              onClick={() => {
+                setVinylMode(false);
+                setIpodMode(true);
+              }}
               className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
-              title="iPod Mode">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              title="iPod Mode"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="5" y="1" width="10" height="18" rx="2" />
                 <rect x="7" y="3" width="6" height="7" rx="1" />
                 <circle cx="10" cy="15" r="2.2" />
               </svg>
             </button>
-            <button onClick={() => setVinylMode(false)}
-              className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+            <button
+              onClick={() => setVinylMode(false)}
+              className="p-2 rounded-full text-primary bg-primary/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+            >
               <Music2 className="w-5 h-5" />
             </button>
           </div>
@@ -255,27 +429,68 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
 
   // ── Controls ────────────────────────────────────────────────────────────────
   const handleTogglePlay = async () => {
-    try { isPlaying ? await pauseMutation.mutateAsync() : await playMutation.mutateAsync({}); } catch (_) {}
+    try {
+      isPlaying
+        ? await pauseMutation.mutateAsync()
+        : await playMutation.mutateAsync({});
+    } catch (_) {}
   };
-  const handleNext     = async () => { try { await nextMutation.mutateAsync(); } catch (_) {} };
-  const handlePrevious = async () => { try { await previousMutation.mutateAsync(); } catch (_) {} };
-  const handleShuffle  = async () => { try { await shuffleMutation.mutateAsync(!shuffle); } catch (_) {} };
-  const handleRepeat   = async () => {
-    try { await repeatMutation.mutateAsync(repeat === "off" ? "context" : repeat === "all" ? "track" : "off"); } catch (_) {}
+  const handleNext = async () => {
+    try {
+      await nextMutation.mutateAsync();
+    } catch (_) {}
   };
-  const handleSeek     = async (p: number) => {
-    try { await seekMutation.mutateAsync(Math.floor((p / 100) * currentTrack.duration_ms)); } catch (_) {}
+  const handlePrevious = async () => {
+    try {
+      await previousMutation.mutateAsync();
+    } catch (_) {}
+  };
+  const handleShuffle = async () => {
+    try {
+      await shuffleMutation.mutateAsync(!shuffle);
+    } catch (_) {}
+  };
+  const handleRepeat = async () => {
+    try {
+      await repeatMutation.mutateAsync(
+        repeat === "off" ? "context" : repeat === "all" ? "track" : "off",
+      );
+    } catch (_) {}
+  };
+  const handleSeek = async (p: number) => {
+    try {
+      await seekMutation.mutateAsync(
+        Math.floor((p / 100) * currentTrack.duration_ms),
+      );
+    } catch (_) {}
   };
   const handleLike = async () => {
     try {
-      if (isLiked) { await removeTrackMutation.mutateAsync(currentTrack.id); setIsLiked(false); toast({ title: "Rimosso dai preferiti" }); }
-      else { await saveTrackMutation.mutateAsync(currentTrack.id); setIsLiked(true); toast({ title: "❤️ Aggiunto ai preferiti" }); }
-    } catch (_) { toast({ title: "Errore", variant: "destructive" }); }
+      if (isLiked) {
+        await removeTrackMutation.mutateAsync(currentTrack.id);
+        setIsLiked(false);
+        toast({ title: "Rimosso dai preferiti" });
+      } else {
+        await saveTrackMutation.mutateAsync(currentTrack.id);
+        setIsLiked(true);
+        toast({ title: "❤️ Aggiunto ai preferiti" });
+      }
+    } catch (_) {
+      toast({ title: "Errore", variant: "destructive" });
+    }
   };
   const handleShare = async () => {
-    const url = currentTrack.external_urls?.spotify || `https://open.spotify.com/track/${currentTrack.id}`;
-    if (navigator.share) { try { await navigator.share({ title: currentTrack.name, url }); } catch (_) {} }
-    else { await navigator.clipboard.writeText(url); toast({ title: "✓ Link copiato!" }); }
+    const url =
+      currentTrack.external_urls?.spotify ||
+      `https://open.spotify.com/track/${currentTrack.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: currentTrack.name, url });
+      } catch (_) {}
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "✓ Link copiato!" });
+    }
   };
 
   const queueTracks = queueData?.queue?.slice(0, 8) || [];
@@ -289,10 +504,13 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
       className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
     >
       {/* Background blur */}
-      <motion.div key={currentTrack.id}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      <motion.div
+        key={currentTrack.id}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute inset-0">
+        className="absolute inset-0"
+      >
         <img src={coverUrl} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-background/82 backdrop-blur-[80px]" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/25" />
@@ -301,47 +519,82 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
       {/* Easter egg */}
       <AnimatePresence>
         {showEasterEgg && (
-          <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
             className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl"
-            onClick={() => setShowEasterEgg(false)}>
+            onClick={() => setShowEasterEgg(false)}
+          >
             <div className="text-8xl mb-4">🎵</div>
             <p className="text-2xl font-bold text-primary mb-2">Easter Egg!</p>
-            <p className="text-muted-foreground text-center px-8">Hai trovato il segreto! La musica è vita. 🎧</p>
-            <div className="mt-6 flex gap-2 text-4xl animate-bounce">🎸 🥁 🎹 🎺 🎻</div>
-            <p className="text-xs text-muted-foreground mt-4">Tocca per chiudere</p>
+            <p className="text-muted-foreground text-center px-8">
+              Hai trovato il segreto! La musica è vita. 🎧
+            </p>
+            <div className="mt-6 flex gap-2 text-4xl animate-bounce">
+              🎸 🥁 🎹 🎺 🎻
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              Tocca per chiudere
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <div className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
-        <button onClick={onClose} className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+      <div
+        className="relative flex items-center justify-between px-4 py-3 z-10 shrink-0"
+        style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
+      >
+        <button
+          onClick={onClose}
+          className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
           <X className="w-6 h-6" />
         </button>
-        <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">In riproduzione</p>
+        <p className="text-sm font-medium text-foreground/60 uppercase tracking-wider">
+          In riproduzione
+        </p>
         <div className="flex items-center gap-1">
           {/* Vinyl button */}
-          <button onClick={() => setVinylMode(true)}
+          <button
+            onClick={() => setVinylMode(true)}
             className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
-            title="Vinyl Mode">
+            title="Vinyl Mode"
+          >
             <Disc3 className="w-5 h-5" />
           </button>
           {/* iPod button */}
-          <button onClick={() => setIpodMode(true)}
+          <button
+            onClick={() => setIpodMode(true)}
             className="p-2 rounded-full text-foreground/70 hover:bg-foreground/10 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
-            title="iPod Mode">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            title="iPod Mode"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect x="5" y="1" width="10" height="18" rx="2" />
               <rect x="7" y="3" width="6" height="7" rx="1" />
               <circle cx="10" cy="15" r="2.2" />
             </svg>
           </button>
-          <button onClick={() => setShowVisualizer(!showVisualizer)}
-            className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${showVisualizer ? "text-primary bg-primary/10" : "text-foreground/70 hover:bg-foreground/10"}`}>
+          <button
+            onClick={() => setShowVisualizer(!showVisualizer)}
+            className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${showVisualizer ? "text-primary bg-primary/10" : "text-foreground/70 hover:bg-foreground/10"}`}
+          >
             <BarChart3 className="w-5 h-5" />
           </button>
-          <button onClick={() => togglePanel("timer")}
-            className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${activePanel === "timer" ? "text-primary bg-primary/10" : sleepTimer.active ? "text-amber-400" : "text-foreground/70 hover:bg-foreground/10"}`}>
+          <button
+            onClick={() => togglePanel("timer")}
+            className={`p-2 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${activePanel === "timer" ? "text-primary bg-primary/10" : sleepTimer.active ? "text-amber-400" : "text-foreground/70 hover:bg-foreground/10"}`}
+          >
             <Timer className="w-5 h-5" />
           </button>
         </div>
@@ -349,7 +602,6 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
 
       {/* Main content - Different layout for desktop */}
       <div className="relative flex-1 flex flex-col md:flex-row min-h-0 z-10 overflow-hidden gap-4 md:gap-6 md:px-6">
-
         {/* Cover / Visualizer + Track Info - Apple-style layout */}
         <div className="flex flex-col lg:flex-row justify-center items-center gap-6 px-6 md:px-0 pt-2 pb-4 md:pb-0 shrink-0 md:flex-1 md:min-h-0">
           {showVisualizer ? (
@@ -357,75 +609,102 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
               <VisualizerCanvas isPlaying={isPlaying} />
             </div>
           ) : (
-            <motion.div key={currentTrack.id}
+            <motion.div
+              key={currentTrack.id}
               initial={{ opacity: 0, scale: 0.85, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ 
+              transition={{
                 duration: 0.7,
                 ease: [0.25, 0.1, 0.25, 1],
-                delay: 0.05
+                delay: 0.05,
               }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="relative cursor-pointer" onClick={handleCoverTap}>
-              <img src={coverUrl} alt="" className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 rounded-2xl object-cover shadow-2xl" />
+              className="relative cursor-pointer"
+              onClick={handleCoverTap}
+            >
+              <img
+                src={coverUrl}
+                alt=""
+                className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 xl:w-96 xl:h-96 rounded-2xl object-cover shadow-2xl"
+              />
               {isPlaying && (
-                <motion.div className="absolute inset-0 rounded-2xl border-2 border-primary/50"
-                  animate={{ 
+                <motion.div
+                  className="absolute inset-0 rounded-2xl border-2 border-primary/50"
+                  animate={{
                     opacity: [0.3, 0.8, 0.3],
-                    scale: [1, 1.01, 1]
+                    scale: [1, 1.01, 1],
                   }}
-                  transition={{ 
-                    duration: 2.8, 
-                    repeat: Infinity, 
-                    ease: [0.4, 0, 0.2, 1]
-                  }} />
+                  transition={{
+                    duration: 2.8,
+                    repeat: Infinity,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                />
               )}
               {bpm && (
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1">
                   <Zap className="w-3 h-3 text-primary" />
-                  <span className="text-[11px] font-bold text-white tabular-nums">{bpm} BPM</span>
+                  <span className="text-[11px] font-bold text-white tabular-nums">
+                    {bpm} BPM
+                  </span>
                 </div>
               )}
             </motion.div>
           )}
-          
+
           {/* Track info su LG+ schermi */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ 
+            transition={{
               duration: 0.6,
               ease: [0.25, 0.1, 0.25, 1],
-              delay: 0.15
+              delay: 0.15,
             }}
-            className={`hidden lg:block lg:max-w-md space-y-6 transition-all duration-500 ${isQuizActive ? "blur-md" : ""}`}>
+            className={`hidden lg:block lg:max-w-md space-y-6 transition-all duration-500 ${isQuizActive ? "blur-md" : ""}`}
+          >
             <div>
-              <h2 className="text-3xl lg:text-4xl font-bold leading-tight">{isQuizActive ? "Guess the Title" : currentTrack.name}</h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground mt-3">{isQuizActive ? "Guess the Artist" : currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
-              <p className="text-base text-muted-foreground/70 mt-2">{currentTrack.album.name}</p>
+              <h2 className="text-3xl lg:text-4xl font-bold leading-tight">
+                {isQuizActive ? "Guess the Title" : currentTrack.name}
+              </h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground mt-3">
+                {isQuizActive
+                  ? "Guess the Artist"
+                  : currentTrack.artists.map((a: any) => a.name).join(", ")}
+              </p>
+              <p className="text-base text-muted-foreground/70 mt-2">
+                {currentTrack.album.name}
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              <motion.button 
+              <motion.button
                 onClick={handleLike}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
                 className={`p-4 rounded-full transition-colors ${
-                  isLiked ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-secondary/50"
-                }`}>
+                  isLiked
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:bg-secondary/50"
+                }`}
+              >
                 <motion.div
                   animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
-                  transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}>
-                  <Heart className={`w-7 h-7 ${isLiked ? "fill-current" : ""}`} />
+                  transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+                >
+                  <Heart
+                    className={`w-7 h-7 ${isLiked ? "fill-current" : ""}`}
+                  />
                 </motion.div>
               </motion.button>
-              <motion.button 
+              <motion.button
                 onClick={handleShare}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                className="p-4 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                className="p-4 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              >
                 <Share2 className="w-6 h-6" />
               </motion.button>
             </div>
@@ -434,21 +713,34 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
 
         {/* Track info + controls */}
         <div className="flex-1 overflow-y-auto px-4 pb-4 md:pb-6 space-y-4 md:max-w-md md:shrink-0">
-
           {/* Track info - nascosto su LG+ */}
           <div className="flex items-center justify-between lg:hidden">
-            <div className={`flex-1 min-w-0 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}>
-              <h2 className="text-xl font-bold truncate">{isQuizActive ? "Guess the Title" : currentTrack.name}</h2>
-              <p className="text-base text-muted-foreground truncate">{isQuizActive ? "Guess the Artist" : currentTrack.artists.map((a: any) => a.name).join(", ")}</p>
-              <p className="text-xs text-muted-foreground truncate">{currentTrack.album.name}</p>
+            <div
+              className={`flex-1 min-w-0 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}
+            >
+              <h2 className="text-xl font-bold truncate">
+                {isQuizActive ? "Guess the Title" : currentTrack.name}
+              </h2>
+              <p className="text-base text-muted-foreground truncate">
+                {isQuizActive
+                  ? "Guess the Artist"
+                  : currentTrack.artists.map((a: any) => a.name).join(", ")}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {currentTrack.album.name}
+              </p>
             </div>
             <div className="flex items-center gap-1 shrink-0 ml-3">
-              <button onClick={handleLike}
-                className={`p-2.5 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${isLiked ? "text-primary" : "text-muted-foreground"}`}>
+              <button
+                onClick={handleLike}
+                className={`p-2.5 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${isLiked ? "text-primary" : "text-muted-foreground"}`}
+              >
                 <Heart className={`w-6 h-6 ${isLiked ? "fill-current" : ""}`} />
               </button>
-              <button onClick={handleShare}
-                className="p-2.5 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={handleShare}
+                className="p-2.5 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <Share2 className="w-5 h-5" />
               </button>
             </div>
@@ -456,53 +748,119 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
 
           {/* Seek bar */}
           <div>
-            <WaveformProgress progress={progress} isPlaying={isPlaying} onSeek={handleSeek} />
+            <WaveformProgress
+              progress={progress}
+              isPlaying={isPlaying}
+              onSeek={handleSeek}
+            />
             <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground tabular-nums">{formatTime(elapsed)}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {formatTime(elapsed)}
+              </span>
               {sleepTimer.active && (
                 <span className="text-xs text-amber-400 flex items-center gap-1">
-                  <Timer className="w-3 h-3" />{formatTime(sleepTimer.remaining)}
+                  <Timer className="w-3 h-3" />
+                  {formatTime(sleepTimer.remaining)}
                 </span>
               )}
-              <span className="text-xs text-muted-foreground tabular-nums">{formatTime(duration)}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {formatTime(duration)}
+              </span>
             </div>
           </div>
 
           {/* Transport */}
           <div className="flex items-center justify-center gap-4">
-            <button onClick={handleShuffle} className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${shuffle ? "text-primary" : "text-muted-foreground"}`}>
+            <button
+              onClick={handleShuffle}
+              className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${shuffle ? "text-primary" : "text-muted-foreground"}`}
+            >
               <Shuffle className="w-5 h-5" />
             </button>
-            <button onClick={handlePrevious} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground">
+            <button
+              onClick={handlePrevious}
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground"
+            >
               <SkipBack className="w-6 h-6 fill-current" />
             </button>
             <motion.button
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.88 }}
-              transition={{ type: "spring", stiffness: 500, damping: 28, mass: 0.6 }}
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 28,
+                mass: 0.6,
+              }}
               onClick={handleTogglePlay}
-              className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center shadow-xl">
-              {isPlaying ? <Pause className="w-7 h-7 text-background" /> : <Play className="w-7 h-7 text-background ml-0.5" />}
+              className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center shadow-xl"
+            >
+              {isPlaying ? (
+                <Pause className="w-7 h-7 text-background" />
+              ) : (
+                <Play className="w-7 h-7 text-background ml-0.5" />
+              )}
             </motion.button>
-            <button onClick={handleNext} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground">
+            <button
+              onClick={handleNext}
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground"
+            >
               <SkipForward className="w-6 h-6 fill-current" />
             </button>
-            <button onClick={handleRepeat} className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground"}`}>
-              {repeat === "one" ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
+            <button
+              onClick={handleRepeat}
+              className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              {repeat === "one" ? (
+                <Repeat1 className="w-5 h-5" />
+              ) : (
+                <Repeat className="w-5 h-5" />
+              )}
             </button>
           </div>
 
           {/* Quick panel buttons */}
           <div className="grid grid-cols-5 gap-2">
             {[
-              { id: "lyrics" as PanelType, icon: Mic2, label: "Testi", action: undefined },
-              { id: "mood" as PanelType, icon: Sparkles, label: "Mood", action: undefined },
-              { id: "listen-along" as PanelType, icon: Users, label: "Listen", action: undefined },
-              { id: "video" as PanelType, icon: Video, label: "Video", action: undefined },
-              { id: "queue" as PanelType, icon: ListMusic, label: "Coda", action: () => { onNavigate?.("queue"); onClose(); } },
+              {
+                id: "lyrics" as PanelType,
+                icon: Mic2,
+                label: "Testi",
+                action: undefined,
+              },
+              {
+                id: "mood" as PanelType,
+                icon: Sparkles,
+                label: "Mood",
+                action: undefined,
+              },
+              {
+                id: "listen-along" as PanelType,
+                icon: Users,
+                label: "Listen",
+                action: undefined,
+              },
+              {
+                id: "video" as PanelType,
+                icon: Video,
+                label: "Video",
+                action: undefined,
+              },
+              {
+                id: "queue" as PanelType,
+                icon: ListMusic,
+                label: "Coda",
+                action: () => {
+                  onNavigate?.("queue");
+                  onClose();
+                },
+              },
             ].map(({ id, icon: Icon, label, action }) => (
-              <button key={id} onClick={action ?? (() => togglePanel(id))}
-                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors min-h-[56px] ${activePanel === id ? "bg-primary/15 text-primary" : "bg-secondary/40 text-muted-foreground hover:text-foreground"}`}>
+              <button
+                key={id}
+                onClick={action ?? (() => togglePanel(id))}
+                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors min-h-[56px] ${activePanel === id ? "bg-primary/15 text-primary" : "bg-secondary/40 text-muted-foreground hover:text-foreground"}`}
+              >
                 <Icon className="w-4 h-4" />
                 {label}
               </button>
@@ -512,17 +870,39 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
           {/* Panel content */}
           <AnimatePresence mode="wait">
             {activePanel === "lyrics" && (
-              <motion.div key="lyrics" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 backdrop-blur-sm overflow-hidden">
+              <motion.div
+                key="lyrics"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 backdrop-blur-sm overflow-hidden"
+              >
+                <motion.div
+                  layoutId="lyrics"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <Mic2 className="w-4 h-4" />
+                  <span className="font-medium">Testi</span>
+                </motion.div>
                 {lyrics.length === 0 ? (
-                  <div className="py-6 text-center text-muted-foreground text-sm">Testi non disponibili</div>
+                  <div className="py-6 text-center text-muted-foreground text-sm">
+                    Testi non disponibili
+                  </div>
                 ) : (
-                  <div ref={lyricsContainerRef} className="max-h-48 overflow-y-auto px-4 py-3 space-y-1 scroll-smooth">
+                  <div
+                    ref={lyricsContainerRef}
+                    className="max-h-48 overflow-y-auto px-4 py-3 space-y-1 scroll-smooth"
+                  >
                     <div style={{ height: "60px" }} />
                     {lyrics.map((line, i) => (
-                      <div key={i} ref={el => { lineRefs.current[i] = el; }}
-                        className={`text-center py-1.5 px-3 rounded-lg transition-all duration-300 ${i === currentLineIndex ? "text-primary font-bold text-base bg-primary/10" : i < currentLineIndex ? "text-muted-foreground/40 text-sm" : "text-foreground/60 text-sm"}`}>
+                      <div
+                        key={i}
+                        ref={(el) => {
+                          lineRefs.current[i] = el;
+                        }}
+                        className={`text-center py-1.5 px-3 rounded-lg transition-all duration-300 ${i === currentLineIndex ? "text-primary font-bold text-base bg-primary/10" : i < currentLineIndex ? "text-muted-foreground/40 text-sm" : "text-foreground/60 text-sm"}`}
+                      >
                         {line.text || "♪"}
                       </div>
                     ))}
@@ -533,66 +913,185 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
             )}
 
             {activePanel === "queue" && (
-              <motion.div key="queue" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 overflow-hidden">
+              <motion.div
+                key="queue"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 overflow-hidden"
+              >
+                <motion.div
+                  layoutId="queue"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <ListMusic className="w-4 h-4" />
+                  <span className="font-medium">Coda</span>
+                </motion.div>
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/20">
                   <p className="text-sm font-semibold">Prossimi</p>
-                  <button onClick={() => { onNavigate?.("queue"); onClose(); }}
-                    className="text-xs text-primary hover:underline">Vedi tutto</button>
+                  <button
+                    onClick={() => {
+                      onNavigate?.("queue");
+                      onClose();
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Vedi tutto
+                  </button>
                 </div>
                 <div className="max-h-44 overflow-y-auto">
                   {queueTracks.length === 0 ? (
-                    <p className="text-center py-4 text-sm text-muted-foreground">Coda vuota</p>
-                  ) : queueTracks.map((t: any, i: number) => (
-                    <div key={i} className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 transition-colors">
-                      <span className="text-xs text-muted-foreground w-4 tabular-nums">{i + 1}</span>
-                      <div className="w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
-                        {t.album?.images?.[0]?.url && <img src={t.album.images[0].url} alt="" className="w-full h-full object-cover" />}
+                    <p className="text-center py-4 text-sm text-muted-foreground">
+                      Coda vuota
+                    </p>
+                  ) : (
+                    queueTracks.map((t: any, i: number) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 transition-colors"
+                      >
+                        <span className="text-xs text-muted-foreground w-4 tabular-nums">
+                          {i + 1}
+                        </span>
+                        <div className="w-9 h-9 rounded-lg overflow-hidden bg-muted shrink-0">
+                          {t.album?.images?.[0]?.url && (
+                            <img
+                              src={t.album.images[0].url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {t.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {t.artists?.[0]?.name}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{t.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{t.artists?.[0]?.name}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
 
             {activePanel === "analysis" && audioFeatures && (
-              <motion.div key="analysis" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 p-4 space-y-3">
+              <motion.div
+                key="analysis"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 p-4 space-y-3"
+              >
+                <motion.div
+                  layoutId="analysis"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="font-medium">Analisi</span>
+                </motion.div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: "BPM", value: Math.round(audioFeatures.tempo), unit: "" },
-                    { label: "Tonalità", value: ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][audioFeatures.key], unit: audioFeatures.mode ? " Mag" : " Min" },
-                    { label: "Energia", value: Math.round(audioFeatures.energy * 100), unit: "%" },
-                    { label: "Danzabilità", value: Math.round(audioFeatures.danceability * 100), unit: "%" },
-                    { label: "Valenza", value: Math.round(audioFeatures.valence * 100), unit: "%" },
-                    { label: "Battiti", value: `${audioFeatures.time_signature}/4`, unit: "" },
+                    {
+                      label: "BPM",
+                      value: Math.round(audioFeatures.tempo),
+                      unit: "",
+                    },
+                    {
+                      label: "Tonalità",
+                      value: [
+                        "C",
+                        "C#",
+                        "D",
+                        "D#",
+                        "E",
+                        "F",
+                        "F#",
+                        "G",
+                        "G#",
+                        "A",
+                        "A#",
+                        "B",
+                      ][audioFeatures.key],
+                      unit: audioFeatures.mode ? " Mag" : " Min",
+                    },
+                    {
+                      label: "Energia",
+                      value: Math.round(audioFeatures.energy * 100),
+                      unit: "%",
+                    },
+                    {
+                      label: "Danzabilità",
+                      value: Math.round(audioFeatures.danceability * 100),
+                      unit: "%",
+                    },
+                    {
+                      label: "Valenza",
+                      value: Math.round(audioFeatures.valence * 100),
+                      unit: "%",
+                    },
+                    {
+                      label: "Battiti",
+                      value: `${audioFeatures.time_signature}/4`,
+                      unit: "",
+                    },
                   ].map(({ label, value, unit }) => (
-                    <div key={label} className="bg-background/30 rounded-xl p-2.5">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
-                      <p className="text-lg font-bold text-primary">{value}{unit}</p>
+                    <div
+                      key={label}
+                      className="bg-background/30 rounded-xl p-2.5"
+                    >
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        {label}
+                      </p>
+                      <p className="text-lg font-bold text-primary">
+                        {value}
+                        {unit}
+                      </p>
                     </div>
                   ))}
                 </div>
                 <div className="space-y-1.5">
                   {[
-                    { label: "Energy", v: audioFeatures.energy, color: "bg-red-500" },
-                    { label: "Dance",  v: audioFeatures.danceability, color: "bg-blue-500" },
-                    { label: "Vibe",   v: audioFeatures.valence, color: "bg-green-500" },
-                    { label: "Acoustic", v: audioFeatures.acousticness, color: "bg-yellow-500" },
-                  ].map(f => (
+                    {
+                      label: "Energy",
+                      v: audioFeatures.energy,
+                      color: "bg-red-500",
+                    },
+                    {
+                      label: "Dance",
+                      v: audioFeatures.danceability,
+                      color: "bg-blue-500",
+                    },
+                    {
+                      label: "Vibe",
+                      v: audioFeatures.valence,
+                      color: "bg-green-500",
+                    },
+                    {
+                      label: "Acoustic",
+                      v: audioFeatures.acousticness,
+                      color: "bg-yellow-500",
+                    },
+                  ].map((f) => (
                     <div key={f.label} className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground w-14">{f.label}</span>
+                      <span className="text-[10px] text-muted-foreground w-14">
+                        {f.label}
+                      </span>
                       <div className="flex-1 h-1.5 bg-secondary/60 rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${f.v * 100}%` }}
-                          transition={{ delay: 0.1 }} className={`h-full ${f.color} rounded-full`} />
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${f.v * 100}%` }}
+                          transition={{ delay: 0.1 }}
+                          className={`h-full ${f.color} rounded-full`}
+                        />
                       </div>
-                      <span className="text-[10px] tabular-nums text-muted-foreground w-8 text-right">{Math.round(f.v * 100)}%</span>
+                      <span className="text-[10px] tabular-nums text-muted-foreground w-8 text-right">
+                        {Math.round(f.v * 100)}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -600,99 +1099,215 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
             )}
 
             {activePanel === "info" && (
-              <motion.div key="info" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 p-4 space-y-2.5">
+              <motion.div
+                key="info"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 p-4 space-y-2.5"
+              >
+                <motion.div
+                  layoutId="info"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <Info className="w-4 h-4" />
+                  <span className="font-medium">Info</span>
+                </motion.div>
                 {[
                   { label: "Album", value: currentTrack.album.name },
-                  { label: "Artisti", value: currentTrack.artists.map((a: any) => a.name).join(", ") },
-                  { label: "Data uscita", value: currentTrack.album.release_date },
+                  {
+                    label: "Artisti",
+                    value: currentTrack.artists
+                      .map((a: any) => a.name)
+                      .join(", "),
+                  },
+                  {
+                    label: "Data uscita",
+                    value: currentTrack.album.release_date,
+                  },
                   { label: "Durata", value: formatTime(duration) },
                   { label: "Popolarità", value: `${currentTrack.popularity}%` },
                   ...(bpm ? [{ label: "BPM", value: `${bpm}` }] : []),
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-start gap-3">
-                    <span className="text-sm text-muted-foreground shrink-0">{label}</span>
-                    <span className="text-sm font-medium text-right">{value}</span>
+                  <div
+                    key={label}
+                    className="flex justify-between items-start gap-3"
+                  >
+                    <span className="text-sm text-muted-foreground shrink-0">
+                      {label}
+                    </span>
+                    <span className="text-sm font-medium text-right">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </motion.div>
             )}
 
             {activePanel === "mood" && audioFeatures && (
-              <motion.div key="mood" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 p-4 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Mood & Vibe (AI Gen)</p>
+              <motion.div
+                key="mood"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 p-4 space-y-3"
+              >
+                <motion.div
+                  layoutId="mood"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Mood</span>
+                </motion.div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" /> Mood & Vibe (AI
+                  Gen)
+                </p>
                 <div className="bg-background/40 p-3 rounded-lg border border-border/50 text-sm text-muted-foreground italic leading-relaxed">
-                  {audioFeatures.energy > 0.7 && audioFeatures.valence > 0.6 ? "Questa traccia ha un'energia vibrante e positiva. Ideale per allenarsi o per darti la carica al mattino!" : 
-                   audioFeatures.energy > 0.6 && audioFeatures.valence < 0.5 ? "Un'energia intensa ma malinconica, perfetta per i momenti di forte espressione o corse notturne." :
-                   audioFeatures.energy < 0.5 && audioFeatures.valence > 0.6 ? "Tranquilla, rilassata e felice. Ideale per una passeggiata al sole o un pomeriggio in relax." :
-                   audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.6 ? "Molto intima e acustica, consigliata per la lettura o per rilassarsi prima di dormire." :
-                   "Un mix bilanciato di emozioni. Ottima come sottofondo per le tue attività quotidiane o per lo studio."}
+                  {audioFeatures.energy > 0.7 && audioFeatures.valence > 0.6
+                    ? "Questa traccia ha un'energia vibrante e positiva. Ideale per allenarsi o per darti la carica al mattino!"
+                    : audioFeatures.energy > 0.6 && audioFeatures.valence < 0.5
+                      ? "Un'energia intensa ma malinconica, perfetta per i momenti di forte espressione o corse notturne."
+                      : audioFeatures.energy < 0.5 &&
+                          audioFeatures.valence > 0.6
+                        ? "Tranquilla, rilassata e felice. Ideale per una passeggiata al sole o un pomeriggio in relax."
+                        : audioFeatures.energy < 0.4 &&
+                            audioFeatures.acousticness > 0.6
+                          ? "Molto intima e acustica, consigliata per la lettura o per rilassarsi prima di dormire."
+                          : "Un mix bilanciato di emozioni. Ottima come sottofondo per le tue attività quotidiane o per lo studio."}
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <span className="text-[10px] px-2 py-1 rounded bg-primary/20 text-primary font-bold">{audioFeatures.energy > 0.6 ? "⚡ Alta Energia" : "☕ Relax"}</span>
-                  <span className="text-[10px] px-2 py-1 rounded bg-secondary text-foreground">{audioFeatures.danceability > 0.6 ? "🕺 Ballabile" : "🎧 Ascolto"}</span>
+                  <span className="text-[10px] px-2 py-1 rounded bg-primary/20 text-primary font-bold">
+                    {audioFeatures.energy > 0.6
+                      ? "⚡ Alta Energia"
+                      : "☕ Relax"}
+                  </span>
+                  <span className="text-[10px] px-2 py-1 rounded bg-secondary text-foreground">
+                    {audioFeatures.danceability > 0.6
+                      ? "🕺 Ballabile"
+                      : "🎧 Ascolto"}
+                  </span>
                 </div>
               </motion.div>
             )}
 
             {activePanel === "listen-along" && (
-              <motion.div key="listen" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 p-4 space-y-3 text-center">
+              <motion.div
+                key="listen"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 p-4 space-y-3 text-center"
+              >
+                <div className="flex items-center gap-2 justify-center px-4 py-2 bg-background/20 border-b border-border/30">
+                  <Users className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Listen Along</span>
+                </div>
                 <Users className="w-8 h-8 text-primary mx-auto mb-2" />
                 <p className="text-sm font-semibold">Listen Along</p>
-                <p className="text-xs text-muted-foreground">Condividi la tua sessione musicale con gli amici e ascoltate in sincrono.</p>
-                
+                <p className="text-xs text-muted-foreground">
+                  Condividi la tua sessione musicale con gli amici e ascoltate
+                  in sincrono.
+                </p>
+
                 <div className="bg-background/50 border border-border p-2 rounded-lg flex items-center justify-between mt-2">
                   <span className="text-xs font-mono text-muted-foreground truncate flex-1 text-left px-2">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/listen?session=user-${Date.now().toString().slice(-6)}` : 'Generazione link...'}
+                    {typeof window !== "undefined"
+                      ? `${window.location.origin}/listen?session=user-${Date.now().toString().slice(-6)}`
+                      : "Generazione link..."}
                   </span>
-                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/listen?session=user-123456`); alert('Link copiato!'); }} 
-                    className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/listen?session=user-123456`,
+                      );
+                      alert("Link copiato!");
+                    }}
+                    className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0"
+                  >
                     <Copy className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="text-[10px] text-green-400 font-semibold flex items-center justify-center gap-1 mt-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sessione attiva (Sei l'host)
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>{" "}
+                  Sessione attiva (Sei l'host)
                 </div>
               </motion.div>
             )}
 
             {activePanel === "video" && (
-              <motion.div key="video" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 overflow-hidden relative" style={{ aspectRatio: '16/9' }}>
-                <iframe 
+              <motion.div
+                key="video"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 overflow-hidden relative"
+                style={{ aspectRatio: "16/9" }}
+              >
+                <motion.div
+                  layoutId="video"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <Video className="w-4 h-4" />
+                  <span className="font-medium">Video</span>
+                </motion.div>
+                <iframe
                   className="w-full h-full border-0 absolute top-0 left-0"
-                  src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentTrack.name + " " + (currentTrack.artists[0]?.name || "") + " official music video")}`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  src={
+                    videoUrl
+                      ? videoUrl
+                      : `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentTrack.name + " " + (currentTrack.artists?.[0]?.name || "") + " official music video")}`
+                  }
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
-                ></iframe>
+                />
               </motion.div>
             )}
 
             {activePanel === "timer" && (
-              <motion.div key="timer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "tween", duration: 0.28, ease: [0.45, 0, 0.55, 1] }}
-                className="rounded-xl bg-secondary/30 p-4 space-y-3">
-                <p className="text-sm font-semibold">⏱ Sleep Timer</p>
+              <motion.div
+                key="timer"
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-xl bg-secondary/30 p-4 space-y-3"
+              >
+                <motion.div
+                  layoutId="timer"
+                  className="flex items-center gap-2 px-4 py-2 bg-background/20 border-b border-border/30"
+                >
+                  <Timer className="w-4 h-4" />
+                  <span className="font-medium">Sleep Timer</span>
+                </motion.div>
                 {sleepTimer.active ? (
                   <div className="flex items-center justify-between">
-                    <span className="text-amber-400 font-mono text-lg">{formatTime(sleepTimer.remaining)}</span>
-                    <button onClick={sleepTimer.cancel}
-                      className="px-3 py-1.5 rounded-lg bg-destructive/20 text-destructive text-xs font-semibold">
+                    <span className="text-amber-400 font-mono text-lg">
+                      {formatTime(sleepTimer.remaining)}
+                    </span>
+                    <button
+                      onClick={sleepTimer.cancel}
+                      className="px-3 py-1.5 rounded-lg bg-destructive/20 text-destructive text-xs font-semibold"
+                    >
                       Annulla
                     </button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
-                    {[5, 10, 15, 20, 30, 45, 60, 90].map(m => (
-                      <button key={m} onClick={() => { sleepTimer.start(m); setActivePanel(null); }}
-                        className="py-2 rounded-xl bg-background/30 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors">
-                        {m < 60 ? `${m}m` : `${m/60}h`}
+                    {[5, 10, 15, 20, 30, 45, 60, 90].map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => {
+                          sleepTimer.start(m);
+                          setActivePanel(null);
+                        }}
+                        className="py-2 rounded-xl bg-background/30 text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors"
+                      >
+                        {m < 60 ? `${m}m` : `${m / 60}h`}
                       </button>
                     ))}
                   </div>
@@ -704,8 +1319,16 @@ export default function NowPlayingView(props: NowPlayingProps & { isQuizActive?:
           {/* Play count placeholder */}
           {audioFeatures && (
             <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" />Popularità: {currentTrack.popularity}%</span>
-              {bpm && <span className="flex items-center gap-1"><Zap className="w-3 h-3" />{bpm} BPM</span>}
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                Popularità: {currentTrack.popularity}%
+              </span>
+              {bpm && (
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3" />
+                  {bpm} BPM
+                </span>
+              )}
             </div>
           )}
         </div>

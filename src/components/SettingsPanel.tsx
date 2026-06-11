@@ -1252,8 +1252,30 @@ import {
   getAdminFeedbacks,
   saveAdminFeedbacks,
   isSupabaseConfigured,
+  getGlobalSettings,
 } from "@/services/supabase-api";
+import { saveTelegramChatId, removeTelegramChatId } from "@/services/telegram-api";
 import { MessageSquare, Bug, Lightbulb, Star } from "lucide-react";
+
+async function sha256hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text)
+  );
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+const Dot = ({ active, color = "#10b981" }: { active: boolean; color?: string }) => (
+  <span
+    className="inline-block w-1.5 h-1.5 rounded-full transition-all duration-300"
+    style={{
+      backgroundColor: active ? color : "rgba(255, 255, 255, 0.15)",
+      boxShadow: active ? `0 0 5px ${color}` : "none",
+    }}
+  />
+);
 
 function TabAccount({ handleLogout }: { handleLogout: () => void }) {
   const { toast } = useToast();
@@ -1266,15 +1288,75 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
   const [feedbackText, setFeedbackText] = useState("");
   const [collabUser, setCollabUser] = useState<any>(null);
   const [showCollabPassword, setShowCollabPassword] = useState(false);
+  const [tempChatId, setTempChatId] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
+
+  const handleSaveChatId = async () => {
+    if (!tempChatId.trim() || !collabUser) return;
+    const ok = await saveTelegramChatId(collabUser.id, tempChatId.trim());
+    if (ok) {
+      toast({
+        title: "✓ Telegram Collegato",
+        description: "Ora riceverai le notifiche su Telegram.",
+      });
+      setCollabUser({
+        ...collabUser,
+        telegramChatId: tempChatId.trim(),
+        telegramEnabled: true,
+      });
+      setTempChatId("");
+    } else {
+      toast({
+        title: "Errore",
+        description: "Impossibile collegare Telegram.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveChatId = async () => {
+    if (!collabUser) return;
+    const ok = await removeTelegramChatId(collabUser.id);
+    if (ok) {
+      toast({
+        title: "✓ Telegram Scollegato",
+        description: "Account rimosso correttamente.",
+      });
+      setCollabUser({
+        ...collabUser,
+        telegramChatId: undefined,
+      });
+    } else {
+      toast({
+        title: "Errore",
+        description: "Impossibile scollegare Telegram.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const userName = userProfile?.display_name || "Utente Spotify";
+
+  useEffect(() => {
+    const checkSuper = async () => {
+      const hash = await sha256hex(userName.trim());
+      const raw = import.meta.env.VITE_ADMIN_CREDENTIALS ?? "";
+      if (raw) {
+        const pairs = raw.split(",").map((pair: string) => pair.split(":")[0]?.trim());
+        if (pairs.includes(hash)) {
+          setIsSuper(true);
+        }
+      }
+    };
+    checkSuper();
+  }, [userName]);
 
   useEffect(() => {
     let mounted = true;
     const fetchUser = async () => {
       const users = await getCollabUsers();
       if (!mounted) return;
-      const me = users.find((u: any) => u.name.toLowerCase() === userName.toLowerCase());
+      const me = users.find((u: any) => u.name.toLowerCase() === userName.toLowerCase() && u.id !== "system_settings");
       setCollabUser(me || null);
     };
 
@@ -1288,6 +1370,20 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
 
   const sendCollabRequest = async () => {
     try {
+      // Check session requests count limit
+      const globalSettings = await getGlobalSettings();
+      const maxRequests = globalSettings?.maxRequestsPerSession ?? 2;
+      const sessionCount = parseInt(sessionStorage.getItem("collab_requests_sent") || "0", 10);
+      
+      if (sessionCount >= maxRequests) {
+        toast({
+          title: "Limite Raggiunto",
+          description: `Hai già inviato il limite massimo di ${maxRequests} richieste per questa sessione.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       const existingUsers = await getCollabUsers();
       let me = existingUsers.find((u: any) => u.name === userName);
 
@@ -1339,6 +1435,9 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
         },
         "j3z-hU3f_1v_x-b1E",
       );
+
+      // Increment count on success
+      sessionStorage.setItem("collab_requests_sent", (sessionCount + 1).toString());
 
       toast({
         title: "✓ Richiesta inviata",
@@ -1530,6 +1629,110 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                     )}
                   </div>
                 )}
+
+              {/* Sezione Permessi & Integrazioni */}
+              {isSuper || collabUser.permissions?.canModifySettings ? (
+                <>
+                  {/* Visualizzazione Permessi Attivi */}
+                  <div className="mt-4 p-4 rounded-xl bg-secondary/40 border border-border space-y-3 text-left">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                      I Tuoi Permessi Attivi
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canViewStats} />
+                        <span>Statistiche Spotify</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canViewToken} />
+                        <span>Visualizzazione Token</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canAccessGithub} />
+                        <span>Accesso GitHub</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canAccessAdmin} />
+                        <span>Accesso Dashboard Admin</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canAccessInfrastructure} />
+                        <span>Accesso Infrastruttura</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canModifySettings} />
+                        <span>Modifica Impostazioni</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Dot active={!!collabUser.permissions?.canModifyGlobalSettings} />
+                        <span>Modifica Globali</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sezione Telegram Integration */}
+                  {collabUser.telegramEnabled && (
+                    <div className="mt-4 p-4 rounded-xl bg-secondary/40 border border-border space-y-3 text-left">
+                      <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                        <span style={{ color: "#2CA5E0" }}>✈️</span> Notifiche Telegram
+                      </p>
+                      {!collabUser.telegramChatId ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground">
+                            L'amministratore ha abilitato le notifiche Telegram per il tuo account. Inserisci il tuo Chat ID per ricevere aggiornamenti.
+                          </p>
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Inserisci Telegram Chat ID"
+                              value={tempChatId}
+                              onChange={(e) => setTempChatId(e.target.value.replace(/\D/g, ""))}
+                              className="w-full bg-background border border-border focus:border-[#2CA5E0] rounded-xl py-2 px-3 text-sm outline-none transition-all text-white"
+                            />
+                            <button
+                              onClick={handleSaveChatId}
+                              disabled={!tempChatId.trim()}
+                              style={{ backgroundColor: "#2CA5E0" }}
+                              className="w-full py-2.5 rounded-xl text-white font-semibold text-xs hover:opacity-95 transition-opacity disabled:opacity-40"
+                            >
+                              Collega account
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground italic">
+                            Tip: Trova il tuo Chat ID cercando @userinfobot su Telegram e avviando la chat.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2.5 bg-green-500/10 border border-green-500/20 rounded-xl">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-400" />
+                              <span className="text-xs font-semibold text-green-300">
+                                Telegram collegato
+                              </span>
+                            </div>
+                            <button
+                              onClick={handleRemoveChatId}
+                              className="text-[10px] text-red-400 hover:text-red-300 underline font-medium"
+                            >
+                              Scollega
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            Chat ID: {collabUser.telegramChatId}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-4 p-4 rounded-xl bg-secondary/10 border border-dashed border-border text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Le tue integrazioni e permessi sono gestiti dall'amministratore.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-4">

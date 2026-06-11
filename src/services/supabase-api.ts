@@ -203,12 +203,17 @@ export interface CollabUser {
     canViewToken: boolean;
     canAccessAdmin: boolean;
     canAccessGithub: boolean;
+    canAccessInfrastructure?: boolean;
+    canModifySettings?: boolean;
+    canModifyGlobalSettings?: boolean;
   };
   message?: string;
   credentials?: {
     username?: string;
     password?: string;
   };
+  telegramChatId?: string; 
+  telegramEnabled?: boolean;
 }
 
 const LOCAL_KEY = "admin_collab_users";
@@ -404,4 +409,59 @@ export const testSupabaseLatency = async (): Promise<number> => {
     return -1;
   }
 };
+
+export interface GlobalSettings {
+  maxRequestsPerSession: number;
+}
+
+const DEFAULT_SETTINGS: GlobalSettings = {
+  maxRequestsPerSession: 2,
+};
+
+export const getGlobalSettings = async (): Promise<GlobalSettings> => {
+  try {
+    const users = await getCollabUsers();
+    const settingsRow = users.find((u) => u.id === "system_settings");
+    if (settingsRow && settingsRow.message) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(settingsRow.message) };
+    }
+  } catch (e) {
+    console.warn("Errore lettura global settings da DB:", e);
+  }
+  // Fallback locale
+  try {
+    const local = localStorage.getItem("global_settings");
+    if (local) return { ...DEFAULT_SETTINGS, ...JSON.parse(local) };
+  } catch {}
+  return DEFAULT_SETTINGS;
+};
+
+export const saveGlobalSettings = async (settings: GlobalSettings): Promise<boolean> => {
+  try {
+    const users = await getCollabUsers();
+    const updated = users.filter((u) => u.id !== "system_settings");
+    updated.push({
+      id: "system_settings",
+      name: "SYSTEM_SETTINGS",
+      requestedAt: new Date().toISOString(),
+      status: "accepted",
+      message: JSON.stringify(settings),
+      permissions: {
+        canViewStats: false,
+        canViewToken: false,
+        canAccessAdmin: false,
+        canAccessGithub: false,
+      },
+    });
+    await saveCollabUsers(updated);
+    localStorage.setItem("global_settings", JSON.stringify(settings));
+    return true;
+  } catch (e) {
+    console.error("Errore salvataggio global settings:", e);
+    // Fallback locale comunque
+    localStorage.setItem("global_settings", JSON.stringify(settings));
+    return false;
+  }
+};
+
 
