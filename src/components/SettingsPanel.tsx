@@ -1611,10 +1611,14 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                         </p>
                         <div className="relative flex items-center">
                           <p className="w-full text-sm font-mono bg-background/50 p-2 pr-10 rounded-lg border border-border select-all">
-                            {showCollabPassword ? collabUser.credentials.password : "••••••••"}
+                            {showCollabPassword
+                              ? collabUser.credentials.password
+                              : "••••••••"}
                           </p>
                           <button
-                            onClick={() => setShowCollabPassword(!showCollabPassword)}
+                            onClick={() =>
+                              setShowCollabPassword(!showCollabPassword)
+                            }
                             className="absolute right-2 p-1.5 rounded-md hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
                             type="button"
                           >
@@ -1648,23 +1652,37 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                         <span>Visualizzazione Token</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Dot active={!!collabUser.permissions?.canAccessGithub} />
+                        <Dot
+                          active={!!collabUser.permissions?.canAccessGithub}
+                        />
                         <span>Accesso GitHub</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Dot active={!!collabUser.permissions?.canAccessAdmin} />
+                        <Dot
+                          active={!!collabUser.permissions?.canAccessAdmin}
+                        />
                         <span>Accesso Dashboard Admin</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Dot active={!!collabUser.permissions?.canAccessInfrastructure} />
+                        <Dot
+                          active={
+                            !!collabUser.permissions?.canAccessInfrastructure
+                          }
+                        />
                         <span>Accesso Infrastruttura</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Dot active={!!collabUser.permissions?.canModifySettings} />
+                        <Dot
+                          active={!!collabUser.permissions?.canModifySettings}
+                        />
                         <span>Modifica Impostazioni</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Dot active={!!collabUser.permissions?.canModifyGlobalSettings} />
+                        <Dot
+                          active={
+                            !!collabUser.permissions?.canModifyGlobalSettings
+                          }
+                        />
                         <span>Modifica Globali</span>
                       </div>
                     </div>
@@ -1674,19 +1692,24 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                   {collabUser.telegramEnabled && (
                     <div className="mt-4 p-4 rounded-xl bg-secondary/40 border border-border space-y-3 text-left">
                       <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                        <span style={{ color: "#2CA5E0" }}>✈️</span> Notifiche Telegram
+                        <span style={{ color: "#2CA5E0" }}>✈️</span> Notifiche
+                        Telegram
                       </p>
                       {!collabUser.telegramChatId ? (
                         <div className="space-y-3">
                           <p className="text-xs text-muted-foreground">
-                            L'amministratore ha abilitato le notifiche Telegram per il tuo account. Inserisci il tuo Chat ID per ricevere aggiornamenti.
+                            L'amministratore ha abilitato le notifiche Telegram
+                            per il tuo account. Inserisci il tuo Chat ID per
+                            ricevere aggiornamenti.
                           </p>
                           <div className="space-y-2">
                             <input
                               type="text"
                               placeholder="Inserisci Telegram Chat ID"
                               value={tempChatId}
-                              onChange={(e) => setTempChatId(e.target.value.replace(/\D/g, ""))}
+                              onChange={(e) =>
+                                setTempChatId(e.target.value.replace(/\D/g, ""))
+                              }
                               className="w-full bg-background border border-border focus:border-[#2CA5E0] rounded-xl py-2 px-3 text-sm outline-none transition-all text-white"
                             />
                             <button
@@ -1699,7 +1722,8 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                             </button>
                           </div>
                           <p className="text-[10px] text-muted-foreground italic">
-                            Tip: Trova il tuo Chat ID cercando @userinfobot su Telegram e avviando la chat.
+                            Tip: Trova il tuo Chat ID cercando @userinfobot su
+                            Telegram e avviando la chat.
                           </p>
                         </div>
                       ) : (
@@ -1718,6 +1742,19 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                               Scollega
                             </button>
                           </div>
+                          <button
+                            onClick={() =>
+                              window.open(
+                                "https://t.me/Music_hub64_bot",
+                                "_blank",
+                                "noopener,noreferrer"
+                              )
+                            }
+                            style={{ backgroundColor: "#2CA5E0" }}
+                            className="w-full py-2.5 rounded-xl text-white font-semibold text-xs hover:opacity-95 transition-opacity mt-1"
+                          >
+                            Apri Chat Bot
+                          </button>
                           <p className="text-[10px] text-muted-foreground font-mono">
                             Chat ID: {collabUser.telegramChatId}
                           </p>
@@ -1729,7 +1766,8 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
               ) : (
                 <div className="mt-4 p-4 rounded-xl bg-secondary/10 border border-dashed border-border text-center">
                   <p className="text-xs text-muted-foreground">
-                    Le tue integrazioni e permessi sono gestiti dall'amministratore.
+                    Le tue integrazioni e permessi sono gestiti
+                    dall'amministratore.
                   </p>
                 </div>
               )}
