@@ -1860,7 +1860,7 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Versione</span>
-            <span className="font-medium">Music-Hub v1.4.0</span>
+            <span className="font-medium">Music-Hub v1.5.0</span>
           </div>
 
           <div className="flex items-center justify-between">
@@ -1874,7 +1874,7 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
 
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Build</span>
-            <span className="font-medium">2026.05</span>
+            <span className="font-medium">2026.06</span>
           </div>
         </div>
       </SectionBox>
