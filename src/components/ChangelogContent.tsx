@@ -10,6 +10,18 @@ interface ChangelogEntry {
 
 const changelogData: ChangelogEntry[] = [
   {
+    date: "12 Giugno 2026",
+    version: "v1.5.0",
+    commits: [
+      "Integrazione del sistema di Analisi Musicale AI avanzata tramite Pollinations",
+      "Sostituzione delle dipendenze Spotify deprecate (Audio Features) per analisi musicale",
+      "Sistema di Fallback procedurale pseudo-AI per garantire dati musicali sempre disponibili offline o in caso di rate-limit",
+      "Ottimizzazione dell'interfaccia UI per il bot Telegram all'interno delle impostazioni",
+      "Nuove animazioni particellari interattive ('Sparkles') per i report musicali",
+      "Risolti vari bug"
+    ]
+  },
+  {
     date: "19 Maggio 2026",
     version: "v1.4.0",
     commits: [
@@ -191,7 +203,7 @@ export default function ChangelogContent() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">
-          Music Hub v1.4.0 • Sviluppato con ❤️
+          Music Hub v1.5.0 • Sviluppato con ❤️
         </p>
       </motion.div>
     </div>
