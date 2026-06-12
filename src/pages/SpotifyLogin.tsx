@@ -13,6 +13,7 @@ export default function SpotifyLogin() {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestUsername, setRequestUsername] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
+  const [requestAccountType, setRequestAccountType] = useState("premium");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = () => {
@@ -32,10 +33,11 @@ export default function SpotifyLogin() {
       msgs.unshift({
         id: Date.now().toString(),
         from: requestUsername,
-        subject: "Nuova richiesta di accesso all'app",
-        body: `L'utente "${requestUsername}" (${requestEmail}) vuole accedere all'app. Vai in Utenti & Permessi per aggiungerlo alla dashboard di Spotify.`,
+        subject: `Nuova richiesta di accesso (${requestAccountType.toUpperCase()})`,
+        body: `L'utente "${requestUsername}" (${requestEmail}) con account Spotify ${requestAccountType.toUpperCase()} vuole accedere all'app. Vai in Utenti & Permessi per aggiungerlo alla dashboard di Spotify.`,
         receivedAt: new Date().toISOString(),
         read: false,
+        accountType: requestAccountType
       });
       localStorage.setItem(MSGS_KEY, JSON.stringify(msgs));
 
@@ -43,7 +45,8 @@ export default function SpotifyLogin() {
       await sendTelegramMessage(
         `🚨 <b>Nuova Richiesta di Accesso all'App!</b>\n\n` +
         `👤 <b>Utente:</b> ${requestUsername}\n` +
-        `📧 <b>Email:</b> ${requestEmail}\n\n` +
+        `📧 <b>Email:</b> ${requestEmail}\n` +
+        `🎵 <b>Account:</b> ${requestAccountType.toUpperCase()}\n\n` +
         `<i>Aggiungi questo utente alla dashboard sviluppatori di Spotify.</i>`
       );
 
@@ -294,6 +297,36 @@ export default function SpotifyLogin() {
                         placeholder="email@esempio.com"
                         className="w-full bg-background/50 border-2 border-border focus:border-primary rounded-xl py-3 pl-10 pr-4 text-sm outline-none transition-all text-white"
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-muted-foreground ml-1">
+                      Tipo di account Spotify
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setRequestAccountType("premium")}
+                        className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                          requestAccountType === "premium" 
+                            ? "border-primary bg-primary/10 text-primary" 
+                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        Premium
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRequestAccountType("free")}
+                        className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                          requestAccountType === "free" 
+                            ? "border-primary bg-primary/10 text-primary" 
+                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        Free
+                      </button>
                     </div>
                   </div>
 
