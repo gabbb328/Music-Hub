@@ -742,8 +742,8 @@ function TabAspetto() {
               {/* Switch chiaro/scuro */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
                 <div className="flex items-center gap-2">
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm font-medium">Chiare</span>
+                  <Moon className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-medium">Scure</span>
                 </div>
                 <button
                   onClick={() => {
@@ -779,8 +779,8 @@ function TabAspetto() {
                   />
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Scure</span>
-                  <Moon className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-medium">Chiare</span>
+                  <Sun className="w-4 h-4 text-amber-400" />
                 </div>
               </div>
 
