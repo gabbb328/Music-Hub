@@ -39,7 +39,7 @@ import { clearToken } from "@/services/spotify-auth";
 import { useNavigate } from "react-router-dom";
 import { usePlaybackState, useUserProfile } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
-import { APP_VERSION, APP_BUILD } from "@/version";
+import { APP_VERSION, APP_BUILD } from "@/hooks/version";
 // ─────────────────────────────────────────────────────────────────────────────
 // DATI STATICI
 // ─────────────────────────────────────────────────────────────────────────────

@@ -65,6 +65,7 @@ import { lyricsStore } from "@/hooks/useLyricsStore";
 import { getCurrentLineIndex } from "@/services/lyrics-api";
 import { useIpodPersistence } from "@/hooks/useIpodPersistence";
 import type { usePlayerStore } from "@/hooks/usePlayerStore";
+import { useVideoFinder } from "@/hooks/useVideoFinder";
 
 type NowPlayingProps = ReturnType<typeof usePlayerStore> & {
   onClose: () => void;
@@ -141,7 +142,6 @@ export default function NowPlayingView(
     typeof window !== "undefined" && window.innerWidth >= 768 ? "lyrics" : null,
   );
   // State to hold video URL fetched via Claude
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -167,11 +167,11 @@ export default function NowPlayingView(
   const { data: savedStatus } = useCheckSavedTracks(
     currentTrack ? [currentTrack.id] : [],
   );
-
+  
   useEffect(() => {
     if (savedStatus?.[0] !== undefined) setIsLiked(savedStatus[0]);
   }, [savedStatus]);
-
+  
   const pauseMutation2 = usePauseMutation();
   const sleepTimer = useSleepTimer(async () => {
     await pauseMutation2.mutateAsync();
@@ -180,18 +180,19 @@ export default function NowPlayingView(
 
   const isPlaying = playbackState?.is_playing || false;
   const progress = playbackState
-    ? (playbackState.progress_ms / (playbackState.item?.duration_ms || 1)) * 100
-    : 0;
+  ? (playbackState.progress_ms / (playbackState.item?.duration_ms || 1)) * 100
+  : 0;
   const shuffle = playbackState?.shuffle_state || false;
   const repeat =
-    playbackState?.repeat_state === "track"
-      ? "one"
-      : playbackState?.repeat_state === "context"
-        ? "all"
-        : "off";
+  playbackState?.repeat_state === "track"
+  ? "one"
+  : playbackState?.repeat_state === "context"
+  ? "all"
+  : "off";
   // Extract basic track info for Claude video fetch
   const trackName = currentTrack?.name || "";
   const trackArtist = currentTrack?.artists?.[0]?.name || "";
+  const videoUrl = useVideoFinder(trackName, trackArtist);
 
   const currentTime = playbackState?.progress_ms
     ? playbackState.progress_ms / 1000
@@ -226,33 +227,6 @@ export default function NowPlayingView(
 
   const coverUrl = currentTrack.album.images[0]?.url;
 
-  // Fetch original video via Claude when track changes
-  useEffect(() => {
-    if (!trackName) {
-      setVideoUrl(null);
-      return;
-    }
-    const fetchVideo = async () => {
-      try {
-        const resp = await fetch("/api/claude-video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: trackName, artist: trackArtist }),
-        });
-        if (!resp.ok) throw new Error("Claude video fetch failed");
-        const data = await resp.json();
-        setVideoUrl(data.videoUrl || null);
-      } catch (e) {
-        console.warn(
-          "Claude video fetch error, falling back to YouTube search",
-          e,
-        );
-        setVideoUrl(null);
-      }
-    };
-    fetchVideo();
-  }, [trackName, trackArtist]);
-  // Define unified animation variants for panel sections
   const panelVariants: Variants = {
     hidden: { opacity: 0, scale: 0.8, y: 10 },
     visible: {
@@ -1259,8 +1233,16 @@ export default function NowPlayingView(
                   className="w-full h-full border-0 absolute top-0 left-0"
                   src={
                     videoUrl
-                      ? videoUrl
-                      : `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentTrack.name + " " + (currentTrack.artists?.[0]?.name || "") + " official music video")}`
+                      ? videoUrl.replace(
+                          "youtube.com/embed",
+                          "www.youtube-nocookie.com/embed",
+                        ) + "?autoplay=0&rel=0"
+                      : `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(
+                          currentTrack.name +
+                            " " +
+                            (currentTrack.artists?.[0]?.name || "") +
+                            " official music video",
+                        )}`
                   }
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen

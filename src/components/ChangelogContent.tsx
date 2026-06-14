@@ -10,14 +10,21 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
-    date: "15 Giugno 2026",
+    date: "14 Giugno 2026",
+    version: "v1.5.2",
+    commits: [
+      "Risolto bug video su NowPlayingView (ora funzionate)",
+    ],
+  },
+  {
+    date: "14 Giugno 2026",
     version: "v1.5.1",
     commits: [
       "Risolto bug tema chiaro/scuro non funzionante",
       "Ottimizzazioni UI/UX",
       "Modifica grafica cambio colore dell'icona del sito",
       "Reso dinamico il cambio di versione e build",
-      "Ottimizzato il tempo di caricamento"
+      "Ottimizzato il tempo di caricamento",
     ],
   },
   {
