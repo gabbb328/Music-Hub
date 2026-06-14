@@ -131,36 +131,86 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [coverImageUrl, setCoverImageUrlState] = useState<string | null>(null);
 
   // ── Applica palette CSS ──────────────────────────────────────────────────
-  const applyTheme = useCallback((t: Theme, ct: ColorTheme, effective: "light" | "dark") => {
-    const root = document.documentElement;
-    root.style.transition = "background-color 0.5s ease, color 0.5s ease";
-    root.classList.remove("light", "dark");
-    root.classList.add(effective);
-    if (ct === "dynamic") { setTimeout(() => { root.style.transition = ""; }, 600); return; }
+  const applyTheme = useCallback(
+    (t: Theme, ct: ColorTheme, effective: "light" | "dark") => {
+      const root = document.documentElement;
+      const body = document.body;
+      root.style.transition = "background-color 0.5s ease, color 0.5s ease";
+      body.style.transition = "background-color 0.5s ease, color 0.5s ease";
+      root.classList.remove("light", "dark");
+      root.classList.add(effective);
 
-    const c = (colorThemes as any)[ct]?.[effective];
-    if (!c) return;
+      // Forza color-scheme così i componenti nativi del browser si adattano
+      root.style.colorScheme = effective;
 
-    root.style.setProperty("--primary",    c.primary);
-    root.style.setProperty("--background", c.background);
-    root.style.setProperty("--foreground", c.foreground);
-    root.style.setProperty("--card",               effective === "light" ? "0 0% 100%" : c.background);
-    root.style.setProperty("--card-foreground",    c.foreground);
-    root.style.setProperty("--popover",            effective === "light" ? "0 0% 100%" : c.background);
-    root.style.setProperty("--popover-foreground", c.foreground);
-    root.style.setProperty("--secondary",          c.muted);
-    root.style.setProperty("--secondary-foreground", c.foreground);
-    root.style.setProperty("--muted",              c.muted);
-    root.style.setProperty("--muted-foreground",   effective === "light" ? "215 16% 47%" : "215 20% 65%");
-    root.style.setProperty("--accent",             c.muted);
-    root.style.setProperty("--accent-foreground",  c.foreground);
-    root.style.setProperty("--border",             effective === "light" ? "214 32% 91%" : c.muted);
-    root.style.setProperty("--input",              effective === "light" ? "214 32% 91%" : c.muted);
-    root.style.setProperty("--ring",               c.accent);
-    root.style.setProperty("--destructive",        effective === "light" ? "0 84% 60%" : "0 62% 51%");
-    root.style.setProperty("--destructive-foreground", "0 0% 98%");
-    setTimeout(() => { root.style.transition = ""; }, 600);
-  }, []);
+      if (ct === "dynamic") {
+        setTimeout(() => {
+          root.style.transition = "";
+          body.style.transition = "";
+        }, 600);
+        return;
+      }
+
+      const c = (colorThemes as any)[ct]?.[effective];
+      if (!c) return;
+
+      if (effective === "light") {
+        root.style.setProperty("--background", "0 0% 98%");
+        root.style.setProperty("--foreground", "222 47% 8%");
+        root.style.setProperty("--card", "0 0% 100%");
+        root.style.setProperty("--card-foreground", "222 47% 8%");
+        root.style.setProperty("--popover", "0 0% 100%");
+        root.style.setProperty("--popover-foreground", "222 47% 8%");
+        root.style.setProperty("--primary", c.primary);
+        root.style.setProperty("--primary-foreground", "0 0% 100%");
+        root.style.setProperty("--secondary", "214 32% 91%");
+        root.style.setProperty("--secondary-foreground", "222 47% 8%");
+        root.style.setProperty("--muted", "214 32% 91%");
+        root.style.setProperty("--muted-foreground", "215 16% 35%");
+        root.style.setProperty("--accent", "214 32% 91%");
+        root.style.setProperty("--accent-foreground", "222 47% 8%");
+        root.style.setProperty("--border", "214 32% 84%");
+        root.style.setProperty("--input", "214 32% 84%");
+        root.style.setProperty("--ring", c.primary);
+        root.style.setProperty("--destructive", "0 84% 55%");
+        root.style.setProperty("--destructive-foreground", "0 0% 100%");
+
+        // Fallback diretto su body per i testi hardcoded
+        body.style.color = "hsl(222, 47%, 8%)";
+        body.style.backgroundColor = "hsl(0, 0%, 98%)";
+      } else {
+        root.style.setProperty("--background", c.background);
+        root.style.setProperty("--foreground", c.foreground);
+        root.style.setProperty("--card", c.background);
+        root.style.setProperty("--card-foreground", c.foreground);
+        root.style.setProperty("--popover", c.background);
+        root.style.setProperty("--popover-foreground", c.foreground);
+        root.style.setProperty("--primary", c.primary);
+        root.style.setProperty("--primary-foreground", "222 47% 11%");
+        root.style.setProperty("--secondary", c.muted);
+        root.style.setProperty("--secondary-foreground", c.foreground);
+        root.style.setProperty("--muted", c.muted);
+        root.style.setProperty("--muted-foreground", "215 20% 65%");
+        root.style.setProperty("--accent", c.muted);
+        root.style.setProperty("--accent-foreground", c.foreground);
+        root.style.setProperty("--border", c.muted);
+        root.style.setProperty("--input", c.muted);
+        root.style.setProperty("--ring", c.accent);
+        root.style.setProperty("--destructive", "0 62% 51%");
+        root.style.setProperty("--destructive-foreground", "0 0% 98%");
+
+        // Ripristina body
+        body.style.color = "";
+        body.style.backgroundColor = "";
+      }
+
+      setTimeout(() => {
+        root.style.transition = "";
+        body.style.transition = "";
+      }, 600);
+    },
+    [],
+  );
 
   // ── Risolve e applica l'icona ─────────────────────────────────────────────
   const resolveAndApplyIcon = useCallback(async (

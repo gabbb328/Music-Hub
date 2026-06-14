@@ -39,6 +39,7 @@ import { clearToken } from "@/services/spotify-auth";
 import { useNavigate } from "react-router-dom";
 import { usePlaybackState, useUserProfile } from "@/hooks/useSpotify";
 import { useToast } from "@/hooks/use-toast";
+import { APP_VERSION, APP_BUILD } from "@/version";
 // ─────────────────────────────────────────────────────────────────────────────
 // DATI STATICI
 // ─────────────────────────────────────────────────────────────────────────────
@@ -534,12 +535,13 @@ function TabAspetto() {
   const artistName = playbackState?.item?.artists?.[0]?.name;
   const selectedIcon =
     iconsList.find((i) => i.id === activeAppIcon) ?? iconsList[0];
+  const [iconTheme, setIconTheme] = useState<"chiaro" | "scuro">("scuro");
 
   return (
     <div className="space-y-6">
       {/* Tema */}
       <SectionBox icon={Sun} title="Tema">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 pb-1.5">
           {(["light", "dark", "system"] as const).map((t) => (
             <motion.button
               key={t}
@@ -560,6 +562,10 @@ function TabAspetto() {
             </motion.button>
           ))}
         </div>
+        <span className="text-xs text-muted-foreground text-center block w-full">
+          Disattivare prima il tema dinamico. <br />
+          Se il tema non si è applicato correttamente ricaricare la pagina.
+        </span>
       </SectionBox>
 
       {/* Colore */}
@@ -668,6 +674,39 @@ function TabAspetto() {
 
       {/* Icona app */}
       <SectionBox icon={ImageIcon} title="Icona app">
+        {/* Selezione modalità: Auto o Manuale */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setActiveAppIcon("auto")}
+            className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+              activeAppIcon === "auto"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border hover:border-primary/40 text-muted-foreground"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            Auto
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => {
+              if (activeAppIcon === "auto") {
+                setActiveAppIcon(iconsList[1].id); // seleziona primo manuale
+              }
+            }}
+            className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+              activeAppIcon !== "auto"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border hover:border-primary/40 text-muted-foreground"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            Manuale
+          </motion.button>
+        </div>
+
+        {/* Preview icona selezionata */}
         <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/40 border border-border">
           {selectedIcon.src ? (
             <img
@@ -689,41 +728,95 @@ function TabAspetto() {
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={() => setActiveAppIcon("auto")}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${activeAppIcon === "auto" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}
-          >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/50 via-violet-500/40 to-pink-500/40 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-[10px] font-medium">Auto</span>
-            {activeAppIcon === "auto" && (
-              <Check className="w-3 h-3 text-primary" />
-            )}
-          </motion.button>
-          {iconsList.slice(1).map((icon) => (
-            <motion.button
-              key={icon.id}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => setActiveAppIcon(icon.id)}
-              className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${activeAppIcon === icon.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}
+
+        {/* Pannello manuale: switch tema + griglia icone */}
+        <AnimatePresence>
+          {activeAppIcon !== "auto" && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden space-y-3 pt-1"
             >
-              <img
-                src={icon.src!}
-                alt={icon.name}
-                className="w-12 h-12 rounded-xl shadow-sm object-cover"
-              />
-              <span className="text-[10px] font-medium leading-none text-center line-clamp-2">
-                {icon.name}
-              </span>
-              {activeAppIcon === icon.id && (
-                <Check className="w-3 h-3 text-primary" />
-              )}
-            </motion.button>
-          ))}
-        </div>
+              {/* Switch chiaro/scuro */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
+                <div className="flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm font-medium">Chiare</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const next = iconTheme === "chiaro" ? "scuro" : "chiaro";
+                    setIconTheme(next);
+                    const current = activeAppIcon;
+                    const colorMatch = current.match(
+                      /app_(.+?)_(chiaro|scuro)\.png/,
+                    );
+
+                    if (colorMatch) {
+                      const color = colorMatch[1];
+                      const sameColorOtherTheme = `app_${color}_${next}.png`;
+                      const exists = iconsList.find(
+                        (i) => i.id === sameColorOtherTheme,
+                      );
+                      if (exists) setActiveAppIcon(sameColorOtherTheme);
+                    } else {
+                      const first = iconsList.find(
+                        (i) => i.id !== "auto" && i.id.includes(next),
+                      );
+                      if (first) setActiveAppIcon(first.id);
+                    }
+                  }}
+                  className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
+                    iconTheme === "chiaro" ? "bg-primary" : "bg-secondary"
+                  }`}
+                >
+                  <motion.div
+                    className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow"
+                    animate={{ x: iconTheme === "chiaro" ? 20 : 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Scure</span>
+                  <Moon className="w-4 h-4 text-slate-400" />
+                </div>
+              </div>
+
+              {/* Griglia icone — filtrata per tema */}
+              <div className="grid grid-cols-4 gap-2">
+                {iconsList
+                  .slice(1)
+                  .filter((icon) => icon.id.includes(iconTheme))
+                  .map((icon) => (
+                    <motion.button
+                      key={icon.id}
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setActiveAppIcon(icon.id)}
+                      className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${
+                        activeAppIcon === icon.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <img
+                        src={icon.src!}
+                        alt={icon.name}
+                        className="w-12 h-12 rounded-xl shadow-sm object-cover"
+                      />
+                      <span className="text-[10px] font-medium leading-none text-center line-clamp-2">
+                        {icon.name}
+                      </span>
+                      {activeAppIcon === icon.id && (
+                        <Check className="w-3 h-3 text-primary" />
+                      )}
+                    </motion.button>
+                  ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </SectionBox>
     </div>
   );
@@ -1254,20 +1347,29 @@ import {
   isSupabaseConfigured,
   getGlobalSettings,
 } from "@/services/supabase-api";
-import { saveTelegramChatId, removeTelegramChatId } from "@/services/telegram-api";
+import {
+  saveTelegramChatId,
+  removeTelegramChatId,
+} from "@/services/telegram-api";
 import { MessageSquare, Bug, Lightbulb, Star } from "lucide-react";
 
 async function sha256hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(text)
+    new TextEncoder().encode(text),
   );
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-const Dot = ({ active, color = "#10b981" }: { active: boolean; color?: string }) => (
+const Dot = ({
+  active,
+  color = "#10b981",
+}: {
+  active: boolean;
+  color?: string;
+}) => (
   <span
     className="inline-block w-1.5 h-1.5 rounded-full transition-all duration-300"
     style={{
@@ -1342,7 +1444,9 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
       const hash = await sha256hex(userName.trim());
       const raw = import.meta.env.VITE_ADMIN_CREDENTIALS ?? "";
       if (raw) {
-        const pairs = raw.split(",").map((pair: string) => pair.split(":")[0]?.trim());
+        const pairs = raw
+          .split(",")
+          .map((pair: string) => pair.split(":")[0]?.trim());
         if (pairs.includes(hash)) {
           setIsSuper(true);
         }
@@ -1356,7 +1460,11 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
     const fetchUser = async () => {
       const users = await getCollabUsers();
       if (!mounted) return;
-      const me = users.find((u: any) => u.name.toLowerCase() === userName.toLowerCase() && u.id !== "system_settings");
+      const me = users.find(
+        (u: any) =>
+          u.name.toLowerCase() === userName.toLowerCase() &&
+          u.id !== "system_settings",
+      );
       setCollabUser(me || null);
     };
 
@@ -1373,8 +1481,11 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
       // Check session requests count limit
       const globalSettings = await getGlobalSettings();
       const maxRequests = globalSettings?.maxRequestsPerSession ?? 2;
-      const sessionCount = parseInt(sessionStorage.getItem("collab_requests_sent") || "0", 10);
-      
+      const sessionCount = parseInt(
+        sessionStorage.getItem("collab_requests_sent") || "0",
+        10,
+      );
+
       if (sessionCount >= maxRequests) {
         toast({
           title: "Limite Raggiunto",
@@ -1437,7 +1548,10 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
       );
 
       // Increment count on success
-      sessionStorage.setItem("collab_requests_sent", (sessionCount + 1).toString());
+      sessionStorage.setItem(
+        "collab_requests_sent",
+        (sessionCount + 1).toString(),
+      );
 
       toast({
         title: "✓ Richiesta inviata",
@@ -1747,7 +1861,7 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
                               window.open(
                                 "https://t.me/Music_hub64_bot",
                                 "_blank",
-                                "noopener,noreferrer"
+                                "noopener,noreferrer",
                               )
                             }
                             style={{ backgroundColor: "#2CA5E0" }}
@@ -1860,21 +1974,25 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Versione</span>
-            <span className="font-medium">Music-Hub v1.5.0</span>
+            <span className="font-medium">Music-Hub {APP_VERSION}</span>
           </div>
 
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Database</span>
             {isSupabaseConfigured() ? (
-              <span className="font-semibold text-green-400">Supabase Connesso</span>
+              <span className="font-semibold text-green-400">
+                Supabase Connesso
+              </span>
             ) : (
-              <span className="font-semibold text-amber-500">LocalStorage (Offline)</span>
+              <span className="font-semibold text-amber-500">
+                LocalStorage (Offline)
+              </span>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Build</span>
-            <span className="font-medium">2026.06</span>
+            <span className="font-medium">{APP_BUILD}</span>
           </div>
         </div>
       </SectionBox>
