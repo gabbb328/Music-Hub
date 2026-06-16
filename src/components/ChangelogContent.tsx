@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ScrollText, GitCommit, Calendar, Heart } from "lucide-react";
+import { ScrollText, GitCommit, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface ChangelogEntry {
@@ -154,7 +154,7 @@ export const changelogData: ChangelogEntry[] = [
     ],
   },
 ];
-const APP_VERSION = changelogData[0].version;
+
 export default function ChangelogContent() {
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -221,16 +221,7 @@ export default function ChangelogContent() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">
-          Music Hub {APP_VERSION} • Sviluppato con{" "}
-          <Heart className="inline w-4 h-4 text-red-500 animate-pulse fill-red-500" /> by{" "}
-          <a
-            className="font-semibold text-primary hover:text-primary/80 transition-colors"
-            href="https://github.com/gabbb328"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Gabriele Savio
-          </a>
+          Music Hub v1.5.0 • Sviluppato con ❤️
         </p>
       </motion.div>
     </div>
