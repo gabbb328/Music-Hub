@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/services/supabase-api";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
 import { useToast } from "@/hooks/use-toast";
+import * as spotifyApi from "@/services/spotify-api";
 
 export const useListenAlong = (sessionId: string | null) => {
   const { player, deviceId, playbackState, isPlaying } = useSpotifyContext();
@@ -25,10 +26,18 @@ export const useListenAlong = (sessionId: string | null) => {
     });
 
     channel
-      .on("broadcast", { event: "sync" }, ({ payload }) => {
+      .on("broadcast", { event: "sync" }, async ({ payload }) => {
         console.log("[ListenAlong] Received sync:", payload);
-        if (payload.type === "PLAY") {
-          // Logica per forzare il playback
+        try {
+          if (payload.type === "PLAY") {
+            await spotifyApi.play(deviceId, undefined, payload.uris, payload.offset);
+          } else if (payload.type === "PAUSE") {
+            await spotifyApi.pause(deviceId);
+          } else if (payload.type === "SEEK") {
+            await spotifyApi.seek(payload.position_ms);
+          }
+        } catch (err) {
+          console.error("[ListenAlong] Error applying sync:", err);
         }
       })
       .on("presence", { event: "sync" }, () => {

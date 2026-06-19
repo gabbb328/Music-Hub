@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence, LayoutGroup, Variants } from "framer-motion";
 import {
   X,
@@ -44,6 +44,9 @@ import VinylNowPlayingView from "./VinylNowPlayingView";
 import IpodNowPlayingView from "./IpodNowPlayingView";
 import WaveformProgress from "./WaveformProgress";
 import VisualizerCanvas from "./VisualizerCanvas";
+import GemOverlay from "./GemOverlay";
+import { useGemOverlay } from "@/hooks/useGemOverlay";
+import { useSessionContext } from "@/contexts/SessionContext";
 import { formatTime } from "@/lib/mock-data";
 import {
   usePlaybackState,
@@ -141,6 +144,43 @@ export default function NowPlayingView(
   const [activePanel, setActivePanel] = useState<PanelType>(
     typeof window !== "undefined" && window.innerWidth >= 768 ? "lyrics" : null,
   );
+  // ── GEM Overlay / Listen Along session ────────────────────────
+  const { listenAlongSessionId, setListenAlongSessionId } = useSessionContext();
+  const gemUserId = useMemo(
+    () => `user-${Math.random().toString(36).slice(2, 8)}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  // Pioggia emoji sulla copertina
+  interface RainDrop { id: string; emoji: string; x: number; }
+  const [rainDrops, setRainDrops] = useState<RainDrop[]>([]);
+  
+  const triggerShower = useCallback((emoji: string) => {
+    // Genera ~10 emoji istantaneamente con delay sfalsati in modo che "piovano" per 5 secondi
+    const dropsToAdd: RainDrop[] = Array.from({ length: 10 }).map((_, i) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      emoji,
+      x: 4 + Math.random() * 92
+    }));
+    
+    setRainDrops((prev) => [...prev, ...dropsToAdd]);
+
+    // Rimuove questi drop dopo 5.5 secondi
+    setTimeout(() => {
+      setRainDrops((prev) => prev.filter(d => !dropsToAdd.find(nd => nd.id === d.id)));
+    }, 5500);
+  }, []);
+
+  const { reactions: gemReactions, sendReaction } = useGemOverlay({ sessionId: listenAlongSessionId, userId: gemUserId });
+  const prevGemLenRef = useRef(0);
+  useEffect(() => {
+    if (gemReactions.length > prevGemLenRef.current) {
+      const latest = gemReactions[gemReactions.length - 1];
+      triggerShower(latest.emoji);
+    }
+    prevGemLenRef.current = gemReactions.length;
+  }, [gemReactions, triggerShower]);
+
   // State to hold video URL fetched via Claude
   const [isLiked, setIsLiked] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -167,7 +207,12 @@ export default function NowPlayingView(
   const { data: savedStatus } = useCheckSavedTracks(
     currentTrack ? [currentTrack.id] : [],
   );
-  
+
+  // Resetta emoji quando cambia canzone
+  useEffect(() => {
+    setRainDrops([]);
+  }, [currentTrack?.id]);
+
   useEffect(() => {
     if (savedStatus?.[0] !== undefined) setIsLiked(savedStatus[0]);
   }, [savedStatus]);
@@ -624,6 +669,29 @@ export default function NowPlayingView(
                   </span>
                 </div>
               )}
+              {/* ── Pioggia emoji GEM Overlay ── */}
+              <AnimatePresence>
+                {rainDrops.map((drop) => (
+                  <motion.span
+                    key={drop.id}
+                    className="absolute pointer-events-none text-3xl drop-shadow-lg select-none"
+                    style={{ left: `${drop.x}%`, bottom: 0, transform: "translateX(-50%)" }}
+                    initial={{ opacity: 0, y: 0, scale: 0.4 }}
+                    animate={{
+                      opacity: [0, 1, 1, 0.7, 0],
+                      y: ["-0%", "-120%", "-240%", "-340%", "-440%"],
+                      scale: [0.4, 1.1, 1, 0.9, 0.7],
+                    }}
+                    transition={{ 
+                      duration: 4.8, 
+                      ease: "easeOut",
+                      delay: Math.random() * 0.8 // Sfalsa la partenza per un effetto più naturale
+                    }}
+                  >
+                    {drop.emoji}
+                  </motion.span>
+                ))}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -1174,40 +1242,73 @@ export default function NowPlayingView(
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="rounded-xl bg-secondary/30 p-4 space-y-3 text-center"
+                className="rounded-xl bg-secondary/30 overflow-hidden"
               >
-                <div className="flex items-center gap-2 justify-center px-4 py-2 bg-background/20 border-b border-border/30">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="font-medium">Listen Along</span>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-2 bg-background/20 border-b border-border/30">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="font-medium">Listen Along</span>
+                  </div>
+                  {listenAlongSessionId ? (
+                    <div className="flex items-center gap-1.5 text-[10px] text-green-400 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Sessione attiva
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Nessuna sessione</span>
+                  )}
                 </div>
-                <Users className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-sm font-semibold">Listen Along</p>
-                <p className="text-xs text-muted-foreground">
-                  Condividi la tua sessione musicale con gli amici e ascoltate
-                  in sincrono.
-                </p>
 
-                <div className="bg-background/50 border border-border p-2 rounded-lg flex items-center justify-between mt-2">
-                  <span className="text-xs font-mono text-muted-foreground truncate flex-1 text-left px-2">
-                    {typeof window !== "undefined"
-                      ? `${window.location.origin}/listen?session=user-${Date.now().toString().slice(-6)}`
-                      : "Generazione link..."}
-                  </span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `${window.location.origin}/listen?session=user-123456`,
-                      );
-                      alert("Link copiato!");
-                    }}
-                    className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="text-[10px] text-green-400 font-semibold flex items-center justify-center gap-1 mt-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>{" "}
-                  Sessione attiva (Sei l'host)
+                <div className="p-4 space-y-4">
+                  {/* Link sessione */}
+                  {!listenAlongSessionId ? (
+                    <div className="space-y-2 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        Avvia una sessione per condividere la musica in sincrono con gli amici.
+                      </p>
+                      <button
+                        onClick={() => {
+                          const id = `user-${Date.now().toString().slice(-6)}`;
+                          setListenAlongSessionId(id);
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                      >
+                        🎧 Avvia sessione
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="bg-background/50 border border-border p-2 rounded-lg flex items-center justify-between">
+                        <span className="text-xs font-mono text-muted-foreground truncate flex-1 text-left px-1">
+                          {`${typeof window !== "undefined" ? window.location.origin : ""}/listen?session=${listenAlongSessionId}`}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${typeof window !== "undefined" ? window.location.origin : ""}/listen?session=${listenAlongSessionId}`,
+                            );
+                            toast({ title: "✓ Link copiato!" });
+                          }}
+                          className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0 ml-1"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setListenAlongSessionId(null)}
+                        className="w-full py-1.5 rounded-xl bg-destructive/15 text-destructive text-xs font-semibold hover:bg-destructive/25 transition-colors"
+                      >
+                        Termina sessione
+                      </button>
+                    </div>
+                  )}
+
+                  {/* GEM Overlay — solo bottoni, pioggia sulla copertina principale */}
+                  <GemOverlay
+                    sessionId={listenAlongSessionId}
+                    sendReaction={sendReaction}
+                  />
                 </div>
               </motion.div>
             )}

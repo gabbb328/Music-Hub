@@ -19,6 +19,8 @@ import {
   Gamepad2,
   Users,
   ScrollText,
+  BookOpen,
+  Trophy,
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 
@@ -42,6 +44,7 @@ const features = [
   { id: "stats", label: "Statistiche", icon: BarChart3 },
   { id: "devices", label: "Dispositivi", icon: Headphones },
   { id: "mood", label: "Mood Gen", icon: Sparkles },
+  { id: "mood-calendar", label: "Diario Musicale", icon: BookOpen },
   { id: "listen-along", label: "Listen Along", icon: Users },
 ];
 
@@ -51,7 +54,9 @@ const libraryItems = [
   { id: "queue", label: "Coda", icon: ListMusic },
 ];
 
-const gameItems = [{ id: "quiz", label: "Music Quiz", icon: Gamepad2 }];
+const gameItems = [
+  { id: "games", label: "Music Games", icon: Gamepad2 },
+];
 
 const appItems = [
   { id: "about", label: "Chi siamo", icon: Info },
@@ -183,7 +188,7 @@ export default function Sidebar({
             <NavItem
               key={item.id}
               {...item}
-              isActive={activeSection === item.id}
+              isActive={activeSection === item.id || activeSection === "quiz"}
               onClick={() => onSectionChange(item.id)}
               mouseY={mouseY}
               isSectionHovered={hoveredSection === "games"}

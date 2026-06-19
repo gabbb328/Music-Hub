@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as spotifyApi from "@/services/spotify-api";
 import { getToken } from "@/services/spotify-auth";
+import { useSessionContext } from "@/contexts/SessionContext";
 
 // ── Rileva iOS (Safari non supporta Web Playback SDK) ─────────────────────────
 const IS_IOS =
@@ -145,6 +146,7 @@ export const useCheckSavedTracks = (trackIds: string[]) => useQuery({
 
 export const usePlayMutation = () => {
   const qc = useQueryClient();
+  const { broadcastAction } = useSessionContext();
   return useMutation({
     mutationFn: (params: {
       deviceId?: string;
@@ -152,9 +154,10 @@ export const usePlayMutation = () => {
       uris?: string[];
       offset?: { position: number } | { uri: string };
     }) => playWithIosFallback(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["playbackState"] });
       qc.invalidateQueries({ queryKey: ["currentlyPlaying"] });
+      broadcastAction("PLAY", { uris: variables.uris, offset: variables.offset });
     },
     retry: 1,
   });
@@ -162,22 +165,26 @@ export const usePlayMutation = () => {
 
 export const usePauseMutation = () => {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: spotifyApi.pause, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); } });
+  const { broadcastAction } = useSessionContext();
+  return useMutation({ mutationFn: spotifyApi.pause, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("PAUSE"); } });
 };
 
 export const useNextMutation = () => {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: spotifyApi.next, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); } });
+  const { broadcastAction } = useSessionContext();
+  return useMutation({ mutationFn: spotifyApi.next, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("PLAY"); } });
 };
 
 export const usePreviousMutation = () => {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: spotifyApi.previous, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); } });
+  const { broadcastAction } = useSessionContext();
+  return useMutation({ mutationFn: spotifyApi.previous, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("PLAY"); } });
 };
 
 export const useSeekMutation = () => {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (ms: number) => spotifyApi.seek(ms), onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); } });
+  const { broadcastAction } = useSessionContext();
+  return useMutation({ mutationFn: (ms: number) => spotifyApi.seek(ms), onSuccess: (_, ms) => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("SEEK", { position_ms: ms }); } });
 };
 
 export const useSetVolumeMutation = () => useMutation({ mutationFn: (v: number) => spotifyApi.setVolume(v) });

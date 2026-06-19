@@ -129,17 +129,30 @@ export default function PlayerBar(props: PlayerProps) {
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleTogglePlay = async () => {
     try {
-      if (spotifyTrack) { isPlaying ? await pauseMutation.mutateAsync() : await playMutation.mutateAsync({}); }
-      else localToggle();
+      if (spotifyTrack) {
+        if (isPlaying) {
+          await pauseMutation.mutateAsync();
+        } else {
+          await playMutation.mutateAsync({});
+        }
+      } else {
+        localToggle();
+      }
     } catch { localToggle(); }
   };
   const handleNext = async () => {
-    try { spotifyTrack ? await nextMutation.mutateAsync() : localNextTrack(); }
-    catch { localNextTrack(); }
+    try { 
+      if (spotifyTrack) {
+        await nextMutation.mutateAsync();
+      } else localNextTrack();
+    } catch { localNextTrack(); }
   };
   const handlePrevious = async () => {
-    try { spotifyTrack ? await previousMutation.mutateAsync() : localPrevTrack(); }
-    catch { localPrevTrack(); }
+    try {
+      if (spotifyTrack) {
+        await previousMutation.mutateAsync();
+      } else localPrevTrack();
+    } catch { localPrevTrack(); }
   };
   const handleVolumeChange = async (v: number) => {
     localSetVolume(v);
@@ -148,7 +161,10 @@ export default function PlayerBar(props: PlayerProps) {
   const handleSeek = async (p: number) => {
     localSetProgress(p);
     if (spotifyTrack) {
-      try { await seekMutation.mutateAsync(Math.floor((p / 100) * spotifyTrack.duration_ms)); } catch {}
+      try {
+        const ms = Math.floor((p / 100) * spotifyTrack.duration_ms);
+        await seekMutation.mutateAsync(ms);
+      } catch {}
     }
   };
   const handleToggleShuffle = async () => {

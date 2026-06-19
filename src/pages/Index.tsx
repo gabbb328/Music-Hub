@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SpotifyProvider } from "@/contexts/SpotifyContext";
+import { SessionProvider } from "@/contexts/SessionContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
 import { useDynamicTheme } from "@/hooks/useDynamicTheme";
 import Sidebar from "@/components/Sidebar";
@@ -26,10 +27,12 @@ import MoreContent from "@/components/MoreContent";
 import SamsungBudsContent from "@/components/SamsungBudsContent";
 import AboutContent from "@/components/AboutContent";
 import AudioSettingsContent from "@/components/AudioSettingsContent";
-import MusicQuizContent from "@/components/MusicQuizContent";
+import GamesContent from "@/components/GamesContent";
 import MoodGeneratorContent from "@/components/MoodGeneratorContent";
+import MoodCalendarContent from "@/components/MoodCalendarContent";
 import ListenAlongContent from "@/components/ListenAlongContent";
 import ChangelogContent from "@/components/ChangelogContent";
+import "@/time-machine-filters.css";
 import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
@@ -61,7 +64,6 @@ const KONAMI_KEYS = [
   "b",
   "a",
 ];
-// Sequenza mobile (swipe): ↑↑↓↓←→←→
 const KONAMI_SWIPES = [
   "ArrowUp",
   "ArrowUp",
@@ -198,13 +200,12 @@ function SuperModeOverlay({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IndexInner — vive DENTRO SpotifyProvider, quindi può usare useSpotifyContext
+// IndexInner
 // ═══════════════════════════════════════════════════════════════════════════════
 const IndexInner = () => {
   const isAlexa = useAlexa();
   const player = usePlayerStore();
 
-  // ✅ Ora è dentro SpotifyProvider — nessun errore di contesto
   const { isIOS, playbackState: spPb } = useSpotifyContext();
 
   const [activeSection, setActiveSection] = useState("home");
@@ -298,7 +299,7 @@ const IndexInner = () => {
     [],
   );
 
-  // ── Konami Code — keyboard ─────────────────────────────────────────────────
+  // ── Konami keyboard ────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       konamiRef.current = [...konamiRef.current, e.key].slice(
@@ -313,7 +314,7 @@ const IndexInner = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line
 
-  // ── Konami Code — swipe mobile ─────────────────────────────────────────────
+  // ── Konami swipe mobile ────────────────────────────────────────────────────
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       const t = e.touches[0];
@@ -411,10 +412,15 @@ const IndexInner = () => {
         return <AboutContent />;
       case "audio-settings":
         return <AudioSettingsContent />;
+      // "quiz" rimane per retrocompatibilità (link da MoreContent ecc.)
       case "quiz":
-        return <MusicQuizContent onStateChange={setIsQuizActive} />;
+      // Hub giochi completo: Quiz + Bingo + Classifica
+      case "games":
+        return <GamesContent onStateChange={setIsQuizActive} />;
       case "mood":
         return <MoodGeneratorContent />;
+      case "mood-calendar":
+        return <MoodCalendarContent />;
       case "listen-along":
         return <ListenAlongContent />;
       case "changelog":
@@ -444,7 +450,7 @@ const IndexInner = () => {
     >
       <SpotifyStatus />
 
-      {/* Banner iOS: nessun dispositivo attivo */}
+      {/* Banner iOS */}
       {isIOS && !spPb?.device && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/25 text-sm">
           <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
@@ -455,7 +461,6 @@ const IndexInner = () => {
         </div>
       )}
 
-      {/* Easter egg sfondo + lista */}
       <AnimatePresence>
         {activeEgg && (
           <EasterEggOverlay egg={activeEgg} onDismiss={handleDismissEgg} />
@@ -473,7 +478,6 @@ const IndexInner = () => {
         )}
       </AnimatePresence>
 
-      {/* Super Mode overlay */}
       <AnimatePresence>
         {superMode && (
           <SuperModeOverlay active={superMode} onEnd={deactivateSuperMode} />
@@ -490,7 +494,6 @@ const IndexInner = () => {
         />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {isAlexa ? (
-            // Modalità Alexa: Rendering statico diretto senza alcun overhead di animazione
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {renderContent()}
             </div>
@@ -536,7 +539,6 @@ const IndexInner = () => {
         </div>
       </div>
 
-      {/* Disable complex views on Alexa to save memory/CPU */}
       {!isAlexa && (
         <>
           <AnimatePresence>
@@ -562,14 +564,12 @@ const IndexInner = () => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Index — wrapper che monta SpotifyProvider, poi renderizza IndexInner al suo
-// interno. In questo modo useSpotifyContext() in IndexInner è sempre valido.
-// ═══════════════════════════════════════════════════════════════════════════════
 const Index = () => (
-  <SpotifyProvider>
-    <IndexInner />
-  </SpotifyProvider>
+  <SessionProvider>
+    <SpotifyProvider>
+      <IndexInner />
+    </SpotifyProvider>
+  </SessionProvider>
 );
 
 export default Index;

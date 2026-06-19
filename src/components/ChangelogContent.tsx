@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ScrollText, GitCommit, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { APP_VERSION } from "@/hooks/version";
 
 interface ChangelogEntry {
   date: string;
@@ -10,11 +11,42 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    date: "19 Giugno 2026",
+    version: "v1.8.0",
+    commits: [
+      "Aggiunta gamefication ",
+      "Aggiunta Gem e relativo filtro",
+      "Aggiunta animazione particles per i GEM",
+      "miglioramento Listen Along",
+      "Modifica del mood calendar per renderlo dinamico in base alle canzone ascoltate"
+    ],
+  },
+  {
+    date: "18 Giugno 2026",
+    version: "v1.7.0",
+    commits: ["Miglioramento vista giochi", "Aggiunta time machine"],
+  },
+  {
+    date: "18 Giugno 2026",
+    version: "v1.6.1",
+    commits: [
+      "Aggiunta riproduzione video su Spotify",
+      "Risoluzione Bug riproduzione video su NowPlayingView",
+    ],
+  },
+  {
+    date: "16 Giugno 2026",
+    version: "v1.6.0",
+    commits: [
+      "Risolto bug riproduzione video",
+      "Aggiunta gem overlay",
+      "Mood calendar",
+    ],
+  },
+  {
     date: "14 Giugno 2026",
     version: "v1.5.2",
-    commits: [
-      "Risolto bug video su NowPlayingView (ora funzionate)",
-    ],
+    commits: ["Risolto bug video su NowPlayingView (ora funzionate)"],
   },
   {
     date: "14 Giugno 2026",
@@ -221,7 +253,7 @@ export default function ChangelogContent() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground pb-8">
-          Music Hub v1.5.0 • Sviluppato con ❤️
+          Music Hub {APP_VERSION} • Sviluppato con ❤️
         </p>
       </motion.div>
     </div>

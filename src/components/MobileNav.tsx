@@ -12,7 +12,7 @@ const navItems = [
   { id: "home",    label: "Home",     icon: Home           },
   { id: "search",  label: "Cerca",    icon: Search         },
   { id: "library", label: "Libreria", icon: Library        },
-  { id: "quiz",    label: "Quiz",     icon: Gamepad2       },
+  { id: "games",   label: "Giochi",   icon: Gamepad2       },
   { id: "more",    label: "Altro",    icon: MoreHorizontal },
 ];
 
@@ -37,7 +37,8 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
     >
       <div className="flex justify-around items-center h-14 px-1">
         {navItems.map((item, i) => {
-          const isActive = activeSection === item.id;
+          // "games" è attivo anche se la sezione corrente è "quiz" (retrocompatibilità)
+          const isActive = activeSection === item.id || (item.id === "games" && activeSection === "quiz");
           const Icon = item.icon;
           const squishProps = squish.getProps(i);
 

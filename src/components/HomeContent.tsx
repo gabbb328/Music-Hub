@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Play, Clock, Settings } from "lucide-react";
@@ -23,7 +24,6 @@ const convertSpotifyTrack = (spotifyTrack: SpotifyTrack): Track => ({
   bpm: undefined,
 });
 
-// Skeleton shimmer card
 const SkeletonCard = () => (
   <Card>
     <CardContent className="p-3">
@@ -139,14 +139,14 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
 
       {/* Top Tracks */}
       <section className="space-y-4">
-        <motion.h2
-          className="text-2xl font-semibold tracking-tight"
+        <motion.div
+          className="flex items-center gap-3"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "tween", duration: 0.28, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
         >
-          Your Top Tracks
-        </motion.h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Your Top Tracks</h2>
+        </motion.div>
 
         {loadingTop ? (
           <div className="space-y-2">
@@ -160,6 +160,10 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
               </div>
             ))}
           </div>
+        ) : (topTracks?.items ?? []).length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            <p>Nessun brano trovato.</p>
+          </div>
         ) : (
           <motion.div
             className="space-y-1"
@@ -167,7 +171,7 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
             initial="hidden"
             animate="visible"
           >
-            {topTracks?.items?.slice(0, 5).map((track: SpotifyTrack, index: number) => (
+            {(topTracks?.items ?? []).slice(0, 5).map((track: SpotifyTrack, index: number) => (
               <motion.div
                 key={track.id}
                 variants={LIST_ITEM}
@@ -192,7 +196,7 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium truncate">{track.name}</h3>
-                    <p className="text-sm text-muted-foreground truncate">{track.artists.map(a => a.name).join(", ")}</p>
+                    <p className="text-sm text-muted-foreground truncate">{track.artists.map((a: any) => a.name).join(", ")}</p>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
@@ -200,7 +204,7 @@ const HomeContent = ({ onPlayTrack, onOpenSettings }: HomeContentProps) => {
                   </div>
                   <motion.div
                     className="opacity-0 group-hover:opacity-100"
-                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.15 }}
                   >
                     <div className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-accent">
                       <Play className="h-4 w-4 fill-current" />
