@@ -4,6 +4,7 @@ import { SpotifyProvider } from "@/contexts/SpotifyContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
 import { useDynamicTheme } from "@/hooks/useDynamicTheme";
+import { useTimeMachineSettings } from "@/hooks/useTimeMachineSettings";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import PlayerBar from "@/components/PlayerBar";
@@ -224,6 +225,7 @@ const IndexInner = () => {
 
   useLyricsPreloader();
   useDynamicTheme();
+  useTimeMachineSettings();
 
   const { data: playbackState } = usePlaybackState();
   const playMutation = usePlayMutation();

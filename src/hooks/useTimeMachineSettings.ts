@@ -22,6 +22,7 @@ export const ERA_CONFIGS: EraConfig[] = [
 
 const CSS_FILTER_CLASSES = ERA_CONFIGS.map((e) => e.filterClass);
 const STORAGE_KEY = "harmony_hub_time_machine";
+const EVENT_KEY = "harmony_hub_time_machine_sync";
 
 interface TimeMachineState {
   enabled: boolean;
@@ -37,11 +38,26 @@ function loadState(): TimeMachineState {
 }
 
 function saveState(s: TimeMachineState) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    window.dispatchEvent(new Event(EVENT_KEY));
+  } catch {}
 }
 
 export function useTimeMachineSettings() {
   const [state, setState] = useState<TimeMachineState>(loadState);
+
+  useEffect(() => {
+    const sync = () => setState(loadState());
+    window.addEventListener(EVENT_KEY, sync);
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY) sync();
+    });
+    return () => {
+      window.removeEventListener(EVENT_KEY, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const currentConfig = state.enabled ? (ERA_CONFIGS[state.eraIndex] ?? null) : null;
 
@@ -50,18 +66,22 @@ export function useTimeMachineSettings() {
     const root = document.documentElement;
     CSS_FILTER_CLASSES.forEach((cls) => root.classList.remove(cls));
     if (currentConfig) root.classList.add(currentConfig.filterClass);
-    return () => CSS_FILTER_CLASSES.forEach((cls) => root.classList.remove(cls));
   }, [currentConfig]);
 
-  // Persiste
-  useEffect(() => { saveState(state); }, [state]);
-
   const setEnabled = useCallback((enabled: boolean) => {
-    setState((prev) => ({ ...prev, enabled }));
+    setState((prev) => {
+      const next = { ...prev, enabled };
+      saveState(next);
+      return next;
+    });
   }, []);
 
   const setEraIndex = useCallback((eraIndex: number) => {
-    setState((prev) => ({ ...prev, eraIndex, enabled: true }));
+    setState((prev) => {
+      const next = { ...prev, eraIndex, enabled: true };
+      saveState(next);
+      return next;
+    });
   }, []);
 
   /** Filtra tracce per era — usato in HomeContent */
