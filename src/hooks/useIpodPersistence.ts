@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { IpodScreen } from "@/components/IpodNowPlayingView";
 
-// Memory-only storage (resets on page reload)
 interface IpodStore {
   screen: IpodScreen;
   menuIndex: number;

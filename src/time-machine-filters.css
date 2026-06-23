@@ -1,28 +1,18 @@
-/* ============================================================
-   TIME MACHINE — Filtri CSS per era
-   Importa in main.tsx o App.tsx:
-     import "@/time-machine-filters.css";
-   ============================================================ */
-
-/* ── Anni '60: seppia caldo, saturazione vintage ─────────── */
 .era-60s #root {
   filter: sepia(0.45) saturate(1.3) contrast(1.05) brightness(0.97);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Anni '70: arancione/marrone, look pellicola ─────────── */
 .era-70s #root {
   filter: sepia(0.3) saturate(1.5) hue-rotate(-15deg) contrast(1.1) brightness(0.95);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Anni '80: glitch CRT — scanline overlay ─────────────── */
 .era-80s #root {
   filter: saturate(1.6) contrast(1.15) hue-rotate(5deg) brightness(1.05);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Scanline overlay tramite pseudo-element sul body */
 .era-80s body::after {
   content: "";
   position: fixed;
@@ -39,7 +29,6 @@
   mix-blend-mode: multiply;
 }
 
-/* Glitch animation su elementi h1/h2 */
 .era-80s h1,
 .era-80s h2 {
   animation: crt-glitch 6s infinite;
@@ -54,25 +43,21 @@
   100%      { text-shadow: none; }
 }
 
-/* ── Anni '90: bassa saturazione, look grunge ────────────── */
 .era-90s #root {
   filter: saturate(0.5) contrast(1.1) brightness(0.92) sepia(0.1);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Anni 2000: over-sharpened, lieve oversaturation ─────── */
 .era-2000s #root {
   filter: saturate(1.25) contrast(1.1) brightness(1.02);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Anni 2010: pulito, lievissimo cool-blue ─────────────── */
 .era-2010s #root {
   filter: saturate(1.1) hue-rotate(5deg) contrast(1.02);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Cyberpunk: neon cyan/magenta, alto contrasto ────────── */
 .era-cyberpunk #root {
   filter: saturate(2) contrast(1.2) hue-rotate(-10deg) brightness(1.05);
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -94,7 +79,6 @@
     );
 }
 
-/* Neon glow su titoli in modalità cyberpunk */
 .era-cyberpunk h1,
 .era-cyberpunk h2 {
   text-shadow: 0 0 8px rgba(0, 255, 255, 0.6), 0 0 20px rgba(255, 0, 220, 0.3);
@@ -109,7 +93,6 @@
   99%       { opacity: 1; }
 }
 
-/* Reset pulito quando nessuna era è attiva */
 #root {
   filter: none;
   transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);

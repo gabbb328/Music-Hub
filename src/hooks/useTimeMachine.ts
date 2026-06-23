@@ -1,20 +1,6 @@
-/**
- * useTimeMachine
- *
- * Hook per il "Time Machine Slider" (Fase 2).
- *
- * Responsabilità:
- *  A) Mantiene l'era selezionata e applica/rimuove classi CSS globali al <body>.
- *  B) Espone una funzione per filtrare una lista di tracce per decennio.
- *
- * Il filtro CSS è puramente client-side: nessuna chiamata API.
- */
-
 import { useCallback, useEffect, useState } from "react";
 import type { Era, EraConfig } from "@/types/features";
 import type { SpotifyTrack } from "@/types/spotify";
-
-// ── Configurazione ere ────────────────────────────────────────
 
 export const ERA_CONFIGS: EraConfig[] = [
   {
@@ -77,7 +63,6 @@ export const ERA_CONFIGS: EraConfig[] = [
 
 const CSS_FILTER_CLASSES = ERA_CONFIGS.map((e) => e.filterClass);
 
-// ── Hook ──────────────────────────────────────────────────────
 
 export function useTimeMachine() {
   const [activeEra, setActiveEra] = useState<Era | null>(null);
@@ -87,7 +72,6 @@ export function useTimeMachine() {
     ? ERA_CONFIGS.find((e) => e.id === activeEra) ?? null
     : null;
 
-  // Applica/rimuovi classi al body
   useEffect(() => {
     const root = document.documentElement;
     CSS_FILTER_CLASSES.forEach((cls) => root.classList.remove(cls));
@@ -100,23 +84,16 @@ export function useTimeMachine() {
     };
   }, [activeEra]);
 
-  /** Attiva un'era tramite indice slider */
   const handleSliderChange = useCallback((index: number) => {
     setSliderIndex(index);
     const era = ERA_CONFIGS[index];
     if (era) setActiveEra(era.id);
   }, []);
 
-  /** Disattiva il filtro */
   const resetEra = useCallback(() => {
     setActiveEra(null);
   }, []);
 
-  /**
-   * Filtra un array di SpotifyTrack tenendo solo quelli
-   * il cui album.release_date rientra nell'era selezionata.
-   * Se nessuna era è attiva, restituisce l'array invariato.
-   */
   const filterTracksByEra = useCallback(
     (tracks: Array<SpotifyTrack & { album: { release_date?: string } }>): typeof tracks => {
       if (!currentConfig) return tracks;

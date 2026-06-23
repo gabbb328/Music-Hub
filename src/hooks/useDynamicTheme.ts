@@ -13,7 +13,6 @@ export function useDynamicTheme() {
     const albumCover = playbackState?.item?.album?.images?.[0]?.url ?? null;
     const trackId    = playbackState?.item?.id ?? null;
 
-    // Aggiorna sempre la copertina nel ThemeContext (per icona Auto)
     setCoverImageUrl(albumCover);
 
     if (!isDynamicTheme) {

@@ -1,12 +1,3 @@
-/**
- * useGameLeaderboard
- *
- * Classifica locale (localStorage) separata per "quiz" e "bingo".
- * Nessun backend — puramente client-side.
- *
- * Storage key: "harmony_hub_leaderboard"
- */
-
 import { useCallback, useEffect, useState } from "react";
 
 export type GameType = "quiz" | "bingo";
@@ -16,17 +7,14 @@ export interface LeaderboardEntry {
   gameType: GameType;
   playerName: string;
   score: number;
-  /** Per il quiz: risposte corrette su tot domande — es. "8/10" */
   detail: string;
-  playedAt: number; // timestamp ms
+  playedAt: number;
 }
 
 type LeaderboardStore = Record<GameType, LeaderboardEntry[]>;
 
 const STORAGE_KEY = "harmony_hub_leaderboard";
 const MAX_ENTRIES_PER_GAME = 20;
-
-// ── Helpers ───────────────────────────────────────────────────
 
 function load(): LeaderboardStore {
   try {
@@ -50,8 +38,6 @@ function save(data: LeaderboardStore): void {
   }
 }
 
-// ── Hook ──────────────────────────────────────────────────────
-
 export function useGameLeaderboard() {
   const [store, setStore] = useState<LeaderboardStore>(load);
 
@@ -59,7 +45,6 @@ export function useGameLeaderboard() {
     save(store);
   }, [store]);
 
-  /** Aggiunge un nuovo punteggio e ordina per score desc */
   const addEntry = useCallback(
     (
       gameType: GameType,
@@ -86,7 +71,6 @@ export function useGameLeaderboard() {
     []
   );
 
-  /** Cancella la classifica di un gioco (o entrambe) */
   const clearLeaderboard = useCallback((gameType?: GameType) => {
     if (gameType) {
       setStore((prev) => ({ ...prev, [gameType]: [] }));

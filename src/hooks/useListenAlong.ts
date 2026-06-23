@@ -10,7 +10,6 @@ export const useListenAlong = (sessionId: string | null) => {
   const channelRef = useRef<any>(null);
   const [participants, setParticipants] = useState<string[]>([]);
 
-  // Funzione per generare un codice a 8 cifre
   const generateSessionId = () => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
   };

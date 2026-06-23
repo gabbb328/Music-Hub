@@ -1,12 +1,3 @@
-/**
- * useTimeMachineSettings
- *
- * Gestisce lo stato globale del Time Machine (on/off + era scelta)
- * persisto in localStorage così le impostazioni sopravvivono ai refresh.
- *
- * Usato sia da HomeContent (per applicare filtri) che da SettingsPanel (per controllarlo).
- */
-
 import { useCallback, useEffect, useState } from "react";
 import type { Era, EraConfig } from "@/types/features";
 
@@ -26,7 +17,7 @@ const EVENT_KEY = "harmony_hub_time_machine_sync";
 
 interface TimeMachineState {
   enabled: boolean;
-  eraIndex: number; // indice in ERA_CONFIGS
+  eraIndex: number;
 }
 
 function loadState(): TimeMachineState {
@@ -34,7 +25,7 @@ function loadState(): TimeMachineState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as TimeMachineState;
   } catch {}
-  return { enabled: false, eraIndex: 3 }; // default: Anni '90, disattivato
+  return { enabled: false, eraIndex: 3 };
 }
 
 function saveState(s: TimeMachineState) {
@@ -61,7 +52,6 @@ export function useTimeMachineSettings() {
 
   const currentConfig = state.enabled ? (ERA_CONFIGS[state.eraIndex] ?? null) : null;
 
-  // Applica / rimuovi classi CSS su <html>
   useEffect(() => {
     const root = document.documentElement;
     CSS_FILTER_CLASSES.forEach((cls) => root.classList.remove(cls));
@@ -84,7 +74,6 @@ export function useTimeMachineSettings() {
     });
   }, []);
 
-  /** Filtra tracce per era — usato in HomeContent */
   const filterTracksByEra = useCallback(
     <T extends { album: { release_date?: string } }>(tracks: T[]): T[] => {
       if (!currentConfig) return tracks;

@@ -52,7 +52,6 @@ import { useSpotifyContext } from "@/contexts/SpotifyContext";
 import { Crown, Zap, Smartphone } from "lucide-react";
 import { useAlexa } from "@/hooks/useAlexa";
 
-// ── Konami sequence: ↑↑↓↓←→←→BA ─────────────────────────────────────────────
 const KONAMI_KEYS = [
   "ArrowUp",
   "ArrowUp",
@@ -76,7 +75,6 @@ const KONAMI_SWIPES = [
   "ArrowRight",
 ];
 
-// ── Super Mode Overlay ────────────────────────────────────────────────────────
 function SuperModeOverlay({
   active,
   onEnd,
@@ -104,7 +102,7 @@ function SuperModeOverlay({
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [active, isAlexa]); // eslint-disable-line
+  }, [active, isAlexa]);
 
   if (!active || isAlexa) return null;
 
@@ -200,9 +198,6 @@ function SuperModeOverlay({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// IndexInner
-// ═══════════════════════════════════════════════════════════════════════════════
 const IndexInner = () => {
   const isAlexa = useAlexa();
   const player = usePlayerStore();
@@ -265,7 +260,6 @@ const IndexInner = () => {
 
   const handleDismissEgg = useCallback(() => setActiveEgg(null), []);
 
-  // ── Super Mode ─────────────────────────────────────────────────────────────
   const activateSuperMode = () => {
     if (superActiveRef.current) return;
     superActiveRef.current = true;
@@ -301,7 +295,6 @@ const IndexInner = () => {
     [],
   );
 
-  // ── Konami keyboard ────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       konamiRef.current = [...konamiRef.current, e.key].slice(
@@ -316,7 +309,6 @@ const IndexInner = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line
 
-  // ── Konami swipe mobile ────────────────────────────────────────────────────
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       const t = e.touches[0];
@@ -353,9 +345,8 @@ const IndexInner = () => {
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchend", onTouchEnd);
     };
-  }, []); // eslint-disable-line
+  }, []);
 
-  // ── Content router ─────────────────────────────────────────────────────────
   const renderContent = () => {
     if (activeSection.startsWith("playlist-")) {
       return (
@@ -414,9 +405,7 @@ const IndexInner = () => {
         return <AboutContent />;
       case "audio-settings":
         return <AudioSettingsContent />;
-      // "quiz" rimane per retrocompatibilità (link da MoreContent ecc.)
       case "quiz":
-      // Hub giochi completo: Quiz + Bingo + Classifica
       case "games":
         return <GamesContent onStateChange={setIsQuizActive} />;
       case "mood":
@@ -452,7 +441,6 @@ const IndexInner = () => {
     >
       <SpotifyStatus />
 
-      {/* Banner iOS */}
       {isIOS && !spPb?.device && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/25 text-sm">
           <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
@@ -486,7 +474,6 @@ const IndexInner = () => {
         )}
       </AnimatePresence>
 
-      {/* Layout principale */}
       <div
         className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}
       >
@@ -520,7 +507,6 @@ const IndexInner = () => {
         </main>
       </div>
 
-      {/* PlayerBar e MobileNav */}
       <div className="md:contents fixed bottom-0 left-0 right-0 z-50 flex flex-col pointer-events-none bg-background/80 backdrop-blur-xl border-t border-border/40 md:bg-transparent md:backdrop-blur-none md:border-t-0">
         <div className="md:relative md:z-auto md:static pointer-events-auto">
           <PlayerBar

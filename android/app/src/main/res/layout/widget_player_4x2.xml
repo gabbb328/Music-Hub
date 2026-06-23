@@ -12,7 +12,7 @@
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
         android:src="@drawable/widget_default_cover"
-        android:colorFilter="@color/widget_desaturate" />
+        android:tint="@color/widget_desaturate" />
 
     <!-- Overlay -->
     <View

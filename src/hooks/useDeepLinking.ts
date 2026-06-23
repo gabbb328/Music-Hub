@@ -5,22 +5,17 @@ export const useDeepLinking = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Gestisce deep link quando l'app viene aperta da URL esterno
     const setupDeepLinking = async () => {
       try {
-        // Import dinamico - funziona solo se @capacitor/app è installato
         const { App } = await import('@capacitor/app');
         
-        // Listener per URL ricevuti mentre l'app è già aperta
         App.addListener('appUrlOpen', (event) => {
           console.log('Deep link received:', event.url);
           
           const url = new URL(event.url);
-          const pathname = url.pathname || url.host; // host per scheme custom
+          const pathname = url.pathname || url.host;
           
-          // Esempio: com.musichub.app://callback?code=xxx
           if (pathname.includes('callback')) {
-            // Chiude il browser di Capacitor per far rivedere l'app sotto
             import('@capacitor/browser').then(({ Browser }) => {
               Browser.close().catch(console.error);
             }).catch(console.error);
@@ -30,7 +25,6 @@ export const useDeepLinking = () => {
           }
         });
 
-        // Controlla se l'app è stata aperta tramite URL
         const result = await App.getLaunchUrl();
         if (result?.url) {
           console.log('App launched with URL:', result.url);
@@ -38,7 +32,6 @@ export const useDeepLinking = () => {
           const pathname = url.pathname || url.host;
           
           if (pathname.includes('callback')) {
-            // Chiude il browser anche in caso di cold start, per sicurezza
             import('@capacitor/browser').then(({ Browser }) => {
               Browser.close().catch(console.error);
             }).catch(console.error);
@@ -47,7 +40,6 @@ export const useDeepLinking = () => {
           }
         }
       } catch (error) {
-        // @capacitor/app non disponibile - modalità browser
         console.log('Deep linking not available (browser mode)');
       }
     };
@@ -55,7 +47,6 @@ export const useDeepLinking = () => {
     setupDeepLinking();
 
     return () => {
-      // Cleanup - importa dinamicamente per evitare errori se non disponibile
       import('@capacitor/app').then(({ App }) => {
         App.removeAllListeners();
       }).catch(() => {});

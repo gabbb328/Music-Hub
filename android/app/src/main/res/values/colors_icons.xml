@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icon_blu_scuro">#00008B</color>
+    <color name="icon_blu_chiaro">#ADD8E6</color>
+    <color name="icon_viola_scuro">#800080</color>
+    <color name="icon_viola_chiaro">#EE82EE</color>
+    <color name="icon_azzurro_scuro">#008B8B</color>
+    <color name="icon_azzurro_chiaro">#E0FFFF</color>
+    <color name="icon_verde_scuro">#006400</color>
+    <color name="icon_verde_chiaro">#90EE90</color>
+    <color name="icon_arancione_scuro">#FF8C00</color>
+    <color name="icon_arancione_chiaro">#FFD700</color>
+    <color name="icon_rosa_scuro">#C71585</color>
+    <color name="icon_rosa_chiaro">#FFB6C1</color>
+    <color name="icon_rosso_scuro">#8B0000</color>
+    <color name="icon_rosso_chiaro">#FF0000</color>
+</resources>

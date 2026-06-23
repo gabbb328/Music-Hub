@@ -11,6 +11,15 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    date: "23 Giugno 2026",
+    version: "v1.8.1",
+    commits: [
+      "Migliorata sincronizzazione testo nella modalita karaoke",
+      "Ottimizzato il caricamento del sito",
+      "Bugfix sincronizzazione ",
+    ],
+  },
+  {
     date: "19 Giugno 2026",
     version: "v1.8.0",
     commits: [
@@ -18,7 +27,7 @@ export const changelogData: ChangelogEntry[] = [
       "Aggiunta Gem e relativo filtro",
       "Aggiunta animazione particles per i GEM",
       "miglioramento Listen Along",
-      "Modifica del mood calendar per renderlo dinamico in base alle canzone ascoltate"
+      "Modifica del mood calendar per renderlo dinamico in base alle canzone ascoltate",
     ],
   },
   {

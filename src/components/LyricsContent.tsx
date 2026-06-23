@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVocalRemover } from "@/hooks/useVocalRemover";
 import { fetchSongTrivia, type TriviaResult, fetchSongAnalysis, type AIAnalysisResult } from "@/services/trivia-api";
 import { AlertCircle } from "lucide-react";
+import { lyricsStore } from "@/hooks/useLyricsStore";
 
 interface LyricsContentProps { currentTrack: Track | null; }
 type Mode = "lyrics" | "info" | "analysis" | "trivia";
@@ -49,22 +50,31 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
   // Real-time timer to drive smooth 60fps animations
   const [activeTime, setActiveTime] = useState(0);
+  const syncRef = useRef<{ baseTime: number; updatedAt: number }>({ baseTime: 0, updatedAt: Date.now() });
 
   // Dynamic container height tracker for perfect pixel-centered vertical spacers
   const [containerHeight, setContainerHeight] = useState(300);
 
   // Sync activeTime with playbackState updates
   useEffect(() => {
+    syncRef.current = { baseTime: currentTime, updatedAt: Date.now() };
     setActiveTime(currentTime);
   }, [currentTime]);
 
-  // Tick activeTime locally if playing to guarantee smooth transition animations
+  // Tick activeTime locally if playing using high-precision requestAnimationFrame
   useEffect(() => {
     if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setActiveTime(prev => prev + 0.1);
-    }, 100);
-    return () => clearInterval(interval);
+    let animationFrameId: number;
+    const tick = () => {
+      const now = Date.now();
+      const elapsed = (now - syncRef.current.updatedAt) / 1000;
+      // Add 300ms standard compensation for Spotify API network roundtrip latency
+      const latencyCompensation = 0.3; 
+      setActiveTime(syncRef.current.baseTime + elapsed + latencyCompensation);
+      animationFrameId = requestAnimationFrame(tick);
+    };
+    animationFrameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [isPlaying]);
 
   // Monitor exact container height dynamically to center the lyrics vertically
@@ -82,23 +92,35 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   // ── Carica testo ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentTrack) return;
+    const trackId  = (currentTrack as any)?.id;
     const title    = (currentTrack as any).name   || (currentTrack as any).title   || "";
     const artist   = (currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist || "";
     const duration = (currentTrack as any).duration_ms
       ? Math.floor((currentTrack as any).duration_ms / 1000)
       : (currentTrack as any).duration || 180;
-    setLoadingLyrics(true);
+    
     setLyrics([]);
     setTranslatedLyrics(new Map());
     setShowTranslation(false);
     setCurrentLineIndex(0);
     setActiveTime(0);
-    
-    fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
-      setLyrics(lines);
-      setIsSynced(synced);
+
+    const cached = trackId ? lyricsStore.getLyrics(trackId) : null;
+    if (cached) {
+      setLyrics(cached.lines);
+      setIsSynced(cached.synced);
       setLoadingLyrics(false);
-    });
+      const cachedTrans = lyricsStore.getTranslation(trackId);
+      if (cachedTrans) setTranslatedLyrics(cachedTrans);
+    } else {
+      setLoadingLyrics(true);
+      fetchSyncedLyrics(title, artist, duration).then(({ lines, synced }) => {
+        setLyrics(lines);
+        setIsSynced(synced);
+        setLoadingLyrics(false);
+        if (trackId) lyricsStore.setLyrics(trackId, { lines, synced });
+      });
+    }
     
     setLoadingTrivia(true);
     fetchSongTrivia(artist, title).then(res => {
@@ -329,7 +351,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                   )}
                 </AnimatePresence>
 
-                <div className="mx-auto w-full max-w-2xl px-4 md:px-8 space-y-1 flex flex-col items-center">
+                <div className="mx-auto w-full max-w-4xl px-4 md:px-8 space-y-1 flex flex-col items-center md:items-start">
                   {lyrics.map((line, index) => {
                     const isCurrent = index === currentLineIndex;
                     const isPast    = index < currentLineIndex;
@@ -338,12 +360,84 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                       /^\[.*\]$/.test(line.text) || /^\(.*\)$/.test(line.text) ||
                       /instrumental|music/i.test(line.text);
 
-                    // Split original line into individual words for karaoke zoom effect
-                    const words = line.text.split(/\s+/);
+                    const hasSyncWords = line.words && line.words.length > 0;
+                    const words = hasSyncWords ? line.words!.map(w => w.text) : line.text.split(/\s+/);
+                    
+                    let openParen = 0;
+                    const categorizedWords = words.map((w, i) => {
+                      const opens = (w.match(/[\(\[]/g) || []).length;
+                      const closes = (w.match(/[\)\]]/g) || []).length;
+                      const isChorus = openParen > 0 || opens > 0;
+                      openParen += opens;
+                      openParen -= closes;
+                      openParen = Math.max(0, openParen);
+                      return { text: w, index: i, isChorus };
+                    });
+                    const mainWords = categorizedWords.filter(w => !w.isChorus);
+                    const chorusWords = categorizedWords.filter(w => w.isChorus);
                     const nextLine = lyrics[index + 1];
-                    const lineDuration = nextLine ? nextLine.time - line.time : 4;
+                    // Cap the animation duration based on typical singing speed so words don't animate slowly over long instrumental gaps
+                    const maxRealisticDuration = Math.max(3, words.length * 0.4);
+                    const rawDuration = nextLine ? nextLine.time - line.time : maxRealisticDuration;
+                    const lineDuration = Math.min(rawDuration, maxRealisticDuration);
                     const lineProgress = Math.max(0, Math.min(1, (activeTime - line.time) / lineDuration));
-                    const activeWordIndex = Math.floor(lineProgress * words.length);
+                    
+                    let activeWordIndex = -1;
+                    let activeMainIndex = -1;
+                    let activeChorusIndex = -1;
+
+                    let isStrictlySequential = false;
+                    let isChorusAtEnd = false;
+                    if (mainWords.length > 0 && chorusWords.length > 0) {
+                      const firstChorus = categorizedWords.findIndex(w => w.isChorus);
+                      const lastMain = categorizedWords.findLastIndex(w => !w.isChorus);
+                      if (firstChorus > lastMain) {
+                        isStrictlySequential = true;
+                        isChorusAtEnd = true;
+                      } else {
+                        const lastChorus = categorizedWords.findLastIndex(w => w.isChorus);
+                        const firstMain = categorizedWords.findIndex(w => !w.isChorus);
+                        if (lastChorus < firstMain) {
+                          isStrictlySequential = true;
+                          isChorusAtEnd = false;
+                        }
+                      }
+                    }
+
+                    if (hasSyncWords) {
+                      const nextFutureIndex = line.words!.findIndex(w => w.time > activeTime);
+                      if (nextFutureIndex === -1) {
+                        activeWordIndex = line.words!.length; 
+                      } else if (nextFutureIndex === 0) {
+                        activeWordIndex = -1;
+                      } else {
+                        activeWordIndex = nextFutureIndex - 1;
+                      }
+                    } else {
+                      if (isStrictlySequential) {
+                        const globalActiveIndex = lineProgress === 1 ? words.length : Math.floor(lineProgress * words.length);
+                        if (isChorusAtEnd) {
+                          if (globalActiveIndex < mainWords.length) {
+                            activeMainIndex = globalActiveIndex;
+                            activeChorusIndex = -1;
+                          } else {
+                            activeMainIndex = mainWords.length;
+                            activeChorusIndex = globalActiveIndex - mainWords.length;
+                          }
+                        } else {
+                          if (globalActiveIndex < chorusWords.length) {
+                            activeChorusIndex = globalActiveIndex;
+                            activeMainIndex = -1;
+                          } else {
+                            activeChorusIndex = chorusWords.length;
+                            activeMainIndex = globalActiveIndex - chorusWords.length;
+                          }
+                        }
+                      } else {
+                        activeMainIndex = lineProgress === 1 ? mainWords.length : Math.floor(lineProgress * mainWords.length);
+                        activeChorusIndex = lineProgress === 1 ? chorusWords.length : Math.floor(lineProgress * chorusWords.length);
+                      }
+                    }
 
                     return (
                       <div
@@ -351,24 +445,24 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                         ref={el => { lineRefs.current[index] = el; }}
                         onClick={() => isSynced && handleLineClick(line)}
                         className={`
-                          w-full px-4 py-3 rounded-2xl transition-all duration-300 text-center flex flex-col items-center justify-center
+                          w-full px-4 py-3 rounded-2xl transition-all duration-300 flex flex-col items-center md:items-start justify-center text-center md:text-left
                           ${isSynced ? "cursor-pointer hover:bg-secondary/40 active:scale-[0.98]" : "cursor-default"}
                           ${isCurrent ? "bg-primary/10" : ""}
                         `}
                       >
                         {isBreak ? (
-                          <div className="flex items-center justify-center gap-2 py-1 text-center w-full">
+                          <div className="flex items-center justify-center md:justify-start gap-2 py-1 text-center md:text-left w-full">
                             <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
-                            <span className={`text-sm italic text-center ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
+                            <span className={`text-sm italic text-center md:text-left ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
                               {line.text.trim() || "Instrumental"}
                             </span>
                             <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
                           </div>
                         ) : (
-                          <div className="space-y-1.5 flex flex-col items-center justify-center w-full text-center">
+                          <div className="space-y-1.5 flex flex-col items-center md:items-start justify-center w-full text-center md:text-left">
                             {/* Subtitle Translation - Explicitly centered horizontally and given full width */}
                             {showTranslation && translation && (
-                              <p className={`leading-snug transition-all duration-300 font-medium text-center w-full px-2 ${
+                              <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
                                 isCurrent
                                   ? "text-primary/80 font-semibold text-base md:text-xl animate-fade-in"
                                   : isPast
@@ -381,47 +475,94 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                             
                             {/* Bouncy word-magnification Karaoke Rendering */}
                             {isCurrent && isSynced && isKaraokeActive ? (
-                              <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 w-full text-center px-4 py-1">
-                                {words.map((word, wIdx) => {
-                                  const isWordActive = wIdx === activeWordIndex;
-                                  const isWordPast = wIdx < activeWordIndex;
-                                  return (
-                                    <motion.span
-                                      key={wIdx}
-                                      animate={{
-                                        scale: isWordActive ? 1.25 : 1,
-                                        y: isWordActive ? -2 : 0,
-                                      }}
-                                      transition={{ duration: 0.15, ease: "easeOut" }}
-                                      className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none text-center ${
-                                        isWordActive
-                                          ? "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
-                                          : isWordPast
-                                            ? "text-muted-foreground/30"
-                                            : "text-foreground/80"
-                                      }`}
-                                    >
-                                      {word}
-                                    </motion.span>
-                                  );
-                                })}
+                              <div className="flex flex-col items-center md:items-start w-full gap-2">
+                                {mainWords.length > 0 && (
+                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-1">
+                                    {mainWords.map((wInfo, localIdx) => {
+                                      const isWordActive = hasSyncWords ? wInfo.index === activeWordIndex : localIdx === activeMainIndex;
+                                      const isWordPast = hasSyncWords ? wInfo.index < activeWordIndex : localIdx < activeMainIndex;
+                                      return (
+                                        <motion.span
+                                          key={wInfo.index}
+                                          animate={{
+                                            scale: isWordActive ? 1.25 : 1,
+                                            y: isWordActive ? -2 : 0,
+                                          }}
+                                          transition={{ duration: 0.15, ease: "easeOut" }}
+                                          className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none text-center md:text-left ${
+                                            isWordActive
+                                              ? "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
+                                              : isWordPast
+                                                ? "text-muted-foreground/30"
+                                                : "text-foreground/80"
+                                          }`}
+                                        >
+                                          {wInfo.text}
+                                        </motion.span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {chorusWords.length > 0 && (
+                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-1.5 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-0.5 opacity-80">
+                                    {chorusWords.map((wInfo, localIdx) => {
+                                      const isWordActive = hasSyncWords ? wInfo.index === activeWordIndex : localIdx === activeChorusIndex;
+                                      const isWordPast = hasSyncWords ? wInfo.index < activeWordIndex : localIdx < activeChorusIndex;
+                                      return (
+                                        <motion.span
+                                          key={wInfo.index}
+                                          animate={{
+                                            scale: isWordActive ? 1.15 : 1,
+                                            y: isWordActive ? -1 : 0,
+                                          }}
+                                          transition={{ duration: 0.15, ease: "easeOut" }}
+                                          className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none text-center md:text-left ${
+                                            isWordActive
+                                              ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.4)]"
+                                              : isWordPast
+                                                ? "text-muted-foreground/25"
+                                                : "text-foreground/60"
+                                          }`}
+                                        >
+                                          {wInfo.text}
+                                        </motion.span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               /* Standard Plain Text Rendering - Centered horizontally explicitly inside <p> */
-                              <p className={`leading-snug transition-all duration-300 font-medium text-center w-full px-2 ${
-                                isCurrent
-                                  ? "text-primary font-bold text-2xl md:text-3xl"
-                                  : isPast
-                                    ? "text-muted-foreground/35 text-lg md:text-xl"
-                                    : "text-foreground/65 text-lg md:text-xl"
-                              }`}>
-                                {line.text}
-                              </p>
+                              <div className="flex flex-col items-center md:items-start w-full">
+                                {mainWords.length > 0 && (
+                                  <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
+                                    isCurrent
+                                      ? "text-primary font-bold text-2xl md:text-3xl"
+                                      : isPast
+                                        ? "text-muted-foreground/35 text-lg md:text-xl"
+                                        : "text-foreground/65 text-lg md:text-xl"
+                                  }`}>
+                                    {mainWords.map(w => w.text).join(' ')}
+                                  </p>
+                                )}
+                                {chorusWords.length > 0 && (
+                                  <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 italic mt-1 ${
+                                    isCurrent
+                                      ? "text-primary/80 font-bold text-xl md:text-2xl"
+                                      : isPast
+                                        ? "text-muted-foreground/25 text-base md:text-lg"
+                                        : "text-foreground/50 text-base md:text-lg"
+                                  }`}>
+                                    {chorusWords.map(w => w.text).join(' ')}
+                                  </p>
+                                )}
+                              </div>
                             )}
 
                             {/* Timestamp */}
                             {isSynced && isCurrent && (
-                              <p className="text-[10px] text-primary/50 font-mono mt-1 text-center w-full">
+                              <p className="text-[10px] text-primary/50 font-mono mt-1 text-center md:text-left w-full md:w-auto">
                                 {formatTime(Math.floor(line.time))}
                               </p>
                             )}

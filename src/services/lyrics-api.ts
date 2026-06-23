@@ -2,10 +2,16 @@
 const LYRICS_OVH_BASE = "https://api.lyrics.ovh/v1";
 const LRCLIB_BASE = "https://lrclib.net/api";
 
+export interface LyricWord {
+  time: number;
+  text: string;
+}
+
 export interface LyricLine {
   time: number;
   text: string;
   endTime?: number;
+  words?: LyricWord[];
 }
 
 export interface SyncedLyrics {
@@ -34,16 +40,48 @@ export const parseLRC = (lrcContent: string): LyricLine[] => {
   
   for (const line of lrcLines) {
     try {
-      const match = line.match(/\[(\d{2}):(\d{2})\.?(\d{2})?\](.*)/);
-      if (match) {
-        const minutes = parseInt(match[1], 10);
-        const seconds = parseInt(match[2], 10);
-        const centiseconds = match[3] ? parseInt(match[3], 10) : 0;
-        const text = match[4]?.trim() || '';
+      // Find all line-level timestamp tags like [01:23.45]
+      const timeRegex = /\[(\d{2,}):(\d{2})(?:\.(\d{1,3}))?\]/g;
+      const timeMatches = [...line.matchAll(timeRegex)];
+      
+      if (timeMatches.length > 0) {
+        // Remove the line-level timestamps to get the text
+        const rawText = line.replace(timeRegex, '').trim();
         
-        if (text && !isNaN(minutes) && !isNaN(seconds)) {
-          const time = minutes * 60 + seconds + centiseconds / 100;
-          lines.push({ time, text });
+        let words: LyricWord[] | undefined = undefined;
+        // Parse enhanced LRC word-level timestamps like <01:23.45> Word
+        const wordRegex = /<(\d{2,}):(\d{2})(?:\.(\d{1,3}))?>([^<]*)/g;
+        const wordMatches = [...rawText.matchAll(wordRegex)];
+        
+        let cleanText = rawText;
+        if (wordMatches.length > 0) {
+          words = [];
+          for (const wm of wordMatches) {
+            const wmMin = parseInt(wm[1], 10);
+            const wmSec = parseInt(wm[2], 10);
+            const wmMilli = wm[3] ? parseInt(wm[3].padEnd(3, '0'), 10) : 0;
+            const wTime = wmMin * 60 + wmSec + wmMilli / 1000;
+            const wText = wm[4].trim();
+            if (wText) {
+              words.push({ time: wTime, text: wText });
+            }
+          }
+          cleanText = rawText.replace(/<\d{2,}:\d{2}(?:\.\d{1,3})?>/g, '').trim();
+          if (words.length === 0) words = undefined;
+        } else {
+          // Just clean any stray tags if they exist
+          cleanText = rawText.replace(/<\d{2,}:\d{2}(?:\.\d{1,3})?>/g, '').trim();
+        }
+        
+        for (const match of timeMatches) {
+          const minutes = parseInt(match[1], 10);
+          const seconds = parseInt(match[2], 10);
+          const milliseconds = match[3] ? parseInt(match[3].padEnd(3, '0'), 10) : 0;
+          
+          if (!isNaN(minutes) && !isNaN(seconds)) {
+            const time = minutes * 60 + seconds + milliseconds / 1000;
+            lines.push({ time, text: cleanText, words });
+          }
         }
       }
     } catch (e) {

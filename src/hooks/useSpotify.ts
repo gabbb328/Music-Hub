@@ -3,17 +3,10 @@ import * as spotifyApi from "@/services/spotify-api";
 import { getToken } from "@/services/spotify-auth";
 import { useSessionContext } from "@/contexts/SessionContext";
 
-// ── Rileva iOS (Safari non supporta Web Playback SDK) ─────────────────────────
 const IS_IOS =
   /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-/**
- * playWithIosFallback — su iOS, se Spotify API ritorna NO_ACTIVE_DEVICE,
- * prova automaticamente a trasferire il playback al primo dispositivo disponibile
- * e poi riprova il play. Su iOS Safari il Web Playback SDK non è supportato,
- * quindi il dispositivo attivo deve essere l'app Spotify nativa.
- */
 async function playWithIosFallback(
   params: { deviceId?: string; contextUri?: string; uris?: string[]; offset?: any }
 ) {
@@ -23,7 +16,6 @@ async function playWithIosFallback(
     if (!IS_IOS) throw err;
     if (!err.message?.includes("NO_ACTIVE_DEVICE") && err.message !== "NO_ACTIVE_DEVICE") throw err;
 
-    // Prova a trovare un dispositivo e trasferire
     const devs = await spotifyApi.getAvailableDevices().catch(() => null);
     const devices: any[] = devs?.devices || [];
     const target =
@@ -34,7 +26,6 @@ async function playWithIosFallback(
     if (!target?.id) throw new Error("Apri l'app Spotify sul dispositivo e riprova.");
 
     await spotifyApi.transferPlayback(target.id, true);
-    // Attende che Spotify registri il dispositivo
     await new Promise(r => setTimeout(r, 800));
     return await spotifyApi.play(target.id, params.contextUri, params.uris, params.offset);
   }
@@ -129,8 +120,6 @@ export const useQueue = () => useQuery({
 export const useAudioFeatures = (trackId: string) => useQuery({
   queryKey: ["audio-features", trackId],
   queryFn: async () => {
-    // SPOTIFY DEPRECATED THIS ENDPOINT FOR NON-ENTERPRISE APPS IN 2024.
-    // Returning null directly to prevent 403 Forbidden errors in the console.
     return null;
   },
   enabled: false,
@@ -141,8 +130,6 @@ export const useCheckSavedTracks = (trackIds: string[]) => useQuery({
   queryFn: () => spotifyApi.checkSavedTracks(trackIds),
   enabled: !!getToken() && trackIds.length > 0, staleTime: 30000,
 });
-
-// ── Mutations ─────────────────────────────────────────────────────────────────
 
 export const usePlayMutation = () => {
   const qc = useQueryClient();
@@ -259,11 +246,9 @@ export const useLikeTrackMutation = () => {
   });
 };
 
-// ── New hooks for AI DJ ────────────────────────────────────────────────────────
-
 export const useCurrentUserQuery = () => useQuery({
   queryKey: ["currentUser"],
   queryFn: spotifyApi.getUserProfile,
   enabled: !!getToken(),
-  staleTime: 300000, // 5 minutes
+  staleTime: 300000,
 });

@@ -1,21 +1,6 @@
-/**
- * useWebAudioEngine v3 — spazializzazione REALE e percepibile
- *
- * Cosa fa davvero ora:
- * - Ogni stem ha il suo PannerNode 3D (non solo StereoPanner) con HRTF
- * - La posizione X/Y del radar si traduce in coordinate 3D reali (x, y, z)
- * - La distanza riduce il volume con curva inverse-square
- * - Il reverb aumenta proporzionalmente alla distanza
- * - updateStemParams aggiorna IMMEDIATAMENTE pan e gain durante il drag
- * - Demo: 8 oscillatori con frequenze molto diverse e ben distinguibili
- * - File importato: buffer decodificato riprodotto da ogni stem con offset
- *   di fase diverso + filtro differente per simulare stem separati
- */
-
 import { useRef, useCallback, useEffect } from "react";
 import type { Stem } from "@/types/spatialMixer";
 
-// ── Demo tones — frequenze ben distanziate per sentire la separazione ─────────
 const DEMO: Record<string, { freq: number; type: OscillatorType; vol: number }> = {
   "stem-0": { freq: 261.63, type: "sine",     vol: 0.15 }, // Do4  vocals
   "stem-1": { freq: 329.63, type: "sine",     vol: 0.10 }, // Mi4  backing
@@ -27,7 +12,6 @@ const DEMO: Record<string, { freq: number; type: OscillatorType; vol: number }> 
   "stem-7": { freq: 880.00, type: "triangle", vol: 0.07 }, // La5  archi
 };
 
-// ── Nodi per stem ─────────────────────────────────────────────────────────────
 interface StemNodes {
   panner:     PannerNode;
   gainNode:   GainNode;
@@ -37,7 +21,6 @@ interface StemNodes {
   eqHigh:     BiquadFilterNode;
 }
 
-// ── Costruisce IR sintetico per la stanza ─────────────────────────────────────
 function buildIR(ctx: AudioContext | OfflineAudioContext, duration = 2.0, decay = 2.8): AudioBuffer {
   const len = Math.floor(ctx.sampleRate * duration);
   const buf = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -50,23 +33,16 @@ function buildIR(ctx: AudioContext | OfflineAudioContext, duration = 2.0, decay 
   return buf;
 }
 
-// ── Conversione posizione radar → coordinate 3D ───────────────────────────────
-// Il radar è una vista dall'alto:
-//   x normalizzato (-1…1) → asse X (sinistra/destra)
-//   y normalizzato (-1…1) → asse Z (avanti/indietro) — y negativo = davanti
-// Il listener è fermo all'origine guardando verso z=-1 (avanti)
 function stemTo3D(pos: { x: number; y: number; distance: number }) {
   const scale = 4; // metri (distanza massima stanza)
   return {
     x:  pos.x * scale,
-    y:  0,                    // stesso piano orizzontale del listener
-    z: -pos.y * scale,        // y radar negativo = avanti (z negativo in WebAudio)
+    y:  0,
+    z: -pos.y * scale,
   };
 }
 
-// ── Gain da distanza (curva inverse-distance, non lineare) ───────────────────
 function distGain(distance: number): number {
-  // distance 0…1; gain 1…0.08
   return Math.max(0.08, 1 / (1 + distance * 6));
 }
 
@@ -83,13 +59,11 @@ export function useWebAudioEngine() {
   const startCtxTimeRef = useRef(0);
   const offsetRef       = useRef(0);
 
-  // ── Inizializza AudioContext ────────────────────────────────────────────────
   const getCtx = useCallback((): AudioContext => {
     if (ctxRef.current && ctxRef.current.state !== "closed") return ctxRef.current;
 
     const ctx = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
 
-    // Listener orientato verso -Z (standard WebAudio)
     ctx.listener.setPosition(0, 0, 0);
     if (ctx.listener.forwardX) {
       ctx.listener.forwardX.value  = 0; ctx.listener.forwardY.value  = 0; ctx.listener.forwardZ.value  = -1;
@@ -114,9 +88,7 @@ export function useWebAudioEngine() {
     return ctx;
   }, []);
 
-  // ── Costruisce catena di processing per uno stem ───────────────────────────
   const buildChain = useCallback((ctx: AudioContext, stem: Stem): StemNodes => {
-    // EQ
     const eqLow = ctx.createBiquadFilter();
     eqLow.type = "lowshelf"; eqLow.frequency.value = 120; eqLow.gain.value = stem.eq.low;
     const eqMid = ctx.createBiquadFilter();
@@ -124,13 +96,11 @@ export function useWebAudioEngine() {
     const eqHigh = ctx.createBiquadFilter();
     eqHigh.type = "highshelf"; eqHigh.frequency.value = 8000; eqHigh.gain.value = stem.eq.high;
 
-    // Gain
     const gainNode = ctx.createGain();
     gainNode.gain.value = stem.muted ? 0 : stem.volume * distGain(stem.position.distance);
 
-    // PannerNode 3D con HRTF — questo è il nodo chiave per la spazializzazione
     const panner = ctx.createPanner();
-    panner.panningModel = "HRTF";          // binaural realistico
+    panner.panningModel = "HRTF";
     panner.distanceModel = "inverse";
     panner.refDistance   = 1;
     panner.maxDistance   = 20;
@@ -145,13 +115,10 @@ export function useWebAudioEngine() {
       (panner as any).setPosition(pos3d.x, pos3d.y, pos3d.z);
     }
 
-    // Reverb send — più lontano = più reverb
     const reverbSend = ctx.createGain();
     const reverbAmt = Math.min(0.08 + stem.position.distance * 0.7 + stem.reverbSend * 0.4, 1.0);
     reverbSend.gain.value = reverbAmt;
 
-    // Collegamento: EQ → gain → panner → master (dry)
-    //                         panner → reverbSend → convolver (wet)
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
     eqHigh.connect(gainNode);
@@ -163,7 +130,6 @@ export function useWebAudioEngine() {
     return { panner, gainNode, reverbSend, eqLow, eqMid, eqHigh };
   }, []);
 
-  // ── Distrugge sorgenti audio ────────────────────────────────────────────────
   const killSources = useCallback(() => {
     sourcesRef.current.forEach(src => {
       try { src.stop(); } catch (_) {}
@@ -172,7 +138,6 @@ export function useWebAudioEngine() {
     sourcesRef.current.clear();
   }, []);
 
-  // ── Distrugge tutto ─────────────────────────────────────────────────────────
   const killAll = useCallback(() => {
     killSources();
     stemNodesRef.current.forEach(n => {
@@ -181,8 +146,6 @@ export function useWebAudioEngine() {
     });
     stemNodesRef.current.clear();
   }, [killSources]);
-
-  // ── API ─────────────────────────────────────────────────────────────────────
 
   const loadStems = useCallback((stems: Stem[], buffer?: AudioBuffer) => {
     const ctx = getCtx();
@@ -195,13 +158,11 @@ export function useWebAudioEngine() {
     });
   }, [getCtx, killAll, buildChain]);
 
-  // Crea e avvia una sorgente audio per uno stem
   const attachSource = useCallback((ctx: AudioContext, stem: Stem, nodes: StemNodes, offsetSec: number) => {
     if (bufferRef.current) {
       const src = ctx.createBufferSource();
       src.buffer = bufferRef.current;
       src.loop   = false;
-      // Filtro diverso per ogni stem per simulare separazione
       const filter = ctx.createBiquadFilter();
       const idx = parseInt(stem.id.replace("stem-", "") || "0");
       const freqs = [200, 400, 100, 60, 800, 1200, 2000, 4000];
@@ -278,13 +239,6 @@ export function useWebAudioEngine() {
     return ctx.currentTime - startCtxTimeRef.current;
   }, []);
 
-  /**
-   * updateStemParams — chiamato ad OGNI drag, aggiorna in real-time:
-   * - posizione 3D del PannerNode (spazializzazione immediata)
-   * - gain (volume × distanza)
-   * - reverb send (distanza → più reverb)
-   * - EQ
-   */
   const updateStemParams = useCallback((stem: Stem) => {
     const nodes = stemNodesRef.current.get(stem.id);
     const ctx   = ctxRef.current;
@@ -293,7 +247,6 @@ export function useWebAudioEngine() {
     const now  = ctx.currentTime;
     const ramp = 0.02; // 20ms smooth
 
-    // ── Aggiorna posizione 3D ────────────────────────────────────────────────
     const pos3d = stemTo3D(stem.position);
     if (nodes.panner.positionX) {
       nodes.panner.positionX.linearRampToValueAtTime(pos3d.x, now + ramp);
@@ -303,21 +256,17 @@ export function useWebAudioEngine() {
       (nodes.panner as any).setPosition(pos3d.x, pos3d.y, pos3d.z);
     }
 
-    // ── Aggiorna gain ────────────────────────────────────────────────────────
     const targetGain = stem.muted ? 0 : stem.volume * distGain(stem.position.distance);
     nodes.gainNode.gain.linearRampToValueAtTime(targetGain, now + ramp);
 
-    // ── Aggiorna reverb send ─────────────────────────────────────────────────
     const reverbAmt = Math.min(0.08 + stem.position.distance * 0.7 + stem.reverbSend * 0.4, 1.0);
     nodes.reverbSend.gain.linearRampToValueAtTime(stem.muted ? 0 : reverbAmt, now + ramp);
 
-    // ── Aggiorna EQ ──────────────────────────────────────────────────────────
     nodes.eqLow.gain.setTargetAtTime(stem.eq.low,  now, 0.015);
     nodes.eqMid.gain.setTargetAtTime(stem.eq.mid,  now, 0.015);
     nodes.eqHigh.gain.setTargetAtTime(stem.eq.high, now, 0.015);
   }, []);
 
-  // ── Export WAV ──────────────────────────────────────────────────────────────
   const exportWav = useCallback(async (durationSec: number): Promise<Blob> => {
     const offCtx = new OfflineAudioContext(2, Math.floor(44100 * durationSec), 44100);
     const offMaster = offCtx.createGain(); offMaster.gain.value = 0.85; offMaster.connect(offCtx.destination);
@@ -370,7 +319,6 @@ export function useWebAudioEngine() {
   return { loadStems, play, pause, stop, seekTo, getCurrentTime, updateStemParams, exportWav, dispose };
 }
 
-// ── Encoder WAV PCM 16-bit ────────────────────────────────────────────────────
 function bufferToWav(buf: AudioBuffer): Blob {
   const ch = buf.numberOfChannels, sr = buf.sampleRate, len = buf.length;
   const ab = new ArrayBuffer(44 + len * ch * 2);

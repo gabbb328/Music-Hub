@@ -1,15 +1,3 @@
-/**
- * useMoodCalendar — v2
- *
- * Aggiunge il rilevamento automatico del mood basato sui brani ascoltati oggi.
- *
- * Logica auto-detect:
- *  - Legge i brani recenti da Spotify (passati come parametro)
- *  - Conta i generi/caratteristiche inferite dal nome artista/track
- *  - Mappa a un MoodId e salva automaticamente per oggi
- *  - L'utente può sempre fare override manuale
- */
-
 import { useCallback, useEffect, useState } from "react";
 import type { MoodCalendarData, MoodEntry, MoodId } from "@/types/features";
 
@@ -35,8 +23,6 @@ export const MOOD_META: Record<MoodId, { label: string; emoji: string }> = {
   custom:    { label: "Misto",       emoji: "🎨" },
 };
 
-// ── Keyword → mood mapping ────────────────────────────────────
-// Analizza nome artista e titolo brano cercando keyword
 const MOOD_KEYWORDS: Record<MoodId, string[]> = {
   energetic: ["rock", "metal", "punk", "run", "power", "gym", "workout", "fast", "speed", "rage", "fight", "beast", "hard", "heavy"],
   happy:     ["happy", "sunshine", "summer", "dance", "joy", "love", "wonderful", "beautiful", "smile", "fun", "good"],
@@ -47,10 +33,6 @@ const MOOD_KEYWORDS: Record<MoodId, string[]> = {
   custom:    [],
 };
 
-/**
- * Inferisce un MoodId da una lista di brani Spotify recenti.
- * Conta i punti per ogni mood e restituisce quello con punteggio più alto.
- */
 export function inferMoodFromTracks(
   tracks: Array<{ name: string; artists: Array<{ name: string }> }>
 ): MoodId {
@@ -72,15 +54,12 @@ export function inferMoodFromTracks(
     }
   }
 
-  // Se nessun keyword ha fatto punti, uso "custom"
   const best = (Object.entries(scores) as [MoodId, number][])
     .sort((a, b) => b[1] - a[1])[0];
 
   if (best[1] === 0) return "custom";
   return best[0];
 }
-
-// ── Helpers storage ───────────────────────────────────────────
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -102,8 +81,6 @@ function saveToStorage(data: MoodCalendarData): void {
     console.warn("[MoodCalendar] localStorage non disponibile.");
   }
 }
-
-// ── Hook ──────────────────────────────────────────────────────
 
 export function useMoodCalendar() {
   const [calendar, setCalendar] = useState<MoodCalendarData>(loadFromStorage);
@@ -132,11 +109,6 @@ export function useMoodCalendar() {
     []
   );
 
-  /**
-   * Salva automaticamente il mood di oggi calcolato dai brani recenti.
-   * Non sovrascrive se l'utente ha già fatto un override manuale
-   * (segnalato da entry.autoDetected === false).
-   */
   const autoSaveMood = useCallback(
     (
       tracks: Array<{ name: string; artists: Array<{ name: string }> }>,
@@ -144,7 +116,6 @@ export function useMoodCalendar() {
     ) => {
       const today = todayKey();
       setCalendar((prev) => {
-        // Se l'entry di oggi esiste ed è stata impostata manualmente, non toccare
         const existing = prev[today] as any;
         if (existing && existing.autoDetected === false) return prev;
 
@@ -167,7 +138,6 @@ export function useMoodCalendar() {
     []
   );
 
-  /** Override manuale: marca autoDetected=false così non viene sovrascritto */
   const saveMoodManual = useCallback(
     (
       moodId: MoodId,
@@ -182,7 +152,7 @@ export function useMoodCalendar() {
         color: MOOD_COLORS[moodId],
         tracks: options?.tracks,
         note: options?.note,
-        autoDetected: false, // blocca future auto-sovrascritture
+        autoDetected: false,
       };
       setCalendar((prev) => ({ ...prev, [date]: entry }));
     },

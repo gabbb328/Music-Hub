@@ -23,9 +23,8 @@ export function useSpatialMixer() {
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     engine.dispose();
-  }, []); // eslint-disable-line
+  }, []);
 
-  // ── Tick ─────────────────────────────────────────────────────────────────
   const startTick = useCallback(() => {
     const tick = () => {
       const t   = engine.getCurrentTime();
@@ -48,14 +47,12 @@ export function useSpatialMixer() {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
   }, []);
 
-  // ── loadDemo ──────────────────────────────────────────────────────────────
   const loadDemo = useCallback(() => {
     stopTick();
     engine.stop();
     const demo = createDemoProject();
     durationRef.current = demo.songDuration;
     setProject(demo);
-    // Carica gli stem nell'engine — oscillatori demo
     engine.loadStems(demo.stems, undefined);
     setStatus("ready");
     setPlaybackTime(0);
@@ -63,7 +60,6 @@ export function useSpatialMixer() {
     setSelectedStemId(null);
   }, [engine, stopTick]);
 
-  // ── importFile ────────────────────────────────────────────────────────────
   const importFile = useCallback(async (file: File) => {
     stopTick();
     engine.stop();
@@ -118,10 +114,8 @@ export function useSpatialMixer() {
     setIsPlaying(false);
   }, [engine, stopTick]);
 
-  // ── Transport ─────────────────────────────────────────────────────────────
   const play = useCallback(() => {
     if (!project) return;
-    // Aggiorna snapshot degli stem nell'engine con i valori correnti di posizione
     engine.loadStems(project.stems, undefined);
     engine.play();
     setIsPlaying(true);
@@ -149,11 +143,6 @@ export function useSpatialMixer() {
     setPlaybackTime(sec);
   }, [engine]);
 
-  // ── Stem mutations ────────────────────────────────────────────────────────
-  /**
-   * updateStem — aggiorna lo stato React E i parametri audio in real-time.
-   * Viene chiamato ad ogni drag del nodo nel radar.
-   */
   const updateStem = useCallback((id: string, patch: Partial<Stem>) => {
     setProject(p => {
       if (!p) return p;
@@ -199,7 +188,6 @@ export function useSpatialMixer() {
     updateStem(id, { position: { x: 0, y: 0, angle: 0, distance: 0 } });
   }, [updateStem]);
 
-  // ── Export ────────────────────────────────────────────────────────────────
   const exportMix = useCallback(async (settings: ExportSettings) => {
     if (!project) return;
     setStatus("exporting");
