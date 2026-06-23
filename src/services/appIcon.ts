@@ -7,32 +7,43 @@ import { Capacitor } from "@capacitor/core";
 
 // Mappa nome file icona → nome alias Android
 const ICON_TO_ALIAS: Record<string, string> = {
-  "auto":                     "default",
-  "app_blu_scuro.png":        "IconBluScuro",
-  "app_blu_chiaro.png":       "IconBluChiaro",
-  "app_viola_scuro.png":      "IconViolaScuro",
-  "app_viola_chiaro.png":     "IconViolaChiaro",
-  "app_azzurro_scuro.png":    "IconAzzurroScuro",
-  "app_azzurro_chiaro.png":   "IconAzzurroChiaro",
-  "app_verde_scuro.png":      "IconVerdeScuro",
-  "app_verde_chiaro.png":     "IconVerdeChiaro",
-  "app_arancione_scuro.png":  "IconArancioneScuro",
+  auto: "default",
+  "app_blu_scuro.png": "IconBluScuro",
+  "app_blu_chiaro.png": "IconBluChiaro",
+  "app_viola_scuro.png": "IconViolaScuro",
+  "app_viola_chiaro.png": "IconViolaChiaro",
+  "app_azzurro_scuro.png": "IconAzzurroScuro",
+  "app_azzurro_chiaro.png": "IconAzzurroChiaro",
+  "app_verde_scuro.png": "IconVerdeScuro",
+  "app_verde_chiaro.png": "IconVerdeChiaro",
+  "app_arancione_scuro.png": "IconArancioneScuro",
   "app_arancione_chiaro.png": "IconArancioneChiaro",
-  "app_rosa_scuro.png":       "IconRosaScuro",
-  "app_rosa_chiaro.png":      "IconRosaChiaro",
-  "app_rosso_scuro.png":      "IconRossoScuro",
-  "app_rosso_chiaro.png":     "IconRossoChiaro",
+  "app_rosa_scuro.png": "IconRosaScuro",
+  "app_rosa_chiaro.png": "IconRosaChiaro",
+  "app_rosso_scuro.png": "IconRossoScuro",
+  "app_rosso_chiaro.png": "IconRossoChiaro",
+  "app_chiaro.png": "IconChiaro",
+  "app_scuro.png": "IconScuro",
 };
 
 // Tutti gli alias esistenti nel manifest
 const ALL_ALIASES = [
-  "IconBluScuro", "IconBluChiaro",
-  "IconViolaScuro", "IconViolaChiaro",
-  "IconAzzurroScuro", "IconAzzurroChiaro",
-  "IconVerdeScuro", "IconVerdeChiaro",
-  "IconArancioneScuro", "IconArancioneChiaro",
-  "IconRosaScuro", "IconRosaChiaro",
-  "IconRossoScuro", "IconRossoChiaro",
+  "IconBluScuro",
+  "IconBluChiaro",
+  "IconViolaScuro",
+  "IconViolaChiaro",
+  "IconAzzurroScuro",
+  "IconAzzurroChiaro",
+  "IconVerdeScuro",
+  "IconVerdeChiaro",
+  "IconArancioneScuro",
+  "IconArancioneChiaro",
+  "IconRosaScuro",
+  "IconRosaChiaro",
+  "IconRossoScuro",
+  "IconRossoChiaro",
+  "IconChiaro",
+  "IconScuro",
 ];
 
 /**
@@ -40,13 +51,18 @@ const ALL_ALIASES = [
  */
 export function resolveAutoIconFilename(
   colorTheme: string,
-  theme: "light" | "dark"
+  theme: "light" | "dark",
 ): string {
   const colorToBase: Record<string, string> = {
-    blue: "blu", sky: "blu", indigo: "blu",
+    blue: "blu",
+    sky: "blu",
+    indigo: "blu",
     teal: "azzurro",
-    purple: "viola", violet: "viola", fuchsia: "viola",
-    emerald: "verde", lime: "verde",
+    purple: "viola",
+    violet: "viola",
+    fuchsia: "viola",
+    emerald: "verde",
+    lime: "verde",
     amber: "arancione",
     rose: "rosa",
     crimson: "rosso",
@@ -81,13 +97,16 @@ export async function changeAppIcon(iconFilename: string): Promise<void> {
   }
 }
 
-async function callNative(method: string, data: Record<string, string>): Promise<void> {
+async function callNative(
+  method: string,
+  data: Record<string, string>,
+): Promise<void> {
   // Usa Capacitor plugin bridge
   await (Capacitor as any).nativeCallback(
     "AppIconPlugin",
     method,
     data,
     () => {},
-    () => {}
+    () => {},
   );
 }

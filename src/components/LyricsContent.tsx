@@ -40,10 +40,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const userScrollRef  = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: playbackState }                          = usePlaybackState();
-  const currentTrack                                     = playbackState?.item || localTrack;
-  const seekMutation = useSeekMutation();
-  const { toast }    = useToast();
+  const { data: playbackState } = usePlaybackState();
+  const currentTrack            = playbackState?.item || localTrack;
+  const seekMutation            = useSeekMutation();
+  const { toast }               = useToast();
 
   const isPlaying   = playbackState?.is_playing;
   const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
