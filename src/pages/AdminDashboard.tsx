@@ -3163,20 +3163,20 @@ function VercelPanel() {
                 {deployments.length === 0 ? <Empty icon={Server} text="nessun deploy trovato" /> : deployments.map((d) => {
                   const s = sc(d.state);
                   return (
-                    <div key={d.uid} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px", border: "1px solid rgba(255,255,255,0.02)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                        <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, background: s.bg, color: s.c, padding: "2px 7px", borderRadius: 5 }}>{d.state}</span>
-                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                    <div key={d.uid} style={{ background: "rgba(0,0,0,0.24)", borderRadius: 11, padding: "8px 11px", border: "1px solid rgba(255,255,255,0.02)", display: "flex", flexDirection: "column", minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                        <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, background: s.bg, color: s.c, padding: "2px 7px", borderRadius: 5, flexShrink: 0 }}>{d.state}</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{d.name}</span>
                         <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>{ago(new Date(d.createdAt).toISOString())}</span>
                       </div>
                       {d.meta?.githubCommitMessage && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5, minWidth: 0 }}>
                           <GitBranch size={9} color="rgba(255,255,255,0.18)" style={{ flexShrink: 0 }} />
-                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{d.meta.githubCommitMessage}</span>
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{d.meta.githubCommitMessage}</span>
                           {d.meta?.githubCommitSha && <span style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", flexShrink: 0 }}>{d.meta.githubCommitSha.slice(0, 7)}</span>}
                         </div>
                       )}
-                      {d.url && <a href={`https://${d.url}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 9, color: "rgba(96,165,250,0.5)", textDecoration: "none" }}><Globe size={9} /> {d.url}</a>}
+                      {d.url && <a href={`https://${d.url}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 9, color: "rgba(96,165,250,0.5)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}><Globe size={9} style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.url}</span></a>}
                     </div>
                   );
                 })}
@@ -3245,26 +3245,28 @@ function Topbar({ session, onLogout, onShowShortcuts, onRefreshAll }: { session:
   }, []);
   return (
     <div className="admin-topbar">
-      <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Shield size={13} color="#34d399" />
-      </div>
-      <div>
-        <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>Music Hub</p>
-        <p style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.2 }}>Admin Panel</p>
+      <div className="admin-topbar-left">
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Shield size={13} color="#34d399" />
+        </div>
+        <div className="admin-topbar-title">
+          <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>Music Hub</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.2 }}>Admin Panel</p>
+        </div>
       </div>
       <div className="admin-topbar-actions">
-        <span style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.2)", letterSpacing: 1 }}>{now}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.28)" }}>
+        <span className="admin-hide-mobile" style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.2)", letterSpacing: 1 }}>{now}</span>
+        <div className="admin-user-info" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.28)" }}>
           <User size={10} color="rgba(52,211,153,0.6)" />
           <span style={{ color: "rgba(110,231,183,0.7)" }}>{session.username}</span>
-          <span style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
-          <Clock size={9} />
-          <span>{remaining}m</span>
+          <span className="admin-hide-mobile" style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
+          <Clock className="admin-hide-mobile" size={9} />
+          <span className="admin-hide-mobile">{remaining}m</span>
         </div>
-        <button onClick={onRefreshAll} title="Refresh (R)" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+        <button className="admin-hide-mobile" onClick={onRefreshAll} title="Refresh (R)" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
           <RefreshCw size={11} /> Refresh
         </button>
-        <button onClick={onShowShortcuts} title="Shortcuts (?)" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+        <button className="admin-hide-mobile" onClick={onShowShortcuts} title="Shortcuts (?)" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
           <Keyboard size={11} /> ?
         </button>
         <button onClick={onLogout} title="Logout (Ctrl+L)" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "rgba(248,113,113,0.7)", fontSize: 10, fontFamily: "inherit" }}>
@@ -3391,16 +3393,26 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
-        .admin-topbar { display:flex; align-items:center; gap:12px; padding:10px 18px; border-bottom:1px solid rgba(56,189,248,0.2); background:rgba(5,10,25,0.85); backdrop-filter:blur(20px); position:sticky; top:0; z-index:20; box-shadow:0 4px 30px rgba(0,0,0,0.5); }
-        .admin-topbar-actions { margin-left:auto; display:flex; align-items:center; gap:14px; }
+        .admin-topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 18px; border-bottom:1px solid rgba(56,189,248,0.2); background:rgba(5,10,25,0.85); backdrop-filter:blur(20px); position:sticky; top:0; z-index:20; box-shadow:0 4px 30px rgba(0,0,0,0.5); }
+        .admin-topbar-left { display:flex; align-items:center; gap:12px; }
+        .admin-topbar-actions { display:flex; align-items:center; gap:14px; }
         .admin-grid-1 { display:grid; grid-template-columns:1.5fr 1fr 1.2fr; gap:11px; margin-bottom:11px; }
         .admin-grid-2 { display:grid; grid-template-columns:1.2fr 1fr 1fr 1fr; gap:11px; margin-bottom:11px; }
         .admin-grid-3 { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:11px; margin-bottom:11px; }
         .admin-grid-4 { display:grid; grid-template-columns:1fr 1.2fr 1.8fr; gap:11px; margin-bottom:16px; }
         .admin-credentials-row { display:flex; gap:6px; }
         @media (max-width:1200px) { .admin-grid-1,.admin-grid-2,.admin-grid-3,.admin-grid-4 { grid-template-columns:1fr 1fr; } }
-        @media (max-width:960px) { .admin-container { padding:10px !important; } .admin-grid-1,.admin-grid-2,.admin-grid-3,.admin-grid-4 { grid-template-columns:1fr; gap:14px; } .admin-topbar { flex-direction:column; align-items:stretch; gap:12px; padding:12px 14px; } .admin-topbar-actions { margin-left:0; width:100%; justify-content:flex-start; flex-wrap:wrap; gap:10px; } }
-        @media (max-width:600px) { .admin-credentials-row { flex-direction:column; gap:8px; } .admin-topbar-actions { justify-content:space-between; } }
+        @media (max-width:960px) {
+          .admin-container { padding:10px !important; }
+          .admin-grid-1,.admin-grid-2,.admin-grid-3,.admin-grid-4 { grid-template-columns:1fr; gap:14px; }
+          .admin-topbar { padding:12px 14px; }
+          .admin-hide-mobile { display:none !important; }
+        }
+        @media (max-width:600px) {
+          .admin-credentials-row { flex-direction:column; gap:8px; }
+          .admin-topbar-title p:last-child { display:none; }
+          .admin-user-info { gap:3px !important; }
+        }
       `}</style>
     </div>
   );
