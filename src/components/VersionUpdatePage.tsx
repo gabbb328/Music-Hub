@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Hourglass, Shield, Sparkles } from "lucide-react";
+import { Hourglass, Sparkles } from "lucide-react";
 import { APP_VERSION } from "@/hooks/version";
 
 interface VersionUpdatePageProps {
@@ -168,16 +168,6 @@ export default function VersionUpdatePage({
           </div>
         </div>
       </motion.div>
-
-      {/* Admin access hint footer */}
-      {!isPreview && (
-        <a
-          href="/admin"
-          className="update-admin-link"
-        >
-          <Shield size={13} /> Dashboard Amministrazione
-        </a>
-      )}
 
       {/* Responsive Stylesheet */}
       <style>{`
