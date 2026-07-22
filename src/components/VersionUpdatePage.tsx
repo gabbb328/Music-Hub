@@ -15,11 +15,12 @@ export default function VersionUpdatePage({
 }: VersionUpdatePageProps) {
   return (
     <div
+      className="update-page-wrapper"
       style={{
         position: isPreview ? "relative" : "fixed",
         inset: isPreview ? undefined : 0,
         width: "100%",
-        minHeight: isPreview ? "400px" : "100vh",
+        minHeight: isPreview ? "420px" : "100vh",
         height: isPreview ? "100%" : "100vh",
         zIndex: isPreview ? 10 : 99999,
         background: "radial-gradient(circle at 50% 30%, #0f172a 0%, #020617 100%)",
@@ -27,8 +28,8 @@ export default function VersionUpdatePage({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
-        overflow: "hidden",
+        padding: isPreview ? "16px" : "20px",
+        overflowY: "auto",
         boxSizing: "border-box",
         color: "#f8fafc",
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -41,10 +42,10 @@ export default function VersionUpdatePage({
           top: "40%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: "500px",
-          height: "500px",
+          width: "min(500px, 90vw)",
+          height: "min(500px, 90vw)",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(56,189,248,0.12) 0%, rgba(139,92,246,0.08) 50%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(56,189,248,0.15) 0%, rgba(168,85,247,0.1) 50%, transparent 75%)",
           pointerEvents: "none",
           filter: "blur(60px)",
         }}
@@ -56,9 +57,9 @@ export default function VersionUpdatePage({
           position: "absolute",
           inset: 0,
           backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
+          backgroundSize: "32px 32px",
           pointerEvents: "none",
-          opacity: 0.6,
+          opacity: 0.5,
         }}
       />
 
@@ -67,69 +68,35 @@ export default function VersionUpdatePage({
           onClick={onClosePreview}
           style={{
             position: "absolute",
-            top: 16,
-            right: 16,
+            top: 14,
+            right: 14,
             zIndex: 20,
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.25)",
             color: "#fff",
-            borderRadius: 8,
-            padding: "6px 14px",
+            borderRadius: 10,
+            padding: "8px 16px",
             fontSize: 12,
             cursor: "pointer",
             fontWeight: 600,
-            backdropFilter: "blur(8px)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
           }}
         >
           Chiudi Anteprima
         </button>
       )}
 
-      {/* Main Glassmorphic Container */}
+      {/* Main Responsive Glassmorphic Card */}
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          maxWidth: "780px",
-          width: "100%",
-          background: "rgba(15, 23, 42, 0.75)",
-          border: "1px solid rgba(56, 189, 248, 0.25)",
-          borderRadius: "24px",
-          padding: "36px 44px",
-          backdropFilter: "blur(20px)",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.15)",
-          display: "flex",
-          alignItems: "center",
-          gap: "36px",
-        }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="update-card"
       >
-        {/* LEFT SIDE: Hourglass rotating 180 degrees */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              width: "100px",
-              height: "100px",
-              borderRadius: "24px",
-              background: "linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15))",
-              border: "1px solid rgba(56, 189, 248, 0.4)",
-              boxShadow: "0 0 25px rgba(56, 189, 248, 0.25), inset 0 0 15px rgba(255, 255, 255, 0.05)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-            }}
-          >
+        {/* HOURGLASS CONTAINER (Left on desktop, Top/Center on mobile) */}
+        <div className="update-hourglass-wrapper">
+          <div className="update-hourglass-box">
             {/* Hourglass Icon with 180-degree rotation animation */}
             <motion.div
               animate={{ rotate: [0, 180, 180, 360] }}
@@ -146,17 +113,17 @@ export default function VersionUpdatePage({
                 color: "#38bdf8",
               }}
             >
-              <Hourglass size={48} strokeWidth={1.8} />
+              <Hourglass className="update-hourglass-icon" strokeWidth={1.8} />
             </motion.div>
 
             {/* Glowing particle ring */}
             <motion.div
-              animate={{ opacity: [0.3, 0.8, 0.3], scale: [0.95, 1.05, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.95, 1.05, 0.95] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
               style={{
                 position: "absolute",
                 inset: "-4px",
-                borderRadius: "28px",
+                borderRadius: "24px",
                 border: "1px solid rgba(56, 189, 248, 0.5)",
                 pointerEvents: "none",
               }}
@@ -164,99 +131,38 @@ export default function VersionUpdatePage({
           </div>
         </div>
 
-        {/* RIGHT SIDE: "aggiornamento versione <numero versione>" */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span
-              style={{
-                fontSize: "11px",
-                fontFamily: "monospace",
-                textTransform: "uppercase",
-                letterSpacing: "0.15em",
-                color: "#38bdf8",
-                background: "rgba(56, 189, 248, 0.12)",
-                padding: "3px 10px",
-                borderRadius: "20px",
-                border: "1px solid rgba(56, 189, 248, 0.3)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-              }}
-            >
-              <Sparkles size={12} /> AGGIORNAMENTO IN CORSO
+        {/* CONTENT CONTAINER (Right on desktop, Center/Bottom on mobile) */}
+        <div className="update-content-box">
+          <div className="update-badge-row">
+            <span className="update-status-badge">
+              <Sparkles size={11} /> AGGIORNAMENTO IN CORSO
             </span>
             {APP_VERSION && (
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontFamily: "monospace",
-                  color: "rgba(255, 255, 255, 0.4)",
-                }}
-              >
+              <span className="update-current-version">
                 (attuale: {APP_VERSION})
               </span>
             )}
           </div>
 
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "28px",
-              fontWeight: 800,
-              letterSpacing: "-0.02em",
-              lineHeight: 1.25,
-              background: "linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #38bdf8 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              textTransform: "lowercase",
-            }}
-          >
+          <h1 className="update-title">
             aggiornamento versione {targetVersion}
           </h1>
 
-          <p
-            style={{
-              margin: "4px 0 0 0",
-              fontSize: "14px",
-              lineHeight: 1.5,
-              color: "#94a3b8",
-            }}
-          >
+          <p className="update-description">
             Stiamo aggiornando il sistema per offrirti nuove funzionalità e prestazioni migliorate.
             L'applicazione tornerà disponibile a breve.
           </p>
 
-          {/* Progress bar animation effect */}
-          <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
-            <div
-              style={{
-                height: "6px",
-                width: "100%",
-                background: "rgba(255, 255, 255, 0.08)",
-                borderRadius: "99px",
-                overflow: "hidden",
-                position: "relative",
-              }}
-            >
+          {/* Animated loading bar */}
+          <div className="update-progress-container">
+            <div className="update-progress-track">
               <motion.div
                 animate={{ x: ["-100%", "100%"] }}
                 transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                style={{
-                  height: "100%",
-                  width: "50%",
-                  background: "linear-gradient(90deg, transparent, #38bdf8, #c084fc, transparent)",
-                  borderRadius: "99px",
-                }}
+                className="update-progress-bar"
               />
             </div>
-            <span
-              style={{
-                fontSize: "10px",
-                fontFamily: "monospace",
-                color: "rgba(255,255,255,0.35)",
-                textAlign: "right",
-              }}
-            >
+            <span className="update-progress-text">
               Sincronizzazione pacchetti in corso...
             </span>
           </div>
@@ -267,23 +173,209 @@ export default function VersionUpdatePage({
       {!isPreview && (
         <a
           href="/admin"
-          style={{
-            marginTop: "24px",
-            fontSize: "11px",
-            fontFamily: "monospace",
-            color: "rgba(255, 255, 255, 0.25)",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            transition: "color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(56, 189, 248, 0.7)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.25)")}
+          className="update-admin-link"
         >
-          <Shield size={12} /> Dashboard Amministrazione
+          <Shield size={13} /> Dashboard Amministrazione
         </a>
       )}
+
+      {/* Responsive Stylesheet */}
+      <style>{`
+        .update-card {
+          position: relative;
+          z-index: 1;
+          max-width: 720px;
+          width: 100%;
+          background: rgba(15, 23, 42, 0.8);
+          border: 1px solid rgba(56, 189, 248, 0.3);
+          border-radius: 24px;
+          padding: 36px 40px;
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 35px rgba(56, 189, 248, 0.15);
+          display: flex;
+          align-items: center;
+          gap: 32px;
+          box-sizing: border-box;
+          margin: auto;
+        }
+
+        .update-hourglass-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .update-hourglass-box {
+          width: 96px;
+          height: 96px;
+          border-radius: 22px;
+          background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(168, 85, 247, 0.18));
+          border: 1px solid rgba(56, 189, 248, 0.45);
+          box-shadow: 0 0 30px rgba(56, 189, 248, 0.25), inset 0 0 15px rgba(255, 255, 255, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        }
+
+        .update-hourglass-icon {
+          width: 46px;
+          height: 46px;
+        }
+
+        .update-content-box {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .update-badge-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .update-status-badge {
+          font-size: 10px;
+          font-family: monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: #38bdf8;
+          background: rgba(56, 189, 248, 0.14);
+          padding: 4px 10px;
+          border-radius: 20px;
+          border: 1px solid rgba(56, 189, 248, 0.35);
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-weight: 600;
+        }
+
+        .update-current-version {
+          font-size: 11px;
+          font-family: monospace;
+          color: rgba(255, 255, 255, 0.45);
+        }
+
+        .update-title {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          line-height: 1.25;
+          background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #38bdf8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          text-transform: lowercase;
+          word-break: break-word;
+        }
+
+        .update-description {
+          margin: 4px 0 0 0;
+          font-size: 13.5px;
+          line-height: 1.55;
+          color: #94a3b8;
+        }
+
+        .update-progress-container {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .update-progress-track {
+          height: 6px;
+          width: 100%;
+          background: rgba(255, 255, 255, 0.08);
+          border-radius: 99px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .update-progress-bar {
+          height: 100%;
+          width: 55%;
+          background: linear-gradient(90deg, transparent, #38bdf8, #c084fc, transparent);
+          border-radius: 99px;
+        }
+
+        .update-progress-text {
+          font-size: 10px;
+          font-family: monospace;
+          color: rgba(255, 255, 255, 0.35);
+          text-align: right;
+        }
+
+        .update-admin-link {
+          margin-top: 24px;
+          font-size: 11px;
+          font-family: monospace;
+          color: rgba(255, 255, 255, 0.3);
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: color 0.2s;
+          padding: 8px 14px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .update-admin-link:hover {
+          color: #38bdf8;
+          background: rgba(56, 189, 248, 0.1);
+          border-color: rgba(56, 189, 248, 0.2);
+        }
+
+        /* ── MOBILE OPTIMIZATIONS (< 640px) ────────────────────────── */
+        @media (max-width: 640px) {
+          .update-card {
+            flex-direction: column;
+            text-align: center;
+            padding: 28px 20px;
+            gap: 20px;
+            border-radius: 20px;
+          }
+
+          .update-hourglass-box {
+            width: 80px;
+            height: 80px;
+            border-radius: 18px;
+          }
+
+          .update-hourglass-icon {
+            width: 38px;
+            height: 38px;
+          }
+
+          .update-content-box {
+            align-items: center;
+          }
+
+          .update-badge-row {
+            justify-content: center;
+          }
+
+          .update-title {
+            font-size: 20px;
+          }
+
+          .update-description {
+            font-size: 12.5px;
+          }
+
+          .update-progress-text {
+            text-align: center;
+          }
+        }
+      `}</style>
     </div>
   );
 }
