@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "g2:qr": "evenhub qr --http --port 8080",
+    "g2:pack": "npm run build && evenhub pack app.json dist -o music-hub-g2.ehpk",
+    "g2:install": "npm install @evenrealities/even_hub_sdk && npm install -D @evenrealities/evenhub-cli @evenrealities/evenhub-simulator"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
@@ -20,6 +23,7 @@
     "@capacitor/core": "^8.1.0",
     "@emailjs/browser": "^4.4.1",
     "@emotion/is-prop-valid": "^1.4.0",
+    "@evenrealities/even_hub_sdk": "^0.0.11",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -59,7 +63,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.34.0",
+    "framer-motion": "^12.42.2",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
@@ -76,11 +80,14 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "telegraf": "^4.16.3",
+    "uuid": "^14.0.1",
     "vaul": "^0.9.9",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@evenrealities/evenhub-cli": "^0.1.13",
+    "@evenrealities/evenhub-simulator": "^0.7.3",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",

@@ -13,12 +13,24 @@ import SpotifyCallback from "./pages/SpotifyCallback";
 import AdminPage from "./pages/AdminPage";
 import CollabApprove from "./pages/CollabApprove";
 
+import { useVersionUpdate } from "@/hooks/useVersionUpdate";
+import VersionUpdatePage from "@/components/VersionUpdatePage";
+
 const queryClient = new QueryClient();
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = getToken();
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+// Public Route Guard (blocks app during version update mode)
+const PublicRouteGuard = ({ children }: { children: React.ReactNode }) => {
+  const { isUpdateActive, targetVersion } = useVersionUpdate();
+  if (isUpdateActive) {
+    return <VersionUpdatePage targetVersion={targetVersion} />;
+  }
+  return <>{children}</>;
 };
 
 // App Router with Deep Linking
@@ -30,19 +42,21 @@ const AppRouter = () => {
       {/* ── Admin — route separata, non visibile nel sito ─────────────────── */}
       <Route path="/admin" element={<AdminPage />} />
 
-      {/* ── App principale ────────────────────────────────────────────────── */}
-      <Route path="/login" element={<SpotifyLogin />} />
-      <Route path="/callback" element={<SpotifyCallback />} />
+      {/* ── App principale (protetta da guardia aggiornamento) ─────────────── */}
+      <Route path="/login" element={<PublicRouteGuard><SpotifyLogin /></PublicRouteGuard>} />
+      <Route path="/callback" element={<PublicRouteGuard><SpotifyCallback /></PublicRouteGuard>} />
       <Route
         path="/"
         element={
-          <ProtectedRoute>
-            <Index />
-          </ProtectedRoute>
+          <PublicRouteGuard>
+            <ProtectedRoute>
+              <Index />
+            </ProtectedRoute>
+          </PublicRouteGuard>
         }
       />
-      <Route path="*" element={<NotFound />} />
-      <Route path="/collab/approve" element={<CollabApprove />} />
+      <Route path="/collab/approve" element={<PublicRouteGuard><CollabApprove /></PublicRouteGuard>} />
+      <Route path="*" element={<PublicRouteGuard><NotFound /></PublicRouteGuard>} />
     </Routes>
   );
 };
@@ -53,7 +67,12 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <AppRouter />
         </BrowserRouter>
       </TooltipProvider>

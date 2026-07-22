@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 
+# EvenRealities G2 packaged app
+*.ehpk
+

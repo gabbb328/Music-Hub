@@ -38,10 +38,17 @@ import {
   X,
   MessageSquare,
   Database,
+  Hourglass,
 } from "lucide-react";
 import { getToken } from "@/services/spotify-auth";
 import { usePlaybackState } from "@/hooks/useSpotify";
 import { clearAdminSession, AdminSession } from "./AdminLogin";
+import { Switch } from "@/components/ui/switch";
+import { useVersionUpdate } from "@/hooks/useVersionUpdate";
+import { isVersionGreaterOrEqual, getNextVersionPresets } from "@/services/version-update";
+import { APP_VERSION } from "@/hooks/version";
+import VersionUpdatePage from "@/components/VersionUpdatePage";
+
 
 function fmtDate(ts: number | string | undefined) {
   if (!ts) return "—";
@@ -2793,6 +2800,242 @@ function SystemPanel() {
   );
 }
 
+function VersionUpdatePanel() {
+  const { config, updateConfig } = useVersionUpdate();
+  const [targetInput, setTargetInput] = useState(config.targetVersion);
+  const [showPreview, setShowPreview] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const presets = getNextVersionPresets(APP_VERSION);
+
+  useEffect(() => {
+    setTargetInput(config.targetVersion);
+  }, [config.targetVersion]);
+
+  const handleToggle = (checked: boolean) => {
+    if (checked) {
+      if (!isVersionGreaterOrEqual(targetInput, APP_VERSION)) {
+        setErrorMsg(`La versione deve essere >= a quella attuale (${APP_VERSION})`);
+        return;
+      }
+    }
+    setErrorMsg("");
+    updateConfig({
+      active: checked,
+      targetVersion: targetInput.trim() || presets.minor,
+    });
+  };
+
+  const handleVersionChange = (newVal: string) => {
+    setTargetInput(newVal);
+    if (!isVersionGreaterOrEqual(newVal, APP_VERSION)) {
+      setErrorMsg(`Destinazione (${newVal}) dev'essere >= attuale (${APP_VERSION}).`);
+    } else {
+      setErrorMsg("");
+      if (config.active) {
+        updateConfig({
+          active: true,
+          targetVersion: newVal,
+        });
+      }
+    }
+  };
+
+  const handlePresetSelect = (presetVersion: string) => {
+    setTargetInput(presetVersion);
+    setErrorMsg("");
+    if (config.active) {
+      updateConfig({
+        active: true,
+        targetVersion: presetVersion,
+      });
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+      <PHead
+        icon={Hourglass}
+        label="Aggiornamento Versione"
+        color="#38bdf8"
+        right={
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Dot active={config.active} color={config.active ? "#38bdf8" : undefined} />
+            <span
+              style={{
+                fontSize: 9,
+                fontFamily: "monospace",
+                color: config.active ? "#38bdf8" : "rgba(255,255,255,0.3)",
+              }}
+            >
+              {config.active ? "ATTIVO" : "DISATTIVATO"}
+            </span>
+          </div>
+        }
+      />
+
+      <div
+        style={{
+          background: "rgba(0,0,0,0.22)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          border: config.active ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        <div>
+          <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.85)", margin: 0 }}>
+            Pagina Aggiornamento
+          </p>
+          <p style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", margin: "2px 0 0 0" }}>
+            Attiva la pagina con clessidra e versione successiva
+          </p>
+        </div>
+
+        <Switch
+          checked={config.active}
+          onCheckedChange={handleToggle}
+        />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <PLabel>versione di destinazione</PLabel>
+          <span style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+            Attuale: <strong style={{ color: "#38bdf8" }}>{APP_VERSION}</strong>
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            onClick={() => handlePresetSelect(presets.patch)}
+            style={{
+              flex: 1,
+              padding: "4px 6px",
+              fontSize: 9,
+              fontFamily: "monospace",
+              borderRadius: 6,
+              border: targetInput === presets.patch ? "1px solid #38bdf8" : "1px solid rgba(255,255,255,0.1)",
+              background: targetInput === presets.patch ? "rgba(56,189,248,0.15)" : "rgba(255,255,255,0.03)",
+              color: targetInput === presets.patch ? "#38bdf8" : "rgba(255,255,255,0.6)",
+              cursor: "pointer",
+            }}
+          >
+            Patch ({presets.patch})
+          </button>
+          <button
+            onClick={() => handlePresetSelect(presets.minor)}
+            style={{
+              flex: 1,
+              padding: "4px 6px",
+              fontSize: 9,
+              fontFamily: "monospace",
+              borderRadius: 6,
+              border: targetInput === presets.minor ? "1px solid #38bdf8" : "1px solid rgba(255,255,255,0.1)",
+              background: targetInput === presets.minor ? "rgba(56,189,248,0.15)" : "rgba(255,255,255,0.03)",
+              color: targetInput === presets.minor ? "#38bdf8" : "rgba(255,255,255,0.6)",
+              cursor: "pointer",
+            }}
+          >
+            Minor ({presets.minor})
+          </button>
+          <button
+            onClick={() => handlePresetSelect(presets.major)}
+            style={{
+              flex: 1,
+              padding: "4px 6px",
+              fontSize: 9,
+              fontFamily: "monospace",
+              borderRadius: 6,
+              border: targetInput === presets.major ? "1px solid #38bdf8" : "1px solid rgba(255,255,255,0.1)",
+              background: targetInput === presets.major ? "rgba(56,189,248,0.15)" : "rgba(255,255,255,0.03)",
+              color: targetInput === presets.major ? "#38bdf8" : "rgba(255,255,255,0.6)",
+              cursor: "pointer",
+            }}
+          >
+            Major ({presets.major})
+          </button>
+        </div>
+
+        <input
+          type="text"
+          value={targetInput}
+          onChange={(e) => handleVersionChange(e.target.value)}
+          placeholder="es. v1.9.0"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            background: "rgba(0,0,0,0.35)",
+            border: errorMsg ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 6,
+            padding: "5px 9px",
+            fontSize: 11,
+            fontFamily: "monospace",
+            color: "#fff",
+            outline: "none",
+          }}
+        />
+
+        {errorMsg && (
+          <p style={{ fontSize: 9, color: "#f87171", margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+            <AlertCircle size={10} /> {errorMsg}
+          </p>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+        <button
+          onClick={() => setShowPreview(true)}
+          style={{
+            flex: 1,
+            background: "rgba(56,189,248,0.12)",
+            border: "1px solid rgba(56,189,248,0.25)",
+            borderRadius: 7,
+            padding: "6px",
+            fontSize: 10,
+            fontWeight: 600,
+            color: "#38bdf8",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+          }}
+        >
+          <Eye size={12} /> Anteprima Pagina
+        </button>
+      </div>
+
+      {showPreview && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: "800px", maxHeight: "90vh", overflow: "auto", borderRadius: 24 }}>
+            <VersionUpdatePage
+              targetVersion={targetInput || APP_VERSION}
+              isPreview={true}
+              onClosePreview={() => setShowPreview(false)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SupabasePanel() {
   const [counts, setCounts] = useState<SupabaseTableCounts | null>(null);
   const [recentStates, setRecentStates] = useState<UserNeuroState[]>([]);
@@ -3377,8 +3620,9 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         </div>
         {hasAccessInfra && (
           <div ref={sec4} style={{ scrollMarginTop: 60 }}>
-            <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>④ Infrastruttura</p>
+            <p style={{ fontSize: 9, fontFamily: "monospace", color: "rgba(255,255,255,0.15)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>④ Infrastruttura & Aggiornamenti</p>
             <div className="admin-grid-4">
+              <Panel delay={0.40}><VersionUpdatePanel /></Panel>
               <Panel delay={0.42}><SystemPanel /></Panel>
               <Panel delay={0.44}><SupabasePanel /></Panel>
               <Panel delay={0.46}><VercelPanel /></Panel>
@@ -3399,7 +3643,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         .admin-grid-1 { display:grid; grid-template-columns:1.5fr 1fr 1.2fr; gap:11px; margin-bottom:11px; }
         .admin-grid-2 { display:grid; grid-template-columns:1.2fr 1fr 1fr 1fr; gap:11px; margin-bottom:11px; }
         .admin-grid-3 { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:11px; margin-bottom:11px; }
-        .admin-grid-4 { display:grid; grid-template-columns:1fr 1.2fr 1.8fr; gap:11px; margin-bottom:16px; }
+        .admin-grid-4 { display:grid; grid-template-columns:1fr 1fr 1.2fr 1.8fr; gap:11px; margin-bottom:16px; }
         .admin-credentials-row { display:flex; gap:6px; }
         @media (max-width:1200px) { .admin-grid-1,.admin-grid-2,.admin-grid-3,.admin-grid-4 { grid-template-columns:1fr 1fr; } }
         @media (max-width:960px) {
