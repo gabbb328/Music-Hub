@@ -412,6 +412,11 @@ export const testSupabaseLatency = async (): Promise<number> => {
 
 export interface GlobalSettings {
   maxRequestsPerSession: number;
+  versionUpdate?: {
+    active: boolean;
+    targetVersion: string;
+    updatedAt?: string;
+  };
 }
 
 const DEFAULT_SETTINGS: GlobalSettings = {

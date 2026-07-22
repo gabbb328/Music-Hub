@@ -1,4 +1,5 @@
 import { APP_VERSION } from "@/hooks/version";
+import { getGlobalSettings, saveGlobalSettings } from "@/services/supabase-api";
 
 export interface VersionUpdateConfig {
   active: boolean;
@@ -64,19 +65,53 @@ export function getVersionUpdateConfig(): VersionUpdateConfig {
   };
 }
 
-export function saveVersionUpdateConfig(config: VersionUpdateConfig): void {
+export async function saveVersionUpdateConfig(config: VersionUpdateConfig): Promise<void> {
   const payload: VersionUpdateConfig = {
     active: config.active,
     targetVersion: config.targetVersion,
     updatedAt: new Date().toISOString(),
   };
 
+  // 1. Immediate local state update for zero lag
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     window.dispatchEvent(new CustomEvent(UPDATE_EVENT_NAME, { detail: payload }));
   } catch (e) {
-    console.error("Error saving version update config:", e);
+    console.error("Error saving local version update config:", e);
   }
+
+  // 2. Persist to DB globally so ALL devices receive the update
+  try {
+    const currentGlobal = await getGlobalSettings();
+    await saveGlobalSettings({
+      ...currentGlobal,
+      versionUpdate: payload,
+    });
+  } catch (e) {
+    console.error("Error saving global version update config to DB:", e);
+  }
+}
+
+export async function syncVersionUpdateConfigFromDB(): Promise<VersionUpdateConfig> {
+  try {
+    const globalSettings = await getGlobalSettings();
+    if (globalSettings && globalSettings.versionUpdate) {
+      const dbConfig = globalSettings.versionUpdate;
+      const localConfig = getVersionUpdateConfig();
+
+      if (
+        dbConfig.active !== localConfig.active ||
+        dbConfig.targetVersion !== localConfig.targetVersion
+      ) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dbConfig));
+        window.dispatchEvent(new CustomEvent(UPDATE_EVENT_NAME, { detail: dbConfig }));
+      }
+      return dbConfig;
+    }
+  } catch (e) {
+    console.warn("Error syncing version update config from DB:", e);
+  }
+  return getVersionUpdateConfig();
 }
 
 export function subscribeVersionUpdate(callback: (config: VersionUpdateConfig) => void): () => void {
