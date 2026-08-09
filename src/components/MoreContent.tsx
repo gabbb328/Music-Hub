@@ -16,6 +16,7 @@ import {
   Users,
   ScrollText,
   Calendar,
+  Glasses,
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -92,6 +93,13 @@ const features = [
     id: "mood-calendar",
     label: "Calendario",
     icon: Calendar,
+    color: "text-green-400",
+    bg: "bg-green-400/10",
+  },
+  {
+    id: "even-g2",
+    label: "Occhiali G2",
+    icon: Glasses,
     color: "text-green-400",
     bg: "bg-green-400/10",
   },

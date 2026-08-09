@@ -21,6 +21,7 @@ import {
   ScrollText,
   BookOpen,
   Trophy,
+  Glasses,
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
 

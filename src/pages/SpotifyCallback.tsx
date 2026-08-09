@@ -27,7 +27,9 @@ export default function SpotifyCallback() {
           return;
         }
         await handleSpotifyCallback(code as string, state);
-        navigate("/");
+        const returnPath = localStorage.getItem("return_path") || "/";
+        localStorage.removeItem("return_path");
+        navigate(returnPath);
       } catch (err) {
         console.error("Callback error:", err);
         navigate("/login");

@@ -1,56 +1,96 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic2, Disc, Lightbulb, Music, Loader2, Clock, Languages, AlignCenter, AlignLeft, Sparkles, Brain, BookOpen, Zap, Heart, Gauge, Waves, BarChart3, Radio, Music2 } from "lucide-react";
+import {
+  Mic2,
+  Disc,
+  Lightbulb,
+  Music,
+  Loader2,
+  Clock,
+  Languages,
+  AlignCenter,
+  AlignLeft,
+  Sparkles,
+  Brain,
+  BookOpen,
+  Zap,
+  Heart,
+  Gauge,
+  Waves,
+  BarChart3,
+  Radio,
+  Music2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Track } from "@/lib/mock-data";
 import { usePlaybackState, useSeekMutation } from "@/hooks/useSpotify";
 import { formatTime } from "@/lib/mock-data";
-import { fetchSyncedLyrics, getCurrentLineIndex, type LyricLine } from "@/services/lyrics-api";
+import {
+  fetchSyncedLyrics,
+  getCurrentLineIndex,
+  type LyricLine,
+} from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
 import { useToast } from "@/hooks/use-toast";
 import { useVocalRemover } from "@/hooks/useVocalRemover";
-import { fetchSongTrivia, type TriviaResult, fetchSongAnalysis, type AIAnalysisResult } from "@/services/trivia-api";
+import {
+  fetchSongTrivia,
+  type TriviaResult,
+  fetchSongAnalysis,
+  type AIAnalysisResult,
+} from "@/services/trivia-api";
 import { AlertCircle } from "lucide-react";
 import { lyricsStore } from "@/hooks/useLyricsStore";
 
-interface LyricsContentProps { currentTrack: Track | null; }
+interface LyricsContentProps {
+  currentTrack: Track | null;
+}
 type Mode = "lyrics" | "info" | "analysis" | "trivia";
 
-export default function LyricsContent({ currentTrack: localTrack }: LyricsContentProps) {
-  const [mode, setMode]                         = useState<Mode>("lyrics");
-  const [lyrics, setLyrics]                     = useState<LyricLine[]>([]);
-  const [translatedLyrics, setTranslatedLyrics] = useState<Map<number, string>>(new Map());
-  const [showTranslation, setShowTranslation]   = useState(false);
-  const [isTranslating, setIsTranslating]       = useState(false);
-  const [isSynced, setIsSynced]                 = useState(false);
-  const [loadingLyrics, setLoadingLyrics]       = useState(false);
+export default function LyricsContent({
+  currentTrack: localTrack,
+}: LyricsContentProps) {
+  const [mode, setMode] = useState<Mode>("lyrics");
+  const [lyrics, setLyrics] = useState<LyricLine[]>([]);
+  const [translatedLyrics, setTranslatedLyrics] = useState<Map<number, string>>(
+    new Map(),
+  );
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
+  const [loadingLyrics, setLoadingLyrics] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
-  const [centerMode, setCenterMode]             = useState(true);
-  const [userScrolling, setUserScrolling]       = useState(false);
-  const [trivia, setTrivia]                     = useState<TriviaResult[]>([]);
-  const [loadingTrivia, setLoadingTrivia]       = useState(false);
-  const [analysis, setAnalysis]                 = useState<AIAnalysisResult | null>(null);
-  const [loadingAnalysis, setLoadingAnalysis]   = useState(false);
+  const [centerMode, setCenterMode] = useState(true);
+  const [userScrolling, setUserScrolling] = useState(false);
+  const [trivia, setTrivia] = useState<TriviaResult[]>([]);
+  const [loadingTrivia, setLoadingTrivia] = useState(false);
+  const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const { isKaraokeActive, toggleKaraoke } = useVocalRemover();
 
-  const containerRef   = useRef<HTMLDivElement>(null);
-  const lineRefs       = useRef<(HTMLDivElement | null)[]>([]);
-  const userScrollRef  = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const userScrollRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: playbackState } = usePlaybackState();
-  const currentTrack            = playbackState?.item || localTrack;
-  const seekMutation            = useSeekMutation();
-  const { toast }               = useToast();
+  const currentTrack = playbackState?.item || localTrack;
+  const seekMutation = useSeekMutation();
+  const { toast } = useToast();
 
-  const isPlaying   = playbackState?.is_playing;
-  const currentTime = playbackState?.progress_ms ? playbackState.progress_ms / 1000 : 0;
+  const isPlaying = playbackState?.is_playing;
+  const currentTime = playbackState?.progress_ms
+    ? playbackState.progress_ms / 1000
+    : 0;
 
   // Real-time timer to drive smooth 60fps animations
   const [activeTime, setActiveTime] = useState(0);
-  const syncRef = useRef<{ baseTime: number; updatedAt: number }>({ baseTime: 0, updatedAt: Date.now() });
+  const syncRef = useRef<{ baseTime: number; updatedAt: number }>({
+    baseTime: 0,
+    updatedAt: Date.now(),
+  });
 
   // Dynamic container height tracker for perfect pixel-centered vertical spacers
   const [containerHeight, setContainerHeight] = useState(300);
@@ -69,7 +109,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       const now = Date.now();
       const elapsed = (now - syncRef.current.updatedAt) / 1000;
       // Add 300ms standard compensation for Spotify API network roundtrip latency
-      const latencyCompensation = 0.3; 
+      const latencyCompensation = 0.3;
       setActiveTime(syncRef.current.baseTime + elapsed + latencyCompensation);
       animationFrameId = requestAnimationFrame(tick);
     };
@@ -80,7 +120,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   // Monitor exact container height dynamically to center the lyrics vertically
   useEffect(() => {
     if (!containerRef.current) return;
-    const resizeObserver = new ResizeObserver(entries => {
+    const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         setContainerHeight(entry.contentRect.height);
       }
@@ -92,13 +132,17 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   // ── Carica testo ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentTrack) return;
-    const trackId  = (currentTrack as any)?.id;
-    const title    = (currentTrack as any).name   || (currentTrack as any).title   || "";
-    const artist   = (currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist || "";
+    const trackId = (currentTrack as any)?.id;
+    const title =
+      (currentTrack as any).name || (currentTrack as any).title || "";
+    const artist =
+      (currentTrack as any).artists?.[0]?.name ||
+      (currentTrack as any).artist ||
+      "";
     const duration = (currentTrack as any).duration_ms
       ? Math.floor((currentTrack as any).duration_ms / 1000)
       : (currentTrack as any).duration || 180;
-    
+
     setLyrics([]);
     setTranslatedLyrics(new Map());
     setShowTranslation(false);
@@ -121,15 +165,15 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         if (trackId) lyricsStore.setLyrics(trackId, { lines, synced });
       });
     }
-    
+
     setLoadingTrivia(true);
-    fetchSongTrivia(artist, title).then(res => {
+    fetchSongTrivia(artist, title).then((res) => {
       setTrivia(res);
       setLoadingTrivia(false);
     });
 
     setLoadingAnalysis(true);
-    fetchSongAnalysis(artist, title).then(res => {
+    fetchSongAnalysis(artist, title).then((res) => {
       setAnalysis(res);
       setLoadingAnalysis(false);
     });
@@ -147,7 +191,7 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
   const scrollToCurrentLine = useCallback(() => {
     if (!centerMode || userScrollRef.current) return;
     const container = containerRef.current;
-    const line      = lineRefs.current[currentLineIndex];
+    const line = lineRefs.current[currentLineIndex];
     if (!container || !line) return;
 
     // Recursively accumulate offsets relative to the scrolling container to ensure dead-center placement
@@ -158,11 +202,14 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       currentEl = currentEl.offsetParent as HTMLElement | null;
     }
 
-    const targetScroll = actualOffsetTop - container.clientHeight / 2 + line.clientHeight / 2;
+    const targetScroll =
+      actualOffsetTop - container.clientHeight / 2 + line.clientHeight / 2;
     container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
   }, [centerMode, currentLineIndex]);
 
-  useEffect(() => { scrollToCurrentLine(); }, [currentLineIndex, centerMode, scrollToCurrentLine]);
+  useEffect(() => {
+    scrollToCurrentLine();
+  }, [currentLineIndex, centerMode, scrollToCurrentLine]);
 
   const handleScroll = useCallback(() => {
     if (!centerMode) return;
@@ -182,24 +229,36 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       userScrollRef.current = false;
       setUserScrolling(false);
     } catch {
-      toast({ title: "Seek failed", description: "Make sure a device is playing", variant: "destructive" });
+      toast({
+        title: "Seek failed",
+        description: "Make sure a device is playing",
+        variant: "destructive",
+      });
     }
   };
 
   const handleTranslate = async () => {
-    if (showTranslation) { setShowTranslation(false); return; }
-    if (translatedLyrics.size > 0) { setShowTranslation(true); return; }
+    if (showTranslation) {
+      setShowTranslation(false);
+      return;
+    }
+    if (translatedLyrics.size > 0) {
+      setShowTranslation(true);
+      return;
+    }
     setIsTranslating(true);
-    
-    const systemLang = (typeof navigator !== 'undefined' && navigator.language)
-      ? navigator.language.split('-')[0]
-      : "it";
-    
+
+    const systemLang =
+      typeof navigator !== "undefined" && navigator.language
+        ? navigator.language.split("-")[0]
+        : "it";
+
     const langDisplay = systemLang.toUpperCase();
-    
-    toast({ 
-      title: `Traduzione in corso (${langDisplay})…`, 
-      description: "Traduzione intelligente in corso alla lingua del tuo sistema..." 
+
+    toast({
+      title: `Traduzione in corso (${langDisplay})…`,
+      description:
+        "Traduzione intelligente in corso alla lingua del tuo sistema...",
     });
 
     const map = new Map<number, string>();
@@ -214,12 +273,15 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       }
       setTranslatedLyrics(map);
       setShowTranslation(true);
-      toast({ title: "✓ Traduzione completata", description: `${map.size} righe tradotte in ${langDisplay}` });
+      toast({
+        title: "✓ Traduzione completata",
+        description: `${map.size} righe tradotte in ${langDisplay}`,
+      });
     } catch (err) {
-      toast({ 
-        title: "Errore di traduzione", 
-        description: "Impossibile tradurre i testi, riprova più tardi.", 
-        variant: "destructive" 
+      toast({
+        title: "Errore di traduzione",
+        description: "Impossibile tradurre i testi, riprova più tardi.",
+        variant: "destructive",
       });
     } finally {
       setIsTranslating(false);
@@ -231,7 +293,9 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="text-center">
           <Mic2 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">Riproduci un brano per visualizzare il testo</p>
+          <p className="text-muted-foreground">
+            Riproduci un brano per visualizzare il testo
+          </p>
         </div>
       </div>
     );
@@ -241,59 +305,95 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col animate-fade-in">
-
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 pt-4 pb-3 shrink-0 border-b border-border/30">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
-            <img src={(currentTrack as any).album?.images?.[0]?.url || (currentTrack as any).cover || ""} alt=""
-              className="w-11 h-11 rounded-lg object-cover shadow-md" />
+            <img
+              src={
+                (currentTrack as any).album?.images?.[0]?.url ||
+                (currentTrack as any).cover ||
+                ""
+              }
+              alt=""
+              className="w-11 h-11 rounded-lg object-cover shadow-md"
+            />
             {isPlaying && (
-              <motion.div className="absolute inset-0 rounded-lg ring-2 ring-primary/50"
-                animate={{ opacity: [0.4, 0.9, 0.4] }} transition={{ duration: 2, repeat: Infinity }} />
+              <motion.div
+                className="absolute inset-0 rounded-lg ring-2 ring-primary/50"
+                animate={{ opacity: [0.4, 0.9, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-bold truncate text-sm">{(currentTrack as any).name || (currentTrack as any).title}</p>
-            <p className="text-xs text-muted-foreground truncate">{(currentTrack as any).artists?.[0]?.name || (currentTrack as any).artist}</p>
+            <p className="font-bold truncate text-sm">
+              {(currentTrack as any).name || (currentTrack as any).title}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {(currentTrack as any).artists?.[0]?.name ||
+                (currentTrack as any).artist}
+            </p>
             {mode === "lyrics" && (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {isSynced && (
                   <div className="flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5 text-green-500" />
-                    <span className="text-[10px] text-green-500 font-medium">Synced</span>
+                    <span className="text-[10px] text-green-500 font-medium">
+                      Synced
+                    </span>
                   </div>
                 )}
                 {isSynced && (
-                  <Button size="sm" variant={centerMode ? "default" : "outline"}
+                  <Button
+                    size="sm"
+                    variant={centerMode ? "default" : "outline"}
                     onClick={() => {
-                      setCenterMode(v => {
+                      setCenterMode((v) => {
                         const next = !v;
-                        if (next) { userScrollRef.current = false; setTimeout(() => scrollToCurrentLine(), 50); }
+                        if (next) {
+                          userScrollRef.current = false;
+                          setTimeout(() => scrollToCurrentLine(), 50);
+                        }
                         return next;
                       });
                     }}
-                    className="h-6 px-2 text-[10px] gap-1">
-                    {centerMode ? <AlignCenter className="w-2.5 h-2.5" /> : <AlignLeft className="w-2.5 h-2.5" />}
+                    className="h-6 px-2 text-[10px] gap-1"
+                  >
+                    {centerMode ? (
+                      <AlignCenter className="w-2.5 h-2.5" />
+                    ) : (
+                      <AlignLeft className="w-2.5 h-2.5" />
+                    )}
                     {centerMode ? "Centered" : "Free"}
                   </Button>
                 )}
                 {lyrics.length > 0 && !isTranslating && (
-                  <Button size="sm" variant={showTranslation ? "default" : "outline"}
-                    onClick={handleTranslate} className="h-6 px-2 text-[10px] gap-1">
+                  <Button
+                    size="sm"
+                    variant={showTranslation ? "default" : "outline"}
+                    onClick={handleTranslate}
+                    className="h-6 px-2 text-[10px] gap-1"
+                  >
                     <Languages className="w-2.5 h-2.5" />
                     {showTranslation ? "Original" : "Translate"}
                   </Button>
                 )}
-                <Button size="sm" variant={isKaraokeActive ? "default" : "outline"}
-                  onClick={toggleKaraoke} className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-pink-600 text-white hover:bg-pink-700" : "text-muted-foreground"}`}>
+                <Button
+                  size="sm"
+                  variant={isKaraokeActive ? "default" : "outline"}
+                  onClick={toggleKaraoke}
+                  className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-pink-600 text-white hover:bg-pink-700" : "text-muted-foreground"}`}
+                >
                   <Mic2 className="w-2.5 h-2.5" />
                   {isKaraokeActive ? "Karaoke ON" : "Karaoke Mode"}
                 </Button>
                 {isTranslating && (
                   <div className="flex items-center gap-1">
                     <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
-                    <span className="text-[10px] text-primary">Translating…</span>
+                    <span className="text-[10px] text-primary">
+                      Translating…
+                    </span>
                   </div>
                 )}
               </div>
@@ -303,16 +403,21 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
         {/* Tabs */}
         <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
-          {([
-            { id: "lyrics"   as Mode, label: "Lyrics",   icon: Mic2      },
-            { id: "trivia"   as Mode  , label: "About",   icon: Lightbulb },
-            { id: "info"     as Mode, label: "Info",     icon: Disc      },
+          {[
+            { id: "lyrics" as Mode, label: "Lyrics", icon: Mic2 },
+            { id: "trivia" as Mode, label: "About", icon: Lightbulb },
+            { id: "info" as Mode, label: "Info", icon: Disc },
             { id: "analysis" as Mode, label: "Analysis", icon: Music },
-          ]).map(tab => (
-            <button key={tab.id} onClick={() => setMode(tab.id)}
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setMode(tab.id)}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                mode === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}>
+                mode === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
               <tab.icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
@@ -322,10 +427,13 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-hidden relative">
-
         {/* ── LYRICS ── */}
         {mode === "lyrics" && (
-          <div ref={containerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto pb-10">
+          <div
+            ref={containerRef}
+            onScroll={handleScroll}
+            className="absolute inset-0 overflow-y-auto pb-10"
+          >
             {loadingLyrics ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
@@ -334,19 +442,32 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
             ) : lyrics.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full px-4 text-center">
                 <Music className="w-14 h-14 text-muted-foreground/30 mb-3" />
-                <h3 className="text-lg font-semibold mb-1">Lyrics not available</h3>
-                <p className="text-sm text-muted-foreground">No lyrics found for this track</p>
+                <h3 className="text-lg font-semibold mb-1">
+                  Lyrics not available
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  No lyrics found for this track
+                </p>
               </div>
             ) : (
               <>
                 {/* Dynamic spacer that perfectly targets the vertical center of the container */}
-                <div style={{ height: `${containerHeight / 2}px` }} aria-hidden />
+                <div
+                  style={{ height: `${containerHeight / 2}px` }}
+                  aria-hidden
+                />
 
                 <AnimatePresence>
                   {userScrolling && centerMode && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="sticky top-2 z-10 mx-auto mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center w-fit">
-                      <p className="text-[10px] text-muted-foreground">Auto-scroll paused · resumes in 3s</p>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="sticky top-2 z-10 mx-auto mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center w-fit"
+                    >
+                      <p className="text-[10px] text-muted-foreground">
+                        Auto-scroll paused · resumes in 3s
+                      </p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -354,15 +475,19 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 <div className="mx-auto w-full max-w-4xl px-4 md:px-8 space-y-1 flex flex-col items-center md:items-start">
                   {lyrics.map((line, index) => {
                     const isCurrent = index === currentLineIndex;
-                    const isPast    = index < currentLineIndex;
+                    const isPast = index < currentLineIndex;
                     const translation = translatedLyrics.get(index);
-                    const isBreak = !line.text.trim() ||
-                      /^\[.*\]$/.test(line.text) || /^\(.*\)$/.test(line.text) ||
+                    const isBreak =
+                      !line.text.trim() ||
+                      /^\[.*\]$/.test(line.text) ||
+                      /^\(.*\)$/.test(line.text) ||
                       /instrumental|music/i.test(line.text);
 
                     const hasSyncWords = line.words && line.words.length > 0;
-                    const words = hasSyncWords ? line.words!.map(w => w.text) : line.text.split(/\s+/);
-                    
+                    const words = hasSyncWords
+                      ? line.words!.map((w) => w.text)
+                      : line.text.split(/\s+/);
+
                     let openParen = 0;
                     const categorizedWords = words.map((w, i) => {
                       const opens = (w.match(/[\(\[]/g) || []).length;
@@ -373,15 +498,30 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                       openParen = Math.max(0, openParen);
                       return { text: w, index: i, isChorus };
                     });
-                    const mainWords = categorizedWords.filter(w => !w.isChorus);
-                    const chorusWords = categorizedWords.filter(w => w.isChorus);
+                    const mainWords = categorizedWords.filter(
+                      (w) => !w.isChorus,
+                    );
+                    const chorusWords = categorizedWords.filter(
+                      (w) => w.isChorus,
+                    );
                     const nextLine = lyrics[index + 1];
                     // Cap the animation duration based on typical singing speed so words don't animate slowly over long instrumental gaps
-                    const maxRealisticDuration = Math.max(3, words.length * 0.4);
-                    const rawDuration = nextLine ? nextLine.time - line.time : maxRealisticDuration;
-                    const lineDuration = Math.min(rawDuration, maxRealisticDuration);
-                    const lineProgress = Math.max(0, Math.min(1, (activeTime - line.time) / lineDuration));
-                    
+                    const maxRealisticDuration = Math.max(
+                      3,
+                      words.length * 0.4,
+                    );
+                    const rawDuration = nextLine
+                      ? nextLine.time - line.time
+                      : maxRealisticDuration;
+                    const lineDuration = Math.min(
+                      rawDuration,
+                      maxRealisticDuration,
+                    );
+                    const lineProgress = Math.max(
+                      0,
+                      Math.min(1, (activeTime - line.time) / lineDuration),
+                    );
+
                     let activeWordIndex = -1;
                     let activeMainIndex = -1;
                     let activeChorusIndex = -1;
@@ -389,14 +529,28 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     let isStrictlySequential = false;
                     let isChorusAtEnd = false;
                     if (mainWords.length > 0 && chorusWords.length > 0) {
-                      const firstChorus = categorizedWords.findIndex(w => w.isChorus);
-                      const lastMain = categorizedWords.findLastIndex(w => !w.isChorus);
+                      const firstChorus = categorizedWords.findIndex(
+                        (w) => w.isChorus,
+                      );
+                      const lastMain =
+                        categorizedWords.length -
+                        1 -
+                        [...categorizedWords]
+                          .reverse()
+                          .findIndex((w) => !w.isChorus);
                       if (firstChorus > lastMain) {
                         isStrictlySequential = true;
                         isChorusAtEnd = true;
                       } else {
-                        const lastChorus = categorizedWords.findLastIndex(w => w.isChorus);
-                        const firstMain = categorizedWords.findIndex(w => !w.isChorus);
+                        const lastChorus =
+                          categorizedWords.length -
+                          1 -
+                          [...categorizedWords]
+                            .reverse()
+                            .findIndex((w) => w.isChorus);
+                        const firstMain = categorizedWords.findIndex(
+                          (w) => !w.isChorus,
+                        );
                         if (lastChorus < firstMain) {
                           isStrictlySequential = true;
                           isChorusAtEnd = false;
@@ -405,9 +559,11 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     }
 
                     if (hasSyncWords) {
-                      const nextFutureIndex = line.words!.findIndex(w => w.time > activeTime);
+                      const nextFutureIndex = line.words!.findIndex(
+                        (w) => w.time > activeTime,
+                      );
                       if (nextFutureIndex === -1) {
-                        activeWordIndex = line.words!.length; 
+                        activeWordIndex = line.words!.length;
                       } else if (nextFutureIndex === 0) {
                         activeWordIndex = -1;
                       } else {
@@ -415,14 +571,18 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                       }
                     } else {
                       if (isStrictlySequential) {
-                        const globalActiveIndex = lineProgress === 1 ? words.length : Math.floor(lineProgress * words.length);
+                        const globalActiveIndex =
+                          lineProgress === 1
+                            ? words.length
+                            : Math.floor(lineProgress * words.length);
                         if (isChorusAtEnd) {
                           if (globalActiveIndex < mainWords.length) {
                             activeMainIndex = globalActiveIndex;
                             activeChorusIndex = -1;
                           } else {
                             activeMainIndex = mainWords.length;
-                            activeChorusIndex = globalActiveIndex - mainWords.length;
+                            activeChorusIndex =
+                              globalActiveIndex - mainWords.length;
                           }
                         } else {
                           if (globalActiveIndex < chorusWords.length) {
@@ -430,19 +590,28 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                             activeMainIndex = -1;
                           } else {
                             activeChorusIndex = chorusWords.length;
-                            activeMainIndex = globalActiveIndex - chorusWords.length;
+                            activeMainIndex =
+                              globalActiveIndex - chorusWords.length;
                           }
                         }
                       } else {
-                        activeMainIndex = lineProgress === 1 ? mainWords.length : Math.floor(lineProgress * mainWords.length);
-                        activeChorusIndex = lineProgress === 1 ? chorusWords.length : Math.floor(lineProgress * chorusWords.length);
+                        activeMainIndex =
+                          lineProgress === 1
+                            ? mainWords.length
+                            : Math.floor(lineProgress * mainWords.length);
+                        activeChorusIndex =
+                          lineProgress === 1
+                            ? chorusWords.length
+                            : Math.floor(lineProgress * chorusWords.length);
                       }
                     }
 
                     return (
                       <div
                         key={index}
-                        ref={el => { lineRefs.current[index] = el; }}
+                        ref={(el) => {
+                          lineRefs.current[index] = el;
+                        }}
                         onClick={() => isSynced && handleLineClick(line)}
                         className={`
                           w-full px-4 py-3 rounded-2xl transition-all duration-300 flex flex-col items-center md:items-start justify-center text-center md:text-left
@@ -452,35 +621,47 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                       >
                         {isBreak ? (
                           <div className="flex items-center justify-center md:justify-start gap-2 py-1 text-center md:text-left w-full">
-                            <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
-                            <span className={`text-sm italic text-center md:text-left ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}>
+                            <Music
+                              className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
+                            />
+                            <span
+                              className={`text-sm italic text-center md:text-left ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
+                            >
                               {line.text.trim() || "Instrumental"}
                             </span>
-                            <Music className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`} />
+                            <Music
+                              className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
+                            />
                           </div>
                         ) : (
                           <div className="space-y-1.5 flex flex-col items-center md:items-start justify-center w-full text-center md:text-left">
                             {/* Subtitle Translation - Explicitly centered horizontally and given full width */}
                             {showTranslation && translation && (
-                              <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
-                                isCurrent
-                                  ? "text-primary/80 font-semibold text-base md:text-xl animate-fade-in"
-                                  : isPast
-                                    ? "text-muted-foreground/25 text-xs md:text-sm"
-                                    : "text-muted-foreground/45 text-xs md:text-sm"
-                              }`}>
+                              <p
+                                className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
+                                  isCurrent
+                                    ? "text-primary/80 font-semibold text-base md:text-xl animate-fade-in"
+                                    : isPast
+                                      ? "text-muted-foreground/25 text-xs md:text-sm"
+                                      : "text-muted-foreground/45 text-xs md:text-sm"
+                                }`}
+                              >
                                 {translation}
                               </p>
                             )}
-                            
+
                             {/* Bouncy word-magnification Karaoke Rendering */}
                             {isCurrent && isSynced && isKaraokeActive ? (
                               <div className="flex flex-col items-center md:items-start w-full gap-2">
                                 {mainWords.length > 0 && (
                                   <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-1">
                                     {mainWords.map((wInfo, localIdx) => {
-                                      const isWordActive = hasSyncWords ? wInfo.index === activeWordIndex : localIdx === activeMainIndex;
-                                      const isWordPast = hasSyncWords ? wInfo.index < activeWordIndex : localIdx < activeMainIndex;
+                                      const isWordActive = hasSyncWords
+                                        ? wInfo.index === activeWordIndex
+                                        : localIdx === activeMainIndex;
+                                      const isWordPast = hasSyncWords
+                                        ? wInfo.index < activeWordIndex
+                                        : localIdx < activeMainIndex;
                                       return (
                                         <motion.span
                                           key={wInfo.index}
@@ -488,7 +669,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                                             scale: isWordActive ? 1.25 : 1,
                                             y: isWordActive ? -2 : 0,
                                           }}
-                                          transition={{ duration: 0.15, ease: "easeOut" }}
+                                          transition={{
+                                            duration: 0.15,
+                                            ease: "easeOut",
+                                          }}
                                           className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none text-center md:text-left ${
                                             isWordActive
                                               ? "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
@@ -503,12 +687,16 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                                     })}
                                   </div>
                                 )}
-                                
+
                                 {chorusWords.length > 0 && (
                                   <div className="flex flex-wrap justify-center md:justify-start gap-x-1.5 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-0.5 opacity-80">
                                     {chorusWords.map((wInfo, localIdx) => {
-                                      const isWordActive = hasSyncWords ? wInfo.index === activeWordIndex : localIdx === activeChorusIndex;
-                                      const isWordPast = hasSyncWords ? wInfo.index < activeWordIndex : localIdx < activeChorusIndex;
+                                      const isWordActive = hasSyncWords
+                                        ? wInfo.index === activeWordIndex
+                                        : localIdx === activeChorusIndex;
+                                      const isWordPast = hasSyncWords
+                                        ? wInfo.index < activeWordIndex
+                                        : localIdx < activeChorusIndex;
                                       return (
                                         <motion.span
                                           key={wInfo.index}
@@ -516,7 +704,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                                             scale: isWordActive ? 1.15 : 1,
                                             y: isWordActive ? -1 : 0,
                                           }}
-                                          transition={{ duration: 0.15, ease: "easeOut" }}
+                                          transition={{
+                                            duration: 0.15,
+                                            ease: "easeOut",
+                                          }}
                                           className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none text-center md:text-left ${
                                             isWordActive
                                               ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.4)]"
@@ -536,25 +727,29 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                               /* Standard Plain Text Rendering - Centered horizontally explicitly inside <p> */
                               <div className="flex flex-col items-center md:items-start w-full">
                                 {mainWords.length > 0 && (
-                                  <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
-                                    isCurrent
-                                      ? "text-primary font-bold text-2xl md:text-3xl"
-                                      : isPast
-                                        ? "text-muted-foreground/35 text-lg md:text-xl"
-                                        : "text-foreground/65 text-lg md:text-xl"
-                                  }`}>
-                                    {mainWords.map(w => w.text).join(' ')}
+                                  <p
+                                    className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
+                                      isCurrent
+                                        ? "text-primary font-bold text-2xl md:text-3xl"
+                                        : isPast
+                                          ? "text-muted-foreground/35 text-lg md:text-xl"
+                                          : "text-foreground/65 text-lg md:text-xl"
+                                    }`}
+                                  >
+                                    {mainWords.map((w) => w.text).join(" ")}
                                   </p>
                                 )}
                                 {chorusWords.length > 0 && (
-                                  <p className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 italic mt-1 ${
-                                    isCurrent
-                                      ? "text-primary/80 font-bold text-xl md:text-2xl"
-                                      : isPast
-                                        ? "text-muted-foreground/25 text-base md:text-lg"
-                                        : "text-foreground/50 text-base md:text-lg"
-                                  }`}>
-                                    {chorusWords.map(w => w.text).join(' ')}
+                                  <p
+                                    className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 italic mt-1 ${
+                                      isCurrent
+                                        ? "text-primary/80 font-bold text-xl md:text-2xl"
+                                        : isPast
+                                          ? "text-muted-foreground/25 text-base md:text-lg"
+                                          : "text-foreground/50 text-base md:text-lg"
+                                    }`}
+                                  >
+                                    {chorusWords.map((w) => w.text).join(" ")}
                                   </p>
                                 )}
                               </div>
@@ -574,7 +769,10 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 </div>
 
                 {/* Dynamic spacer that perfectly targets the vertical center of the container */}
-                <div style={{ height: `${containerHeight / 2 + 650}px` }} aria-hidden />
+                <div
+                  style={{ height: `${containerHeight / 2 + 650}px` }}
+                  aria-hidden
+                />
               </>
             )}
           </div>
@@ -583,33 +781,61 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         {/* ── INFO ── */}
         {mode === "info" && spotifyTrack && (
           <div className="absolute inset-0 overflow-y-auto p-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-5 max-w-2xl mx-auto"
+            >
               <div className="flex flex-col sm:flex-row items-start gap-4">
-                <img src={spotifyTrack.album.images[0]?.url} alt={spotifyTrack.album.name}
-                  className="w-full sm:w-44 aspect-square rounded-xl object-cover shadow-xl" />
+                <img
+                  src={spotifyTrack.album.images[0]?.url}
+                  alt={spotifyTrack.album.name}
+                  className="w-full sm:w-44 aspect-square rounded-xl object-cover shadow-xl"
+                />
                 <div className="flex-1 space-y-3 w-full">
                   <div>
-                    <h2 className="text-xl font-bold break-words">{spotifyTrack.name}</h2>
-                    <p className="text-muted-foreground break-words">{spotifyTrack.artists.map((a: any) => a.name).join(", ")}</p>
+                    <h2 className="text-xl font-bold break-words">
+                      {spotifyTrack.name}
+                    </h2>
+                    <p className="text-muted-foreground break-words">
+                      {spotifyTrack.artists.map((a: any) => a.name).join(", ")}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Album",    value: spotifyTrack.album.name },
-                      { label: "Release",  value: spotifyTrack.album.release_date },
-                      { label: "Duration", value: formatTime(Math.floor(spotifyTrack.duration_ms / 1000)) },
+                      { label: "Album", value: spotifyTrack.album.name },
+                      {
+                        label: "Release",
+                        value: spotifyTrack.album.release_date,
+                      },
+                      {
+                        label: "Duration",
+                        value: formatTime(
+                          Math.floor(spotifyTrack.duration_ms / 1000),
+                        ),
+                      },
                     ].map(({ label, value }) => (
                       <div key={label} className="space-y-0.5">
                         <p className="text-xs text-muted-foreground">{label}</p>
-                        <p className="text-sm font-medium break-words">{value}</p>
+                        <p className="text-sm font-medium break-words">
+                          {value}
+                        </p>
                       </div>
                     ))}
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Popularity</p>
+                      <p className="text-xs text-muted-foreground">
+                        Popularity
+                      </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${spotifyTrack.popularity}%` }} />
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${spotifyTrack.popularity}%` }}
+                          />
                         </div>
-                        <span className="text-xs font-medium">{spotifyTrack.popularity}%</span>
+                        <span className="text-xs font-medium">
+                          {spotifyTrack.popularity}%
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -622,8 +848,11 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         {/* ── ANALYSIS ── */}
         {mode === "analysis" && (
           <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-2xl mx-auto pb-10">
-              
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6 max-w-2xl mx-auto pb-10"
+            >
               {/* Titolo sezione */}
               <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
@@ -632,13 +861,16 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center md:justify-start gap-2">
-                    <h2 className="text-xl font-bold tracking-tight">Analisi Musicale AI</h2>
+                    <h2 className="text-xl font-bold tracking-tight">
+                      Analisi Musicale AI
+                    </h2>
                     <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
                       Live
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-                    Analisi armonica, strutturale e strumentale elaborata dall'intelligenza artificiale in tempo reale.
+                    Analisi armonica, strutturale e strumentale elaborata
+                    dall'intelligenza artificiale in tempo reale.
                   </p>
                 </div>
               </div>
@@ -649,40 +881,80 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
                     <Sparkles className="w-4 h-4 text-cyan-400 absolute top-0 right-0 animate-ping" />
                   </div>
-                  <p className="text-sm text-muted-foreground font-semibold">Elaborazione analisi in corso…</p>
+                  <p className="text-sm text-muted-foreground font-semibold">
+                    Elaborazione analisi in corso…
+                  </p>
                 </div>
               ) : !analysis ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center">
                   <AlertCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">Analisi non disponibile.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Analisi non disponibile.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {/* Pill metriche principali */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {([
-                      { label: "BPM Stimato", value: analysis.bpm, icon: Gauge,  color: "#f97316" },
-                      { label: "Tonalità", value: analysis.key,               icon: Music2, color: "#a78bfa"   },
-                      { label: "Umore",   value: analysis.mood,               icon: Heart,  color: "#facc15"   },
-                      { label: "Stile",  value: analysis.style,               icon: Zap,    color: "#34d399"   },
-                    ] as const).map(({ label, value, icon: Icon, color }) => (
-                      <Card key={label} className="flex flex-col items-center justify-center gap-2 p-4 border border-border/30 bg-card/25 hover:bg-card/40 transition-colors text-center">
+                    {(
+                      [
+                        {
+                          label: "BPM Stimato",
+                          value: analysis.bpm,
+                          icon: Gauge,
+                          color: "#f97316",
+                        },
+                        {
+                          label: "Tonalità",
+                          value: analysis.key,
+                          icon: Music2,
+                          color: "#a78bfa",
+                        },
+                        {
+                          label: "Umore",
+                          value: analysis.mood,
+                          icon: Heart,
+                          color: "#facc15",
+                        },
+                        {
+                          label: "Stile",
+                          value: analysis.style,
+                          icon: Zap,
+                          color: "#34d399",
+                        },
+                      ] as const
+                    ).map(({ label, value, icon: Icon, color }) => (
+                      <Card
+                        key={label}
+                        className="flex flex-col items-center justify-center gap-2 p-4 border border-border/30 bg-card/25 hover:bg-card/40 transition-colors text-center"
+                      >
                         <Icon className="w-6 h-6 shrink-0" style={{ color }} />
-                        <p className="font-bold text-sm leading-tight line-clamp-2" style={{ color }}>{value}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+                        <p
+                          className="font-bold text-sm leading-tight line-clamp-2"
+                          style={{ color }}
+                        >
+                          {value}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {label}
+                        </p>
                       </Card>
                     ))}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
-                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Disc className="w-4 h-4" /> Descrizione Sonora</h4>
+                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Disc className="w-4 h-4" /> Descrizione Sonora
+                      </h4>
                       <p className="text-sm text-foreground/90 leading-relaxed font-medium">
                         {analysis.description}
                       </p>
                     </Card>
                     <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
-                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Radio className="w-4 h-4" /> Strumentazione</h4>
+                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Radio className="w-4 h-4" /> Strumentazione
+                      </h4>
                       <p className="text-sm text-foreground/90 leading-relaxed">
                         {analysis.instruments}
                       </p>
@@ -697,29 +969,40 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
         {/* ── TRIVIA ── */}
         {mode === "trivia" && (
           <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-2xl mx-auto pb-10">
-              
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6 max-w-2xl mx-auto pb-10"
+            >
               {/* Header Banner */}
               <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
                 <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-inner shrink-0 relative">
                   <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-                  <motion.div 
-                    animate={{ rotate: 360 }} 
-                    transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 15,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="absolute -inset-1 border border-dashed border-primary/30 rounded-2xl pointer-events-none"
                   />
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center md:justify-start gap-2">
-                    <h2 className="text-xl font-bold tracking-tight">AI Insights & Curiosità</h2>
+                    <h2 className="text-xl font-bold tracking-tight">
+                      AI Insights & Curiosità
+                    </h2>
                     <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
                       Live
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-                    Analisi intelligente in tempo reale per scoprire fatti incredibili, aneddoti storici e dettagli di produzione su questa canzone e sul suo interprete.
+                    Analisi intelligente in tempo reale per scoprire fatti
+                    incredibili, aneddoti storici e dettagli di produzione su
+                    questa canzone e sul suo interprete.
                   </p>
                 </div>
               </div>
@@ -731,14 +1014,18 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     <Sparkles className="w-5 h-5 text-cyan-400 absolute animate-pulse" />
                   </div>
                   <div className="text-center space-y-1">
-                    <p className="text-sm font-semibold text-foreground">Elaborazione in corso...</p>
-                    <p className="text-xs text-muted-foreground animate-pulse">Sintesi dei dati musicali in tempo reale...</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      Elaborazione in corso...
+                    </p>
+                    <p className="text-xs text-muted-foreground animate-pulse">
+                      Sintesi dei dati musicali in tempo reale...
+                    </p>
                   </div>
                 </div>
               ) : trivia.length > 0 ? (
                 <div className="grid grid-cols-1 gap-5">
                   {trivia.map((item, idx) => {
-                    const isAI = item.type === 'ai';
+                    const isAI = item.type === "ai";
                     return (
                       <motion.div
                         key={idx}
@@ -747,43 +1034,54 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                         transition={{ duration: 0.3, delay: idx * 0.08 }}
                       >
                         <Card className="p-6 border border-border/30 hover:border-primary/30 bg-card/25 backdrop-blur-md hover:bg-card/35 transition-all duration-300 relative group overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5">
-                          
                           {/* Top accent line */}
-                          <div className={`absolute top-0 inset-x-0 h-[2px] transition-all duration-300 ${
-                            isAI ? "bg-gradient-to-r from-violet-500 via-primary to-cyan-400" : "bg-gradient-to-r from-muted-foreground/20 to-muted-foreground/10"
-                          }`} />
-                          
+                          <div
+                            className={`absolute top-0 inset-x-0 h-[2px] transition-all duration-300 ${
+                              isAI
+                                ? "bg-gradient-to-r from-violet-500 via-primary to-cyan-400"
+                                : "bg-gradient-to-r from-muted-foreground/20 to-muted-foreground/10"
+                            }`}
+                          />
+
                           {/* Corner glow */}
                           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                          
+
                           <div className="flex items-start gap-4">
-                            <div className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
-                              isAI 
-                                ? "bg-violet-500/10 border-violet-500/20 text-violet-400" 
-                                : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
-                            }`}>
-                              {isAI ? <Brain className="w-4.5 h-4.5" /> : <BookOpen className="w-4.5 h-4.5" />}
+                            <div
+                              className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
+                                isAI
+                                  ? "bg-violet-500/10 border-violet-500/20 text-violet-400"
+                                  : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                              }`}
+                            >
+                              {isAI ? (
+                                <Brain className="w-4.5 h-4.5" />
+                              ) : (
+                                <BookOpen className="w-4.5 h-4.5" />
+                              )}
                             </div>
-                            
+
                             <div className="space-y-2.5 flex-1 min-w-0">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                                 <h3 className="font-bold text-base leading-snug group-hover:text-primary transition-colors pr-2">
                                   {item.title}
                                 </h3>
-                                
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border tracking-wide w-fit uppercase shrink-0 ${
-                                  isAI 
-                                    ? "bg-violet-500/10 text-violet-400 border-violet-500/20" 
-                                    : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                                }`}>
+
+                                <span
+                                  className={`text-[9px] font-bold px-2 py-0.5 rounded-md border tracking-wide w-fit uppercase shrink-0 ${
+                                    isAI
+                                      ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                                      : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                                  }`}
+                                >
                                   {isAI ? "AI Synthesized" : "Official Bio"}
                                 </span>
                               </div>
-                              
+
                               <p className="text-sm leading-relaxed text-muted-foreground font-normal">
                                 {item.extract}
                               </p>
-                              
+
                               <div className="pt-2 flex items-center justify-between text-[10px] text-muted-foreground/60 border-t border-border/10">
                                 <span className="flex items-center gap-1">
                                   <Lightbulb className="w-3.5 h-3.5 text-yellow-500/70" />
@@ -806,8 +1104,12 @@ export default function LyricsContent({ currentTrack: localTrack }: LyricsConten
                     <Music className="w-10 h-10 text-muted-foreground/30" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold">Nessuna curiosità trovata</p>
-                    <p className="text-xs text-muted-foreground">Trivia non disponibile per questo brano in questo momento.</p>
+                    <p className="text-sm font-semibold">
+                      Nessuna curiosità trovata
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Trivia non disponibile per questo brano in questo momento.
+                    </p>
                   </div>
                 </div>
               )}

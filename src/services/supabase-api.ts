@@ -214,6 +214,7 @@ export interface CollabUser {
   };
   telegramChatId?: string; 
   telegramEnabled?: boolean;
+  isDev?: boolean;
 }
 
 const LOCAL_KEY = "admin_collab_users";

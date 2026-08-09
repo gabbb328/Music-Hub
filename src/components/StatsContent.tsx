@@ -4,7 +4,7 @@ import { useTopTracks, useTopArtists, useRecentlyPlayed } from "@/hooks/useSpoti
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import WrappedExport from "./WrappedExport";
+import StickerWrapped from "./StickerWrapped";
 import { Share2, ArrowLeft } from "lucide-react";
 
 type TimeRange = "short_term" | "medium_term" | "long_term";
@@ -331,9 +331,6 @@ export default function StatsContent() {
 }
 
 function WrappedView({ topTracks, topArtists, topGenres, onBack }: any) {
-  const topArtist = topArtists[0]?.name || "Artista Sconosciuto";
-  const topTrack = topTracks[0]?.name || "Canzone Sconosciuta";
-  const topGenre = topGenres[0]?.name || "Musica";
   const coverUrl = topTracks[0]?.album?.images[0]?.url || "";
   
   return (
@@ -344,10 +341,9 @@ function WrappedView({ topTracks, topArtists, topGenres, onBack }: any) {
         </Button>
       </div>
       
-      <WrappedExport 
-        topArtist={topArtist}
-        topTrack={topTrack}
-        topGenre={topGenre}
+      <StickerWrapped 
+        topArtists={topArtists}
+        topTracks={topTracks}
         minutesListened={12450} // Mocked
         coverUrl={coverUrl}
       />

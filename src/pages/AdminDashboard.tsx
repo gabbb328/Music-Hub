@@ -1456,6 +1456,63 @@ function UsersPermissionsPanel({
                               </div>
                             </div>
 
+                            {/* ── Dev Mode Toggle ── */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                background: u.isDev ? "rgba(56,189,248,0.07)" : "rgba(0,0,0,0.2)",
+                                border: u.isDev ? "1px solid rgba(56,189,248,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                                borderRadius: 8,
+                                padding: "6px 10px",
+                                marginTop: 4,
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {u.isDev ? (
+                                  <Zap size={10} color="#38bdf8" />
+                                ) : (
+                                  <Zap size={10} color="rgba(255,255,255,0.25)" />
+                                )}
+                                <div>
+                                  <span style={{ fontSize: 10, color: u.isDev ? "#38bdf8" : "rgba(255,255,255,0.55)" }}>
+                                    Modalità Dev
+                                  </span>
+                                  <p style={{ fontSize: 8, color: "rgba(255,255,255,0.28)", margin: 0, fontFamily: "monospace" }}>
+                                    Bypassa la schermata di aggiornamento versione
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => update(u.id, { isDev: !u.isDev })}
+                                style={{
+                                  width: 32,
+                                  height: 16,
+                                  borderRadius: 99,
+                                  border: "none",
+                                  cursor: "pointer",
+                                  background: u.isDev ? "#38bdf8" : "rgba(255,255,255,0.1)",
+                                  position: "relative",
+                                  flexShrink: 0,
+                                  transition: "background 0.2s",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: 2,
+                                    left: u.isDev ? 18 : 2,
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: "50%",
+                                    background: "white",
+                                    transition: "left 0.2s",
+                                  }}
+                                />
+                              </button>
+                            </div>
+
                             {/* ── Telegram Integration — admin view only ── */}
                             <div
                               style={{
@@ -2984,29 +3041,6 @@ function VersionUpdatePanel() {
             <AlertCircle size={10} /> {errorMsg}
           </p>
         )}
-      </div>
-
-      <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
-        <button
-          onClick={() => setShowPreview(true)}
-          style={{
-            flex: 1,
-            background: "rgba(56,189,248,0.12)",
-            border: "1px solid rgba(56,189,248,0.25)",
-            borderRadius: 7,
-            padding: "6px",
-            fontSize: 10,
-            fontWeight: 600,
-            color: "#38bdf8",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 5,
-          }}
-        >
-          <Eye size={12} /> Anteprima Pagina
-        </button>
       </div>
 
       {showPreview && (

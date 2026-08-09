@@ -463,6 +463,9 @@ interface AudioConfig {
   autoplay: boolean;
 }
 
+const EMAIL_ADDRESS = "tfu";
+const PHONE_NUMBER = "3240972463";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MICRO-COMPONENTI
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1860,6 +1863,35 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Build</span>
             <span className="font-medium">{APP_BUILD}</span>
+          </div>
+        </div>
+      </SectionBox>
+
+      <SectionBox icon={Users} title="Contatti">
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Email</span>
+            <a
+              href={`mailto:${EMAIL_ADDRESS}`}
+              className="font-medium hover:text-primary hover:underline transition-colors"
+            >
+              {EMAIL_ADDRESS}
+            </a>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Telefono</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(PHONE_NUMBER);
+                toast({
+                  title: "✓ Numero copiato",
+                  description: "Il numero è stato copiato negli appunti.",
+                });
+              }}
+              className="font-medium hover:text-primary transition-colors cursor-pointer"
+            >
+              {PHONE_NUMBER}
+            </button>
           </div>
         </div>
       </SectionBox>

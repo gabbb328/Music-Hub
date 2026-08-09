@@ -6,12 +6,28 @@ import { Loader2, Wifi, WifiOff, Music, AlertCircle, CheckCircle } from "lucide-
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
 import { useUserProfile } from "@/hooks/useSpotify";
 import { getToken, clearToken, redirectToSpotifyAuth } from "@/services/spotify-auth";
+import { getCollabUsers } from "@/services/supabase-api";
 
 export const SpotifyStatus = () => {
   const { isReady, deviceId } = useSpotifyContext();
   const { data: profile, isLoading, error } = useUserProfile();
   const [showStatus, setShowStatus] = useState(true);
   const token = getToken();
+
+  useEffect(() => {
+    if (profile?.display_name) {
+      getCollabUsers().then((users) => {
+        const me = users.find(
+          (u) => u.name.toLowerCase() === profile.display_name?.toLowerCase() && u.id !== "system_settings"
+        );
+        if (me?.isDev) {
+          localStorage.setItem("harmony_dev_mode", "true");
+        } else {
+          localStorage.removeItem("harmony_dev_mode");
+        }
+      });
+    }
+  }, [profile?.display_name]);
 
   useEffect(() => {
     if (isReady && profile && !error) {
