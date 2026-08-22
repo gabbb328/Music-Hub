@@ -280,22 +280,6 @@ export default function MoreContent({
         <div className="space-y-2">
           {[
             {
-              onClick: () => onOpenAI?.(),
-              icon: Sparkles,
-              iconColor: "text-amber-400",
-              iconBg: "bg-amber-500/10",
-              label: "LyraAI Chatbot",
-              sub: "Assistente musicale e analisi brani",
-            },
-            {
-              onClick: () => onOpenProfile?.(),
-              icon: User,
-              iconColor: "text-blue-400",
-              iconBg: "bg-blue-500/10",
-              label: "Profilo Utente",
-              sub: "Dettagli account Spotify e statistiche",
-            },
-            {
               onClick: onOpenSettings,
               icon: Settings,
               iconColor: "text-primary",
