@@ -760,15 +760,15 @@ export default function NowPlayingView(
             <div
               className={`flex-1 min-w-0 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}
             >
-              <h2 className="text-xl font-bold truncate">
+              <h2 className="text-xl font-bold leading-tight break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
                 {isQuizActive ? "Guess the Title" : currentTrack.name}
               </h2>
-              <p className="text-base text-muted-foreground truncate">
+              <p className="text-base text-muted-foreground leading-snug break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
                 {isQuizActive
                   ? "Guess the Artist"
                   : currentTrack.artists.map((a: any) => a.name).join(", ")}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground leading-snug break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
                 {currentTrack.album.name}
               </p>
             </div>
@@ -795,19 +795,16 @@ export default function NowPlayingView(
               isPlaying={isPlaying}
               onSeek={handleSeek}
             />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {formatTime(elapsed)}
-              </span>
+            <div className="mt-1.5 text-center">
+              <div className="text-xs text-muted-foreground tabular-nums leading-none">
+                {formatTime(elapsed)} / {formatTime(duration)}
+              </div>
               {sleepTimer.active && (
-                <span className="text-xs text-amber-400 flex items-center gap-1">
+                <div className="mt-1 text-xs text-amber-400 flex items-center justify-center gap-1">
                   <Timer className="w-3 h-3" />
                   {formatTime(sleepTimer.remaining)}
-                </span>
+                </div>
               )}
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {formatTime(duration)}
-              </span>
             </div>
           </div>
 

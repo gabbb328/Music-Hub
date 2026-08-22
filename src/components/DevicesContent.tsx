@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Laptop, Smartphone, Speaker, Radio, Check, RefreshCw,
-  Wifi, WifiOff, Bluetooth, Monitor, Tv, Volume2, ArrowRight,
-  Headphones, Loader2, AlertCircle, Zap
+  WifiOff, Monitor, Tv, Volume2, ArrowRight,
+  Headphones, Loader2, Zap, Lock
 } from "lucide-react";
 import { useAvailableDevices, useTransferPlaybackMutation, usePlaybackState } from "@/hooks/useSpotify";
 import { SpotifyDevice } from "@/types/spotify";
@@ -53,11 +53,14 @@ function DeviceIcon({ type }: { type: string }) {
   }
 }
 
+import { useAccountTier } from "@/hooks/useAccountTier";
+
 export default function DevicesContent() {
   const { data: devicesData, isLoading, refetch } = useAvailableDevices();
   const { data: pb } = usePlaybackState();
   const transferMutation = useTransferPlaybackMutation();
   const { toast } = useToast();
+  const { isFree, showPremiumToast } = useAccountTier();
   const [transferring, setTransferring] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
@@ -73,6 +76,10 @@ export default function DevicesContent() {
   const inactiveDevices = devices.filter(d => !d.is_active);
 
   const handleTransfer = async (device: SpotifyDevice) => {
+    if (isFree) {
+      showPremiumToast("Trasferimento Spotify Connect");
+      return;
+    }
     setTransferring(device.id);
     try {
       await transferMutation.mutateAsync({ deviceId: device.id, play: pb?.is_playing ?? true });
@@ -105,6 +112,16 @@ export default function DevicesContent() {
         </button>
       </div>
 
+      {isFree && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-start gap-3">
+          <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold text-amber-200 block mb-0.5">Spotify Connect (Riservato a Premium)</strong>
+            Il controllo remoto e il passaggio tra dispositivi Spotify richiede Spotify Premium. Con l'account Free la riproduzione delle anteprime audio avviene nel browser.
+          </div>
+        </div>
+      )}
+
       {isLoading && devices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -129,7 +146,7 @@ export default function DevicesContent() {
           {activeDevice && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">In riproduzione</p>
-              <DeviceCard device={activeDevice} isActive onTransfer={() => {}} transferring={false} />
+              <DeviceCard device={activeDevice} isActive onTransfer={() => {}} transferring={false} isFree={isFree} />
             </div>
           )}
 
@@ -147,6 +164,7 @@ export default function DevicesContent() {
                     isActive={false}
                     onTransfer={() => handleTransfer(device)}
                     transferring={transferring === device.id}
+                    isFree={isFree}
                   />
                 ))}
               </div>
@@ -166,9 +184,9 @@ export default function DevicesContent() {
 
 // ── Singola card dispositivo ──────────────────────────────────────────────────
 function DeviceCard({
-  device, isActive, onTransfer, transferring
+  device, isActive, onTransfer, transferring, isFree
 }: {
-  device: SpotifyDevice; isActive: boolean; onTransfer: () => void; transferring: boolean;
+  device: SpotifyDevice; isActive: boolean; onTransfer: () => void; transferring: boolean; isFree: boolean;
 }) {
   const info = parseDeviceInfo(device.name, device.type);
 
@@ -214,13 +232,21 @@ function DeviceCard({
       {!isActive && (
         <button
           onClick={onTransfer}
-          disabled={transferring}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold transition-colors min-h-[44px] shrink-0 disabled:opacity-50"
+          disabled={transferring || isFree}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors min-h-[44px] shrink-0 disabled:opacity-50 ${
+            isFree
+              ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 cursor-not-allowed"
+              : "bg-primary/15 hover:bg-primary/25 text-primary"
+          }`}
+          title={isFree ? "Spotify Connect richiede Premium" : "Trasferisci riproduzione"}
         >
-          {transferring
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <><ArrowRight className="w-3.5 h-3.5" />Trasferisci</>
-          }
+          {transferring ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : isFree ? (
+            <><Lock className="w-3.5 h-3.5 text-amber-400" />Solo Premium</>
+          ) : (
+            <><ArrowRight className="w-3.5 h-3.5" />Trasferisci</>
+          )}
         </button>
       )}
     </motion.div>

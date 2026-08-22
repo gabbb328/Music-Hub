@@ -32,6 +32,7 @@ import {
   Users,
   Eye,
   EyeOff,
+  LayoutTemplate,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -533,6 +534,8 @@ function TabAspetto() {
     setAutoDarkMode,
     activeAppIcon,
     setActiveAppIcon,
+    uiStyle,
+    setUIStyle,
   } = useTheme();
   const { data: playbackState } = usePlaybackState();
   const coverUrl = playbackState?.item?.album?.images?.[0]?.url;
@@ -544,6 +547,35 @@ function TabAspetto() {
 
   return (
     <div className="space-y-6">
+      {/* Aspetto UI */}
+      <SectionBox icon={LayoutTemplate} title="Stile Interfaccia">
+        <div className="grid grid-cols-2 gap-3">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setUIStyle("glass")}
+            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative overflow-hidden ${uiStyle === "glass" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 opacity-50 blur-xl" />
+            <div className="w-full h-12 rounded bg-white/5 backdrop-blur-md flex flex-col items-center justify-center border border-white/10 relative z-10 shadow-lg">
+               <Sparkles className="w-4 h-4 text-primary/70 mb-1" />
+               <div className="w-1/2 h-1.5 rounded bg-white/40"></div>
+            </div>
+            <span className="text-xs font-bold mt-1 relative z-10">Glass Dark</span>
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setUIStyle("classic")}
+            className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${uiStyle === "classic" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}
+          >
+            <div className="w-full h-12 rounded bg-secondary/50 flex flex-col items-center justify-center border border-border/50">
+              <div className="w-3/4 h-2 rounded bg-muted-foreground/30 mb-2"></div>
+              <div className="w-1/2 h-2 rounded bg-muted-foreground/30"></div>
+            </div>
+            <span className="text-xs font-bold mt-1">Classico</span>
+          </motion.button>
+        </div>
+      </SectionBox>
+
       {/* Tema */}
       <SectionBox icon={Sun} title="Tema">
         <div className="grid grid-cols-3 gap-3 pb-1.5">
@@ -1790,6 +1822,14 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
 
   return (
     <div className="space-y-4">
+      {/* Greeting header — solo in Glass mode */}
+      <div className="px-1 pt-1 pb-2">
+        <h2 className="text-2xl font-black tracking-tight">
+          Ciao, <span className="text-primary">{userName.split(" ")[0]}</span>
+        </h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Bentornato su Music Hub</p>
+      </div>
+
       <SectionBox icon={Settings2} title="Profilo">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/60 to-primary/20 flex items-center justify-center shadow-lg">
@@ -1966,18 +2006,30 @@ function TabAccount({ handleLogout }: { handleLogout: () => void }) {
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: "aspetto" | "audio" | "cuffie";
+  onOpenProfile: () => void;
 }
 
-const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
+const TABS: { id: "aspetto" | "audio" | "cuffie"; label: string; icon: React.ComponentType<any> }[] = [
   { id: "aspetto", label: "Aspetto", icon: Palette },
   { id: "audio", label: "Audio", icon: Volume2 },
   { id: "cuffie", label: "Cuffie", icon: Headphones },
-  { id: "account", label: "Account", icon: Settings2 },
 ];
 
-export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("aspetto");
+export default function SettingsPanel({ isOpen, onClose, initialTab, onOpenProfile }: SettingsPanelProps) {
+  const [activeTab, setActiveTab] = useState<"aspetto" | "audio" | "cuffie">(initialTab || "aspetto");
+  const { data: userProfile } = useUserProfile();
+  const userAvatar = (userProfile as any)?.images?.[0]?.url || null;
+  const userInitial = ((userProfile as any)?.display_name || "U").charAt(0).toUpperCase();
   const navigate = useNavigate();
+  const { uiStyle } = useTheme();
+  const isGlass = uiStyle === "glass";
+
+  // Sync tab when opened with a specific initialTab
+  useEffect(() => {
+    if (isOpen && initialTab) setActiveTab(initialTab as "aspetto" | "audio" | "cuffie");
+  }, [isOpen, initialTab]);
+
   const handleLogout = () => {
     clearToken();
     navigate("/login");
@@ -1993,23 +2045,39 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
           />
           <motion.div
-            initial={{ x: "100%" }}
+            initial={{ x: isGlass ? "-100%" : "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            exit={{ x: isGlass ? "-100%" : "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-background border-l border-border z-50 flex flex-col shadow-2xl"
+            className={`fixed ${isGlass ? "left-0 border-r" : "right-0 border-l"} top-0 h-full w-full sm:w-[420px] bg-background border-border z-[100] flex flex-col shadow-2xl`}
           >
+            {/* Header con titolo + avatar profilo */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <h2 className="text-xl font-bold">Impostazioni</h2>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-secondary/60 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Avatar → apre ProfilePanel (solo in Classic mode) */}
+                {!isGlass && (
+                  <button
+                    onClick={() => { onClose(); onOpenProfile(); }}
+                    className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/30 hover:ring-primary/60 transition-all"
+                    title="Profilo"
+                  >
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="profilo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center">
+                        <span className="text-sm font-bold text-primary-foreground">{userInitial}</span>
+                      </div>
+                    )}
+                  </button>
+                )}
+                <button onClick={onClose} className="p-2 rounded-full hover:bg-secondary/60 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-1 px-4 pt-3 pb-0 shrink-0">
@@ -2048,9 +2116,6 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   {activeTab === "aspetto" && <TabAspetto />}
                   {activeTab === "audio" && <TabAudio />}
                   {activeTab === "cuffie" && <TabCuffie />}
-                  {activeTab === "account" && (
-                    <TabAccount handleLogout={handleLogout} />
-                  )}
                 </motion.div>
               </AnimatePresence>
             </div>

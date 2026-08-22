@@ -162,7 +162,10 @@ export default function SpotifyLogin() {
 
   // ── Standard (browser normale) ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-background flex items-center justify-center p-4">
+    <div className="theme-glass relative min-h-screen overflow-hidden bg-[#0d1117] flex items-center justify-center p-4 text-foreground">
+      <div className="glass-blob glass-blob-1" />
+      <div className="glass-blob glass-blob-2" />
+      <div className="glass-blob glass-blob-3" />
       <AnimatePresence mode="wait">
         {!showRequestForm ? (
           <motion.div
@@ -171,9 +174,9 @@ export default function SpotifyLogin() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="w-full max-w-md"
+            className="relative z-10 w-full max-w-md"
           >
-            <div className="glass-surface border-2 border-primary/20 rounded-2xl">
+            <div className="glass-surface border-2 border-white/10 rounded-2xl shadow-2xl shadow-black/30">
               <div className="p-8 space-y-6">
                 <div className="text-center space-y-2">
                   <motion.div
@@ -240,9 +243,9 @@ export default function SpotifyLogin() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="w-full max-w-md"
+            className="relative z-10 w-full max-w-md"
           >
-            <div className="glass-surface border-2 border-primary/20 rounded-2xl relative overflow-hidden">
+            <div className="glass-surface border-2 border-white/10 rounded-2xl relative overflow-hidden shadow-2xl shadow-black/30">
               <button
                 onClick={() => setShowRequestForm(false)}
                 className="absolute top-4 left-4 p-2 rounded-full hover:bg-secondary/50 text-muted-foreground transition-colors z-10"

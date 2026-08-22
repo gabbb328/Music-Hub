@@ -22,21 +22,33 @@ import {
   BookOpen,
   Trophy,
   Glasses,
+  Settings2,
+  AppWindow,
+  ChevronDown,
 } from "lucide-react";
 import { useUserPlaylists } from "@/hooks/useSpotify";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
+  onOpenSettings: () => void;
 }
 
-const mainNav = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "search", label: "Cerca", icon: Search },
+const classicMainNav = [
+  { id: "home",    label: "Home",     icon: Home    },
+  { id: "search", label: "Cerca",    icon: Search  },
   { id: "library", label: "Libreria", icon: Library },
 ];
 
-const features = [
+const glassMainNav = [
+  { id: "home",       label: "Home",           icon: Home },
+  { id: "search",     label: "Cerca",          icon: Search },
+  { id: "library",    label: "Libreria",       icon: Library },
+  { id: "extensions", label: "Strumenti & App", icon: AppWindow },
+];
+
+const classicFeatures = [
   { id: "ai-dj", label: "AI DJ", icon: Sparkles },
   { id: "neural-mixer", label: "Neural Mixer", icon: Layers },
   { id: "radio", label: "Radio", icon: Radio },
@@ -49,14 +61,32 @@ const features = [
   { id: "listen-along", label: "Listen Along", icon: Users },
 ];
 
+const classicGames = [
+  { id: "games", label: "Music Games", icon: Gamepad2 },
+];
+
+const glassMusicSubItems = [
+  { id: "lyrics", label: "Testi & Karaoke", icon: Mic2 },
+  { id: "devices", label: "Dispositivi Audio", icon: Headphones },
+  { id: "ai-dj", label: "AI DJ", icon: Sparkles },
+  { id: "neural-mixer", label: "Neural Mixer", icon: Layers },
+  { id: "equalizer", label: "Equalizzatore", icon: Settings2 },
+  { id: "radio", label: "Radio Hub", icon: Radio },
+  { id: "recognize", label: "Riconosci Brano", icon: ScanSearch },
+  { id: "stats", label: "Statistiche", icon: BarChart3 },
+  { id: "mood", label: "Mood Generator", icon: Sparkles },
+  { id: "mood-calendar", label: "Diario Musicale", icon: BookOpen },
+  { id: "listen-along", label: "Listen Along", icon: Users },
+];
+
+const glassGamesSubItems = [
+  { id: "games", label: "Music Games", icon: Gamepad2 },
+];
+
 const libraryItems = [
   { id: "liked", label: "Preferiti", icon: Heart },
   { id: "recent", label: "Recenti", icon: Clock },
   { id: "queue", label: "Coda", icon: ListMusic },
-];
-
-const gameItems = [
-  { id: "games", label: "Music Games", icon: Gamepad2 },
 ];
 
 const appItems = [
@@ -67,9 +97,14 @@ const appItems = [
 export default function Sidebar({
   activeSection,
   onSectionChange,
+  onOpenSettings,
 }: SidebarProps) {
   const { data: playlistsData, isLoading } = useUserPlaylists();
   const playlists = playlistsData?.items || [];
+  const { uiStyle } = useTheme();
+  const isGlass = uiStyle === "glass";
+
+  const [isExtensionsExpanded, setIsExtensionsExpanded] = useState(true);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const mouseY = useMotionValue(-1000);
@@ -89,11 +124,13 @@ export default function Sidebar({
     mouseY.set(-1000);
   };
 
-  const indicatorY = useSpring(mouseY, { stiffness: 400, damping: 40 }); // Overdamped = No bounce
+  const indicatorY = useSpring(mouseY, { stiffness: 400, damping: 40 });
   const indicatorOpacity = useSpring(isSidebarHovered ? 1 : 0, {
     stiffness: 400,
     damping: 40,
   });
+
+  const mainNavItems = isGlass ? glassMainNav : classicMainNav;
 
   return (
     <aside
@@ -128,36 +165,109 @@ export default function Sidebar({
           className="px-3 space-y-0.5"
           onMouseEnter={() => setHoveredSection("nav")}
         >
-          {mainNav.map((item) => (
+          {mainNavItems.map((item) => (
             <NavItem
               key={item.id}
               {...item}
-              isActive={activeSection === item.id}
-              onClick={() => onSectionChange(item.id)}
+              isActive={item.id === "extensions" ? isExtensionsExpanded : activeSection === item.id}
+              onClick={() => {
+                if (item.id === "extensions") {
+                  setIsExtensionsExpanded((prev) => !prev);
+                  return;
+                }
+                onSectionChange(item.id);
+              }}
               mouseY={mouseY}
               isSectionHovered={hoveredSection === "nav"}
             />
           ))}
         </nav>
 
-        <div
-          className="px-3 mt-5"
-          onMouseEnter={() => setHoveredSection("features")}
-        >
-          <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            Funzionalità
-          </p>
-          {features.map((item) => (
-            <NavItem
-              key={item.id}
-              {...item}
-              isActive={activeSection === item.id}
-              onClick={() => onSectionChange(item.id)}
-              mouseY={mouseY}
-              isSectionHovered={hoveredSection === "features"}
-            />
-          ))}
-        </div>
+        {/* --- CLASSIC MODE (`!isGlass`): Rimanere tutto come prima --- */}
+        {!isGlass && (
+          <>
+            <div
+              className="px-3 mt-5"
+              onMouseEnter={() => setHoveredSection("features")}
+            >
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                Scoperte & Magia
+              </p>
+              {classicFeatures.map((item) => (
+                <NavItem
+                  key={item.id}
+                  {...item}
+                  isActive={activeSection === item.id}
+                  onClick={() => onSectionChange(item.id)}
+                  mouseY={mouseY}
+                  isSectionHovered={hoveredSection === "features"}
+                />
+              ))}
+            </div>
+
+            <div
+              className="px-3 mt-5"
+              onMouseEnter={() => setHoveredSection("games")}
+            >
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                Giochi
+              </p>
+              {classicGames.map((item) => (
+                <NavItem
+                  key={item.id}
+                  {...item}
+                  isActive={activeSection === item.id || activeSection === "quiz"}
+                  onClick={() => onSectionChange(item.id)}
+                  mouseY={mouseY}
+                  isSectionHovered={hoveredSection === "games"}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* --- GLASS MODE (`isGlass`): Sotto-menu espandibile per Estensioni suddivise in Categorie --- */}
+        {isGlass && isExtensionsExpanded && (
+          <div className="px-3 mt-4 space-y-4 border-l-2 border-primary/20 ml-5 pl-2 py-1">
+            {/* Categoria Musica & AI */}
+            <div onMouseEnter={() => setHoveredSection("glass-music")}>
+              <p className="px-2 mb-1 text-[9px] font-bold uppercase tracking-wider text-primary/70">
+                Musica & AI
+              </p>
+              <div className="space-y-0.5">
+                {glassMusicSubItems.map((item) => (
+                  <NavItem
+                    key={item.id}
+                    {...item}
+                    isActive={activeSection === item.id}
+                    onClick={() => onSectionChange(item.id)}
+                    mouseY={mouseY}
+                    isSectionHovered={hoveredSection === "glass-music"}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Categoria Giochi */}
+            <div onMouseEnter={() => setHoveredSection("glass-games")}>
+              <p className="px-2 mb-1 text-[9px] font-bold uppercase tracking-wider text-primary/70">
+                Giochi
+              </p>
+              <div className="space-y-0.5">
+                {glassGamesSubItems.map((item) => (
+                  <NavItem
+                    key={item.id}
+                    {...item}
+                    isActive={activeSection === item.id || activeSection === "quiz"}
+                    onClick={() => onSectionChange(item.id)}
+                    mouseY={mouseY}
+                    isSectionHovered={hoveredSection === "glass-games"}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div
           className="px-3 mt-5"
@@ -180,29 +290,10 @@ export default function Sidebar({
 
         <div
           className="px-3 mt-5"
-          onMouseEnter={() => setHoveredSection("games")}
-        >
-          <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            Giochi
-          </p>
-          {gameItems.map((item) => (
-            <NavItem
-              key={item.id}
-              {...item}
-              isActive={activeSection === item.id || activeSection === "quiz"}
-              onClick={() => onSectionChange(item.id)}
-              mouseY={mouseY}
-              isSectionHovered={hoveredSection === "games"}
-            />
-          ))}
-        </div>
-
-        <div
-          className="px-3 mt-5"
           onMouseEnter={() => setHoveredSection("app")}
         >
           <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            App
+            Info App
           </p>
           {appItems.map((item) => (
             <NavItem
@@ -217,7 +308,7 @@ export default function Sidebar({
         </div>
 
         <div
-          className="px-3 mt-5 pb-4"
+          className="px-3 mt-5 pb-16"
           onMouseEnter={() => setHoveredSection("playlists")}
         >
           <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
@@ -252,6 +343,19 @@ export default function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Floating glass settings button positioned floating over the bottom of the sidebar */}
+      {isGlass && (
+        <div className="absolute bottom-4 right-4 z-[60] pointer-events-none">
+          <button
+            onClick={onOpenSettings}
+            className="pointer-events-auto p-3 rounded-full bg-background/30 backdrop-blur-xl border border-white/20 hover:bg-background/70 transition-all text-muted-foreground hover:text-primary shadow-2xl hover:scale-105 active:scale-95"
+            title="Impostazioni"
+          >
+            <Settings2 className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

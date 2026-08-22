@@ -1,4 +1,4 @@
-import { Home, Search, Library, Gamepad2, MoreHorizontal } from "lucide-react";
+import { Home, Search, Library, AppWindow, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSquish } from "@/hooks/useSquish";
 
@@ -9,11 +9,11 @@ interface MobileNavProps {
 }
 
 const navItems = [
-  { id: "home",    label: "Home",     icon: Home           },
-  { id: "search",  label: "Cerca",    icon: Search         },
-  { id: "library", label: "Libreria", icon: Library        },
-  { id: "games",   label: "Giochi",   icon: Gamepad2       },
-  { id: "more",    label: "Altro",    icon: MoreHorizontal },
+  { id: "home",       label: "Home",       icon: Home           },
+  { id: "search",     label: "Cerca",      icon: Search         },
+  { id: "library",    label: "Libreria",   icon: Library        },
+  { id: "extensions", label: "Estensioni", icon: AppWindow      },
+  { id: "more",       label: "Altro",      icon: MoreHorizontal },
 ];
 
 const NAV_SPRING = { type: "spring", stiffness: 600, damping: 30, mass: 0.8 } as const;
@@ -21,9 +21,9 @@ const NAV_SPRING = { type: "spring", stiffness: 600, damping: 30, mass: 0.8 } as
 export default function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
   // Squish: elemento premuto si ingrandisce, adiacenti si rimpiccioliscono
   const squish = useSquish(navItems.length, {
-    activeScale:   1.25,
-    neighborScale: 0.82,
-    farScale:      0.90,
+    activeScale:   1.2,
+    neighborScale: 0.85,
+    farScale:      0.92,
     neighborRadius: 1,
     spring: { stiffness: 650, damping: 28, mass: 0.8 },
   });
@@ -45,6 +45,7 @@ export default function MobileNav({ activeSection, onSectionChange }: MobileNavP
           return (
             <motion.button
               key={item.id}
+              data-section={item.id}
               onClick={() => onSectionChange(item.id)}
               className="relative flex flex-col items-center justify-center flex-1 h-full gap-0.5 min-w-0 touch-manipulation"
               whileTap={{ scale: 0.9, rotate: [0, -1, 1, 0] }}

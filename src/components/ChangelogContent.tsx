@@ -11,6 +11,17 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    date: "12 Settembre 2026",
+    version: "2.0.0",
+    commits: [
+      "Nuova interfaccia Dark Glass con sfondi sfocati ed elementi fluttuanti",
+      "Pulsante Impostazioni traslucido fluttuante in basso a destra nella sidebar",
+      "Nuovo assistente chatbot LyraAI integrato in tempo reale",
+      "Organizzazione barra di navigazione con la sezione 'Strumenti & App' e categorie dedicate",
+      "Tutorial interattivo v3.0 aggiornato per guidare l'utente tra le novità",
+    ],
+  },
+  {
     date: "23 Giugno 2026",
     version: "v1.8.1",
     commits: [

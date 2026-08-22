@@ -392,8 +392,8 @@ export const getRecentNeuroStates = async (limit: number = 5): Promise<UserNeuro
       .limit(limit);
     if (error) throw error;
     return data || [];
-  } catch (e) {
-    console.error("Errore recupero recent neuro states:", e);
+  } catch (e: any) {
+    console.warn("Neuro states non disponibili:", e?.message || e);
     return [];
   }
 };

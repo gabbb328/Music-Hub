@@ -24,6 +24,7 @@ import PlaylistDetail from "@/components/PlaylistDetail";
 import RecognizeContent from "@/components/RecognizeContent";
 import EqualizerContent from "@/components/EqualizerContent";
 import SettingsPanel from "@/components/SettingsPanel";
+import ProfilePanel from "@/components/ProfilePanel";
 import MoreContent from "@/components/MoreContent";
 import SamsungBudsContent from "@/components/SamsungBudsContent";
 import AboutContent from "@/components/AboutContent";
@@ -47,8 +48,13 @@ import {
   useSeekMutation,
 } from "@/hooks/useSpotify";
 import EasterEggOverlay, { EasterEggList } from "@/components/EasterEggOverlay";
+import VersionUpdatePage from "@/components/VersionUpdatePage";
+import AIPanel from "@/components/AIPanel";
+import ExtensionsContent from "@/components/ExtensionsContent";
+import { APP_VERSION } from "@/hooks/version";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Crown, Zap, Smartphone } from "lucide-react";
 import { useAlexa } from "@/hooks/useAlexa";
 
@@ -201,12 +207,18 @@ function SuperModeOverlay({
 const IndexInner = () => {
   const isAlexa = useAlexa();
   const player = usePlayerStore();
+  const { uiStyle } = useTheme();
+  const isGlass = uiStyle === "glass";
 
   const { isIOS, playbackState: spPb } = useSpotifyContext();
 
   const [activeSection, setActiveSection] = useState("home");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"aspetto" | "audio" | "cuffie">("aspetto");
   const [activeEgg, setActiveEgg] = useState<EasterEggType>(null);
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [showEggList, setShowEggList] = useState(false);
@@ -357,11 +369,14 @@ const IndexInner = () => {
       );
     }
     switch (activeSection) {
+      case "extensions":
+        return <ExtensionsContent onSectionChange={setActiveSection} />;
       case "search":
         return (
           <SearchContent
             onPlayTrack={player.playTrack}
             onActivateEgg={setActiveEgg}
+            initialQuery={searchQuery}
           />
         );
       case "library":
@@ -421,6 +436,8 @@ const IndexInner = () => {
           <MoreContent
             onSectionChange={setActiveSection}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenProfile={() => setShowProfile(true)}
+            onOpenAI={() => setShowAIPanel(true)}
           />
         );
       default:
@@ -428,6 +445,25 @@ const IndexInner = () => {
           <HomeContent
             onPlayTrack={player.playTrack}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenProfile={() => setShowProfile(true)}
+            onOpenAI={() => setShowAIPanel(true)}
+            onActivateEgg={(egg) => {
+              setActiveEgg(egg);
+              if (egg === "music" || egg === "disco" || egg === "love") {
+                player.playTrack({
+                  id: "easter-egg-track",
+                  title: egg === "music" ? "Secret Track" : egg === "disco" ? "Disco Fever" : "Love Song",
+                  artist: "Easter Egg",
+                  album: "Secrets",
+                  cover: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41",
+                  duration: 180,
+                });
+              }
+            }}
+            onNavigateToSearch={(q) => {
+              setSearchQuery(q);
+              setActiveSection("search");
+            }}
           />
         );
     }
@@ -437,8 +473,23 @@ const IndexInner = () => {
 
   return (
     <div
-      className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""}`}
+      className={`flex flex-col h-screen overflow-hidden bg-background transition-colors duration-700 ${superMode ? "super-mode" : ""} ${isGlass ? "theme-glass" : ""}`}
     >
+      {/* Blob di sfondo animati — visibili solo in Glass mode */}
+      {isGlass && !isAlexa && (
+        <>
+          <div className="glass-blob glass-blob-1" />
+          <div className="glass-blob glass-blob-2" />
+          <div className="glass-blob glass-blob-3" />
+          {/* Sparkle stars decorativi */}
+          <div className="glass-sparkle" style={{ top: "8%", right: "6%", width: 16, height: 16, animationDuration: "3s", animationDelay: "0s" }}>
+            <svg viewBox="0 0 24 24" fill="white"><path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z"/></svg>
+          </div>
+          <div className="glass-sparkle" style={{ bottom: "12%", right: "3%", width: 10, height: 10, animationDuration: "4s", animationDelay: "1.5s" }}>
+            <svg viewBox="0 0 24 24" fill="white"><path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z"/></svg>
+          </div>
+        </>
+      )}
       <SpotifyStatus />
 
       {isIOS && !spPb?.device && (
@@ -474,14 +525,13 @@ const IndexInner = () => {
         )}
       </AnimatePresence>
 
-      <div
-        className={`flex flex-1 min-h-0 ${hasTrack ? "pb-[7.5rem]" : "pb-14"} md:pb-0`}
-      >
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          onOpenSettings={() => { setSettingsTab("aspetto"); setShowSettings(true); }}
         />
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-28 md:pb-0">
           {isAlexa ? (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {renderContent()}
@@ -490,13 +540,12 @@ const IndexInner = () => {
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeSection}
-                className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                initial={{ opacity: 0, y: 10 }}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden transform-gpu will-change-transform"
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
+                exit={{ opacity: 0 }}
                 transition={{
-                  type: "tween",
-                  duration: 0.22,
+                  duration: 0.16,
                   ease: [0.16, 1, 0.3, 1],
                 }}
               >
@@ -505,10 +554,25 @@ const IndexInner = () => {
             </AnimatePresence>
           )}
         </main>
+        {/* Desktop Vertical Player in Glass mode */}
+        {isGlass && hasTrack && (
+          <div className="hidden md:flex flex-col w-80 shrink-0 border-l border-white/10 glass-surface z-50">
+            <PlayerBar
+              {...player}
+              onExpandClick={() => setShowNowPlaying(true)}
+              onNavigate={setActiveSection}
+              onOpenEggList={() => setShowEggList(true)}
+              superMode={superMode}
+              isQuizActive={isQuizActive}
+              isVertical={true}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="md:contents fixed bottom-0 left-0 right-0 z-50 flex flex-col pointer-events-none bg-background/80 backdrop-blur-xl border-t border-border/40 md:bg-transparent md:backdrop-blur-none md:border-t-0">
-        <div className="md:relative md:z-auto md:static pointer-events-auto">
+      {/* Desktop Horizontal Player in Normal/Classic mode */}
+      {!isGlass && hasTrack && (
+        <div className="hidden md:block border-t border-border bg-card/95 backdrop-blur-md z-50">
           <PlayerBar
             {...player}
             onExpandClick={() => setShowNowPlaying(true)}
@@ -516,8 +580,26 @@ const IndexInner = () => {
             onOpenEggList={() => setShowEggList(true)}
             superMode={superMode}
             isQuizActive={isQuizActive}
+            isVertical={false}
           />
         </div>
+      )}
+
+      {/* Mobile Player & Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden flex flex-col pointer-events-none bg-background/95 backdrop-blur-xl border-t border-border/40 shadow-2xl">
+        {hasTrack && (
+          <div className="pointer-events-auto">
+            <PlayerBar
+              {...player}
+              onExpandClick={() => setShowNowPlaying(true)}
+              onNavigate={setActiveSection}
+              onOpenEggList={() => setShowEggList(true)}
+              superMode={superMode}
+              isQuizActive={isQuizActive}
+              isVertical={false}
+            />
+          </div>
+        )}
         <div className="pointer-events-auto">
           <MobileNav
             activeSection={activeSection}
@@ -545,6 +627,16 @@ const IndexInner = () => {
           <SettingsPanel
             isOpen={showSettings}
             onClose={() => setShowSettings(false)}
+            initialTab={settingsTab}
+            onOpenProfile={() => setShowProfile(true)}
+          />
+          <ProfilePanel
+            isOpen={showProfile}
+            onClose={() => setShowProfile(false)}
+          />
+          <AIPanel
+            isOpen={showAIPanel}
+            onClose={() => setShowAIPanel(false)}
           />
         </>
       )}

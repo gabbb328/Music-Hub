@@ -48,6 +48,20 @@ interface LyricsContentProps {
 }
 type Mode = "lyrics" | "info" | "analysis" | "trivia";
 
+function getWeightedActiveIndex<T extends { text: string }>(words: T[], progress: number): number {
+  if (progress <= 0) return -1;
+  if (progress >= 1) return words.length;
+  const weights = words.map((word) => Math.max(0.7, Math.sqrt(word.text.replace(/[^\w]/g, "").length || 1)));
+  const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+  const target = total * progress;
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    acc += weights[i];
+    if (target < acc) return i;
+  }
+  return words.length;
+}
+
 export default function LyricsContent({
   currentTrack: localTrack,
 }: LyricsContentProps) {
@@ -89,7 +103,7 @@ export default function LyricsContent({
   const [activeTime, setActiveTime] = useState(0);
   const syncRef = useRef<{ baseTime: number; updatedAt: number }>({
     baseTime: 0,
-    updatedAt: Date.now(),
+    updatedAt: performance.now(),
   });
 
   // Dynamic container height tracker for perfect pixel-centered vertical spacers
@@ -97,7 +111,7 @@ export default function LyricsContent({
 
   // Sync activeTime with playbackState updates
   useEffect(() => {
-    syncRef.current = { baseTime: currentTime, updatedAt: Date.now() };
+    syncRef.current = { baseTime: currentTime, updatedAt: performance.now() };
     setActiveTime(currentTime);
   }, [currentTime]);
 
@@ -106,10 +120,9 @@ export default function LyricsContent({
     if (!isPlaying) return;
     let animationFrameId: number;
     const tick = () => {
-      const now = Date.now();
+      const now = performance.now();
       const elapsed = (now - syncRef.current.updatedAt) / 1000;
-      // Add 300ms standard compensation for Spotify API network roundtrip latency
-      const latencyCompensation = 0.3;
+      const latencyCompensation = 0.12;
       setActiveTime(syncRef.current.baseTime + elapsed + latencyCompensation);
       animationFrameId = requestAnimationFrame(tick);
     };
@@ -302,6 +315,9 @@ export default function LyricsContent({
   }
 
   const spotifyTrack = playbackState?.item;
+  const trackDurationSeconds = (currentTrack as any).duration_ms
+    ? Math.floor((currentTrack as any).duration_ms / 1000)
+    : (currentTrack as any).duration || 180;
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col animate-fade-in">
@@ -505,18 +521,11 @@ export default function LyricsContent({
                       (w) => w.isChorus,
                     );
                     const nextLine = lyrics[index + 1];
-                    // Cap the animation duration based on typical singing speed so words don't animate slowly over long instrumental gaps
-                    const maxRealisticDuration = Math.max(
-                      3,
-                      words.length * 0.4,
-                    );
-                    const rawDuration = nextLine
-                      ? nextLine.time - line.time
-                      : maxRealisticDuration;
-                    const lineDuration = Math.min(
-                      rawDuration,
-                      maxRealisticDuration,
-                    );
+                    const lineEndTime =
+                      line.endTime ??
+                      nextLine?.time ??
+                      Math.min(trackDurationSeconds, line.time + Math.max(2.5, words.length * 0.45));
+                    const lineDuration = Math.max(0.25, lineEndTime - line.time);
                     const lineProgress = Math.max(
                       0,
                       Math.min(1, (activeTime - line.time) / lineDuration),
@@ -572,9 +581,7 @@ export default function LyricsContent({
                     } else {
                       if (isStrictlySequential) {
                         const globalActiveIndex =
-                          lineProgress === 1
-                            ? words.length
-                            : Math.floor(lineProgress * words.length);
+                          getWeightedActiveIndex(categorizedWords, lineProgress);
                         if (isChorusAtEnd) {
                           if (globalActiveIndex < mainWords.length) {
                             activeMainIndex = globalActiveIndex;
@@ -596,13 +603,9 @@ export default function LyricsContent({
                         }
                       } else {
                         activeMainIndex =
-                          lineProgress === 1
-                            ? mainWords.length
-                            : Math.floor(lineProgress * mainWords.length);
+                          getWeightedActiveIndex(mainWords, lineProgress);
                         activeChorusIndex =
-                          lineProgress === 1
-                            ? chorusWords.length
-                            : Math.floor(lineProgress * chorusWords.length);
+                          getWeightedActiveIndex(chorusWords, lineProgress);
                       }
                     }
 
@@ -651,7 +654,7 @@ export default function LyricsContent({
                             )}
 
                             {/* Bouncy word-magnification Karaoke Rendering */}
-                            {isCurrent && isSynced && isKaraokeActive ? (
+                            {isCurrent && isKaraokeActive ? (
                               <div className="flex flex-col items-center md:items-start w-full gap-2">
                                 {mainWords.length > 0 && (
                                   <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-1">

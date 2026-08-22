@@ -7,7 +7,7 @@ interface WaveformProgressProps {
   onSeek: (progress: number) => void;
 }
 
-const BAR_COUNT = 60;
+const BAR_COUNT = 44;
 
 export default function WaveformProgress({ progress, isPlaying, onSeek }: WaveformProgressProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export default function WaveformProgress({ progress, isPlaying, onSeek }: Wavefo
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center gap-[2px] h-10 cursor-pointer group touch-none"
+      className="relative flex items-center gap-[3px] h-10 cursor-pointer group touch-none"
       onMouseDown={handleInteractionStart}
       onTouchStart={handleInteractionStart}
       onMouseMove={(e) => !isDragging && handleInteractionMove(e.nativeEvent)}

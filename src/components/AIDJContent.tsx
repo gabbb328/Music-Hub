@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Play, Pause, SkipForward, Loader2, Mic, Music2,
@@ -248,6 +248,13 @@ export default function AIDJContent() {
       setLoadingSuggestions(false);
     }
   };
+
+  // Auto-generate suggestions on mount
+  useEffect(() => {
+    if (currentTrack && topTracks.length > 0 && suggestions.length === 0 && !loadingSuggestions) {
+      generateSuggestions();
+    }
+  }, [currentTrack?.id, topTracks.length]);
 
   const createDJMixPlaylist = async () => {
     try {

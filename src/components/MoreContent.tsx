@@ -20,9 +20,13 @@ import {
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
 
+import { useUserProfile } from "@/hooks/useSpotify";
+
 interface MoreContentProps {
   onSectionChange: (section: string) => void;
   onOpenSettings: () => void;
+  onOpenProfile?: () => void;
+  onOpenAI?: () => void;
 }
 
 const features = [
@@ -96,13 +100,6 @@ const features = [
     color: "text-green-400",
     bg: "bg-green-400/10",
   },
-  {
-    id: "even-g2",
-    label: "Occhiali G2",
-    icon: Glasses,
-    color: "text-green-400",
-    bg: "bg-green-400/10",
-  },
 ];
 
 const libraryItems = [
@@ -149,20 +146,57 @@ const LIB_SQUISH = {
 export default function MoreContent({
   onSectionChange,
   onOpenSettings,
+  onOpenProfile,
+  onOpenAI,
 }: MoreContentProps) {
   const featureSquish = useSquish(features.length, GRID_SQUISH);
   const libSquish = useSquish(libraryItems.length, LIB_SQUISH);
+  const { data: userProfile } = useUserProfile();
+
+  const userAvatar = (userProfile as any)?.images?.[0]?.url || null;
+  const userInitial = ((userProfile as any)?.display_name || "U").charAt(0).toUpperCase();
 
   return (
     <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-6">
-      <motion.h2
-        className="text-2xl font-bold flex items-center gap-2"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "tween", duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <User className="w-6 h-6 text-primary" /> Altro
-      </motion.h2>
+      <div className="flex items-center justify-between gap-3">
+        <motion.h2
+          className="text-2xl font-bold flex items-center gap-2"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "tween", duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <User className="w-6 h-6 text-primary" /> Altro
+        </motion.h2>
+
+        {/* Due bottoni circolare in alto a destra: LyraAI e Profilo Utente Spotify */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={onOpenAI}
+            className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500/20 to-primary/20 border border-primary/30 flex items-center justify-center text-primary shadow-sm hover:ring-2 hover:ring-primary/40 transition-all shrink-0"
+            title="LyraAI Chatbot"
+          >
+            <Sparkles className="w-5 h-5 text-amber-400" />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={onOpenProfile}
+            className="w-11 h-11 rounded-full overflow-hidden border border-primary/30 shadow-sm hover:ring-2 hover:ring-primary/50 transition-all flex items-center justify-center bg-secondary shrink-0"
+            title="Profilo Spotify"
+          >
+            {userAvatar ? (
+              <img src={userAvatar} alt="Spotify Profile" className="w-full h-full object-cover rounded-full" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center rounded-full">
+                <span className="text-xs font-bold text-primary-foreground">{userInitial}</span>
+              </div>
+            )}
+          </motion.button>
+        </div>
+      </div>
 
       {/* Feature grid — squish a 2 colonne */}
       <div>
@@ -246,6 +280,22 @@ export default function MoreContent({
         <div className="space-y-2">
           {[
             {
+              onClick: () => onOpenAI?.(),
+              icon: Sparkles,
+              iconColor: "text-amber-400",
+              iconBg: "bg-amber-500/10",
+              label: "LyraAI Chatbot",
+              sub: "Assistente musicale e analisi brani",
+            },
+            {
+              onClick: () => onOpenProfile?.(),
+              icon: User,
+              iconColor: "text-blue-400",
+              iconBg: "bg-blue-500/10",
+              label: "Profilo Utente",
+              sub: "Dettagli account Spotify e statistiche",
+            },
+            {
               onClick: onOpenSettings,
               icon: Settings,
               iconColor: "text-primary",
@@ -269,7 +319,7 @@ export default function MoreContent({
               label: "Changelog",
               sub: "Cronologia degli aggiornamenti",
             },
-          ].map(({ onClick, icon: Icon, iconColor, iconBg, label, sub }, i) => (
+          ].map(({ onClick, icon: Icon, iconColor, iconBg, label, sub }) => (
             <motion.button
               key={label}
               onClick={onClick}

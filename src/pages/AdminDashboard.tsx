@@ -1148,7 +1148,8 @@ function UsersPermissionsPanel({
     const u = all.find((u) => u.id === id);
     if (!u) return;
     
-    const nextPerms = { ...u.permissions, [perm]: !u.permissions[perm] };
+    const currPerms = u.permissions || {};
+    const nextPerms = { ...currPerms, [perm]: !currPerms[perm] };
     if (perm === "canAccessAdmin" && !nextPerms.canAccessAdmin) {
       nextPerms.canAccessInfrastructure = false;
     }
@@ -1371,20 +1372,21 @@ function UsersPermissionsPanel({
                                 }}
                               >
                                 {(() => {
+                                  const userPerms = u.permissions || {};
                                   const list: [keyof CollabUser["permissions"], string][] = [
                                     ["canViewStats", "Può vedere statistiche Spotify"],
                                     ["canViewToken", "Può vedere il token OAuth"],
                                     ["canAccessGithub", "Accesso al progetto su GitHub"],
                                     ["canAccessAdmin", "Accesso alla dashboard admin"],
                                   ];
-                                  if (u.permissions.canAccessAdmin) {
+                                  if (userPerms.canAccessAdmin) {
                                     list.push(["canAccessInfrastructure", "Accesso all'infrastruttura"]);
                                   }
                                   list.push(["canModifySettings", "Modifica permessi/integrazioni"]);
                                   list.push(["canModifyGlobalSettings", "Modifica impostazioni globali"]);
                                   return list;
                                 })().map(([perm, label]) => {
-                                  const isVal = !!u.permissions[perm];
+                                  const isVal = !!u.permissions?.[perm];
                                   return (
                                     <div
                                       key={perm}

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 
 type Theme = "light" | "dark" | "system";
 
+export type UIStyle = "classic" | "glass";
+
 type ColorTheme =
   | "blue" | "purple" | "violet" | "emerald" | "teal"
   | "amber" | "rose" | "crimson" | "indigo" | "lime" | "sky" | "fuchsia"
@@ -21,6 +23,9 @@ interface ThemeContextType {
   setActiveAppIcon: (iconName: string) => void;
   /** Chiamato dal Neural Mixer quando importa un file con copertina */
   setCoverImageUrl: (url: string | null) => void;
+  /** Stile UI: 'classic' (default) o 'glass' (nuovo look) */
+  uiStyle: UIStyle;
+  setUIStyle: (style: UIStyle) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -123,10 +128,11 @@ function applyFavicon(iconPath: string) {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setThemeState]         = useState<Theme>(() => (localStorage.getItem("theme") as Theme) || "dark");
+  const [theme, setThemeState]         = useState<Theme>("dark");
   const [colorTheme, setColorThemeState] = useState<ColorTheme>(() => (localStorage.getItem("colorTheme") as ColorTheme) || "blue");
   const [autoDarkMode, setAutoDarkModeState] = useState<boolean>(() => localStorage.getItem("autoDarkMode") === "true");
   const [activeAppIcon, setActiveAppIconState] = useState<string>(() => localStorage.getItem("activeAppIcon") || "auto");
+  const [uiStyle, setUIStyleState] = useState<UIStyle>("glass");
   /** URL copertina importata nel Neural Mixer (o Spotify) */
   const [coverImageUrl, setCoverImageUrlState] = useState<string | null>(null);
 
@@ -277,6 +283,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const setAutoDarkMode = (v: boolean) => { setAutoDarkModeState(v); localStorage.setItem("autoDarkMode", String(v)); };
   const setActiveAppIcon = (name: string) => { setActiveAppIconState(name); localStorage.setItem("activeAppIcon", name); };
   const setCoverImageUrl = (url: string | null) => { setCoverImageUrlState(url); };
+  const setUIStyle = (s: UIStyle) => { setUIStyleState(s); localStorage.setItem("uiStyle", s); };
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   return (
@@ -286,6 +293,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       autoDarkMode, setAutoDarkMode,
       activeAppIcon, setActiveAppIcon,
       setCoverImageUrl,
+      uiStyle, setUIStyle,
     }}>
       {children}
     </ThemeContext.Provider>

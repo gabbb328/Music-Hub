@@ -560,3 +560,97 @@ input[type="range"]::-moz-range-thumb {
   opacity: 1 !important;
   visibility: visible !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   GLASS DARK THEME — nuovo look con blob animati e glassmorphism
+   Applicato tramite classe .theme-glass sul root div dell'app
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Blob animati di sfondo */
+@keyframes blob-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -40px) scale(1.08); }
+  66%       { transform: translate(-20px, 20px) scale(0.95); }
+}
+@keyframes blob-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%       { transform: translate(-35px, 30px) scale(1.06); }
+  70%       { transform: translate(25px, -25px) scale(0.97); }
+}
+@keyframes blob-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(20px, 35px) scale(1.05); }
+}
+
+.glass-blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+.glass-blob-1 {
+  width: 480px; height: 480px;
+  top: -120px; left: -100px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.4) 0%, hsl(var(--primary) / 0.15) 60%, transparent 100%);
+  animation: blob-float-1 12s ease-in-out infinite;
+}
+.glass-blob-2 {
+  width: 420px; height: 420px;
+  bottom: -80px; right: -80px;
+  background: radial-gradient(circle, hsl(var(--accent) / 0.35) 0%, hsl(var(--accent) / 0.12) 60%, transparent 100%);
+  animation: blob-float-2 15s ease-in-out infinite;
+}
+.glass-blob-3 {
+  width: 350px; height: 350px;
+  top: 40%; left: 40%;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.2) 0%, hsl(var(--ring) / 0.08) 60%, transparent 100%);
+  animation: blob-float-3 18s ease-in-out infinite;
+}
+
+/* Root layout in Glass mode */
+.theme-glass {
+  background: #0d1117 !important;
+}
+
+/* Sidebar Glass */
+.theme-glass aside {
+  background: rgba(255,255,255,0.04) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-right: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* Glass surface più intenso in Glass mode */
+.theme-glass .glass-surface {
+  background: rgba(255,255,255,0.05) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Card content glassmorphism */
+.theme-glass main > * {
+  background: transparent;
+}
+
+/* Player bar glass */
+.theme-glass [data-player-bar] {
+  background: rgba(15,20,35,0.7) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border-top: 1px solid rgba(255,255,255,0.07) !important;
+}
+
+/* Sparkle stars per Glass mode */
+@keyframes glass-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50%       { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+.glass-sparkle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  animation: glass-sparkle ease-in-out infinite;
+}

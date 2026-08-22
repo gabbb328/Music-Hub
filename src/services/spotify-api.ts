@@ -150,8 +150,12 @@ export const getRecommendations = (params: Record<string, any>) => {
   }
   return api(`/recommendations?${p}`);
 };
-export const getQueue   = () => api("/me/player/queue");
-export const addToQueue = (uri: string) => api(`/me/player/queue?uri=${encodeURIComponent(uri)}`, { method: "POST" });
+export const getQueue = async () => {
+  try { return await api("/me/player/queue"); } catch { return { currently_playing: null, queue: [] }; }
+};
+export const addToQueue = async (uri: string) => {
+  try { return await api(`/me/player/queue?uri=${encodeURIComponent(uri)}`, { method: "POST" }); } catch { return null; }
+};
 
 // ── Playlist management ────────────────────────────────────────────────────────
 

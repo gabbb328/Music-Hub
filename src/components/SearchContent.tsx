@@ -132,6 +132,7 @@ function TrackAnalyticsPanel({ track, onClose }: { track: SpotifyTrack; onClose:
 interface SearchContentProps {
   onPlayTrack: (track: Track) => void;
   onActivateEgg?: (egg: EasterEggType) => void;
+  initialQuery?: string;
 }
 
 const toTrack = (t: SpotifyTrack): Track => ({
@@ -164,11 +165,17 @@ const EXACT_KEYWORDS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principale
 // ─────────────────────────────────────────────────────────────────────────────
-const SearchContent = ({ onPlayTrack, onActivateEgg }: SearchContentProps) => {
-  const [query, setQuery]             = useState("");
+const SearchContent = ({ onPlayTrack, onActivateEgg, initialQuery }: SearchContentProps) => {
+  const [query, setQuery]             = useState(initialQuery || "");
   const [activeMenu, setActiveMenu]   = useState<string | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const [analyticsTrack, setAnalyticsTrack] = useState<SpotifyTrack | null>(null);
+
+  useEffect(() => {
+    if (initialQuery !== undefined) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery]);
 
   const debouncedQuery = useDebounce(query, 400);
   const playMutation   = usePlayMutation();
