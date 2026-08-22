@@ -53,7 +53,7 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
   const { toast } = useToast();
   const { data: userProfile } = useUserProfile();
   const { data: playbackState } = usePlaybackState();
-  const { isPremium, isFree, simulatedTier, setSimulatedTier } = useAccountTier();
+  const { isPremium, isFree } = useAccountTier();
   const navigate = useNavigate();
 
   const [showCollabPage, setShowCollabPage] = useState(false);
@@ -326,40 +326,6 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
                         </div>
                         <div className="flex items-center justify-between"><span className="text-muted-foreground">Connessione</span><div className="flex items-center gap-1 text-green-400"><CheckCircle2 className="w-4 h-4" />Attiva</div></div>
                         <div className="flex items-center justify-between"><span className="text-muted-foreground">Dispositivo</span><span className="font-medium truncate max-w-[140px] text-right">{playbackState?.device?.name || "Nessuno"}</span></div>
-                      </div>
-
-                      {/* Simulatore Piano per Test */}
-                      <div className="pt-2 border-t border-border/40">
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-2 flex items-center justify-between">
-                          <span>Simulatore Modalità Account</span>
-                          <span className="text-[9px] uppercase tracking-wider text-primary font-mono">Test UI</span>
-                        </p>
-                        <div className="grid grid-cols-3 gap-1.5 p-1 bg-background/60 rounded-xl border border-border/40">
-                          <button
-                            onClick={() => setSimulatedTier("auto")}
-                            className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                              simulatedTier === "auto" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-secondary text-muted-foreground"
-                            }`}
-                          >
-                            Auto
-                          </button>
-                          <button
-                            onClick={() => setSimulatedTier("premium")}
-                            className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                              simulatedTier === "premium" ? "bg-amber-500 text-black font-bold shadow-sm" : "hover:bg-secondary text-muted-foreground"
-                            }`}
-                          >
-                            Premium
-                          </button>
-                          <button
-                            onClick={() => setSimulatedTier("free")}
-                            className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                              simulatedTier === "free" ? "bg-zinc-700 text-white font-bold shadow-sm" : "hover:bg-secondary text-muted-foreground"
-                            }`}
-                          >
-                            Free
-                          </button>
-                        </div>
                       </div>
                     </div>
 
