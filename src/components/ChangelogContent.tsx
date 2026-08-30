@@ -14,11 +14,15 @@ export const changelogData: ChangelogEntry[] = [
     date: "12 Settembre 2026",
     version: "2.0.0",
     commits: [
+      "Modifica dei toast di notifica e autenticazione",
       "Nuova interfaccia Dark Glass con sfondi sfocati ed elementi fluttuanti",
       "Pulsante Impostazioni traslucido fluttuante in basso a destra nella sidebar",
       "Nuovo assistente chatbot LyraAI integrato in tempo reale",
       "Organizzazione barra di navigazione con la sezione 'Strumenti & App' e categorie dedicate",
-      "Tutorial interattivo v3.0 aggiornato per guidare l'utente tra le novità",
+      "Risoluzione bug riproduzione video su NowPlayingView (ora funzionante)",
+      "Nuove animazioni particellari interattive ('Sparkles') per i report musicali",
+      "Ottimizzazione e riorganizzazione UI/UX",
+      "Mpdifica e miglioraento della sezione dei testi, ora piu precisi e piu veloci"
     ],
   },
   {
