@@ -4,95 +4,132 @@ export interface TranslationResult {
   targetLanguage: string;
 }
 
+// In-memory translation cache to prevent rate-limit 429s for repeated lines
+const translationCache = new Map<string, string>();
+
 export const translateText = async (
   text: string,
-  targetLang: string = 'it',
-  sourceLang: string = 'auto'
+  targetLang: string = "it",
+  sourceLang: string = "auto"
 ): Promise<TranslationResult | null> => {
   if (!text || text.trim().length === 0) {
     return null;
   }
 
+  const cacheKey = `${sourceLang}_${targetLang}_${text.trim()}`;
+  if (translationCache.has(cacheKey)) {
+    return {
+      translatedText: translationCache.get(cacheKey)!,
+      targetLanguage: targetLang,
+    };
+  }
+
+  // 1. Try MyMemory API (Fully CORS-enabled, reliable free translation endpoint)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    // Google Translate Public Client REST API (supports sl=auto, completely free, no API keys, extremely fast)
-    const GOOGLE_API = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const pair = sourceLang === "auto" ? `en|${targetLang}` : `${sourceLang}|${targetLang}`;
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+      text
+    )}&langpair=${pair}`;
 
-    const response = await fetch(GOOGLE_API, { signal: controller.signal });
+    const res = await fetch(myMemoryUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      return fallbackTranslate(text, targetLang, sourceLang);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.responseData && data.responseData.translatedText) {
+        const translatedText = data.responseData.translatedText.trim();
+        // Ignore fallback error strings from MyMemory
+        if (
+          translatedText &&
+          !translatedText.includes("IS AN INVALID SRCLANG") &&
+          !translatedText.includes("MYMEMORY WARNING")
+        ) {
+          translationCache.set(cacheKey, translatedText);
+          return {
+            translatedText,
+            detectedLanguage: sourceLang,
+            targetLanguage: targetLang,
+          };
+        }
+      }
     }
+  } catch (e) {
+    // Silent catch, fallback below
+  }
 
-    const data = await response.json();
+  // 2. Fallback to Google Translate client API via CORS Proxy or direct call
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    // Parse the multi-chunk nested translation matrix from Google
-    if (data && data[0] && Array.isArray(data[0])) {
-      const translatedText = data[0]
-        .map((chunk: any) => chunk && chunk[0] ? chunk[0] : "")
-        .join("")
-        .trim();
-        
-      const detectedLanguage = data[2] || sourceLang;
+    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(
+      text
+    )}`;
 
-      if (translatedText) {
+    const response = await fetch(googleUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data[0] && Array.isArray(data[0])) {
+        const translatedText = data[0]
+          .map((chunk: any) => (chunk && chunk[0] ? chunk[0] : ""))
+          .join("")
+          .trim();
+
+        if (translatedText) {
+          translationCache.set(cacheKey, translatedText);
+          return {
+            translatedText,
+            detectedLanguage: data[2] || sourceLang,
+            targetLanguage: targetLang,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    // Silent catch, fallback below
+  }
+
+  // 3. Fallback to Lingva API
+  try {
+    const lingvaUrl = `https://lingva.ml/api/v1/${sourceLang}/${targetLang}/${encodeURIComponent(
+      text
+    )}`;
+    const response = await fetch(lingvaUrl);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.translation) {
+        translationCache.set(cacheKey, data.translation);
         return {
-          translatedText,
-          detectedLanguage,
-          targetLanguage: targetLang
+          translatedText: data.translation,
+          detectedLanguage: sourceLang,
+          targetLanguage: targetLang,
         };
       }
     }
-
-    return fallbackTranslate(text, targetLang, sourceLang);
-  } catch (error: any) {
-    return fallbackTranslate(text, targetLang, sourceLang);
-  }
-};
-
-async function fallbackTranslate(
-  text: string,
-  targetLang: string,
-  sourceLang: string = 'auto'
-): Promise<TranslationResult | null> {
-  try {
-    const LINGVA_API = `https://lingva.ml/api/v1/${sourceLang}/${targetLang}/${encodeURIComponent(text)}`;
-    
-    const response = await fetch(LINGVA_API);
-    if (!response.ok) {
-      return { translatedText: text, targetLanguage: targetLang };
-    }
-
-    const data = await response.json();
-    
-    if (data.translation) {
-      return {
-        translatedText: data.translation,
-        detectedLanguage: sourceLang,
-        targetLanguage: targetLang
-      };
-    }
-
-    return { translatedText: text, targetLanguage: targetLang };
   } catch (e) {
-    return { translatedText: text, targetLanguage: targetLang };
+    // Silent catch
   }
-}
+
+  // Fallback to original text if translation service unavailable
+  return { translatedText: text, targetLanguage: targetLang };
+};
 
 export const translateLyrics = async (
   lyrics: string,
-  targetLang: string = 'it',
-  sourceLang: string = 'auto'
+  targetLang: string = "it",
+  sourceLang: string = "auto"
 ): Promise<string | null> => {
   if (!lyrics || lyrics.trim().length === 0) {
     return null;
   }
 
   try {
-    const paragraphs = lyrics.split('\n\n').filter(p => p.trim());
+    const paragraphs = lyrics.split("\n\n").filter((p) => p.trim());
     const translatedParagraphs: string[] = [];
 
     for (const paragraph of paragraphs) {
@@ -102,26 +139,26 @@ export const translateLyrics = async (
       } else {
         translatedParagraphs.push(paragraph);
       }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
+
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
 
-    return translatedParagraphs.join('\n\n');
+    return translatedParagraphs.join("\n\n");
   } catch (error) {
-    console.error('Lyrics translation error:', error);
+    console.error("Lyrics translation error:", error);
     return null;
   }
 };
 
 export const availableLanguages = [
-  { code: 'it', name: 'Italiano' },
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Español' },
-  { code: 'fr', name: 'Français' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'pt', name: 'Português' },
-  { code: 'ru', name: 'Русский' },
-  { code: 'ja', name: '日本語' },
-  { code: 'zh', name: '中文' },
-  { code: 'ar', name: 'العربية' },
+  { code: "it", name: "Italiano" },
+  { code: "en", name: "English" },
+  { code: "es", name: "Español" },
+  { code: "fr", name: "Français" },
+  { code: "de", name: "Deutsch" },
+  { code: "pt", name: "Português" },
+  { code: "ru", name: "Русский" },
+  { code: "ja", name: "日本語" },
+  { code: "zh", name: "中文" },
+  { code: "ar", name: "العربية" },
 ];

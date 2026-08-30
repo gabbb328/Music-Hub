@@ -35,7 +35,6 @@ import MoodCalendarContent from "@/components/MoodCalendarContent";
 import ListenAlongContent from "@/components/ListenAlongContent";
 import ChangelogContent from "@/components/ChangelogContent";
 import "@/time-machine-filters.css";
-import { SpotifyStatus } from "@/components/SpotifyStatus";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import NeuralSpaceMixerContent from "@/components/NeuralSpaceMixerContent";
 import { useMediaSession } from "@/hooks/useMediaSession";
@@ -218,7 +217,9 @@ const IndexInner = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"aspetto" | "audio" | "cuffie">("aspetto");
+  const [settingsTab, setSettingsTab] = useState<
+    "aspetto" | "audio" | "cuffie"
+  >("aspetto");
   const [activeEgg, setActiveEgg] = useState<EasterEggType>(null);
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [showEggList, setShowEggList] = useState(false);
@@ -452,10 +453,16 @@ const IndexInner = () => {
               if (egg === "music" || egg === "disco" || egg === "love") {
                 player.playTrack({
                   id: "easter-egg-track",
-                  title: egg === "music" ? "Secret Track" : egg === "disco" ? "Disco Fever" : "Love Song",
+                  title:
+                    egg === "music"
+                      ? "Secret Track"
+                      : egg === "disco"
+                        ? "Disco Fever"
+                        : "Love Song",
                   artist: "Easter Egg",
                   album: "Secrets",
-                  cover: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41",
+                  cover:
+                    "https://images.unsplash.com/photo-1614680376593-902f74cf0d41",
                   duration: 180,
                 });
               }
@@ -482,15 +489,38 @@ const IndexInner = () => {
           <div className="glass-blob glass-blob-2" />
           <div className="glass-blob glass-blob-3" />
           {/* Sparkle stars decorativi */}
-          <div className="glass-sparkle" style={{ top: "8%", right: "6%", width: 16, height: 16, animationDuration: "3s", animationDelay: "0s" }}>
-            <svg viewBox="0 0 24 24" fill="white"><path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z"/></svg>
+          <div
+            className="glass-sparkle"
+            style={{
+              top: "8%",
+              right: "6%",
+              width: 16,
+              height: 16,
+              animationDuration: "3s",
+              animationDelay: "0s",
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="white">
+              <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z" />
+            </svg>
           </div>
-          <div className="glass-sparkle" style={{ bottom: "12%", right: "3%", width: 10, height: 10, animationDuration: "4s", animationDelay: "1.5s" }}>
-            <svg viewBox="0 0 24 24" fill="white"><path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z"/></svg>
+          <div
+            className="glass-sparkle"
+            style={{
+              bottom: "12%",
+              right: "3%",
+              width: 10,
+              height: 10,
+              animationDuration: "4s",
+              animationDelay: "1.5s",
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="white">
+              <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5Z" />
+            </svg>
           </div>
         </>
       )}
-      <SpotifyStatus />
 
       {isIOS && !spPb?.device && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/25 text-sm">
@@ -529,7 +559,10 @@ const IndexInner = () => {
         <Sidebar
           activeSection={activeSection}
           onSectionChange={setActiveSection}
-          onOpenSettings={() => { setSettingsTab("aspetto"); setShowSettings(true); }}
+          onOpenSettings={() => {
+            setSettingsTab("aspetto");
+            setShowSettings(true);
+          }}
         />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-28 md:pb-0">
           {isAlexa ? (
@@ -634,10 +667,7 @@ const IndexInner = () => {
             isOpen={showProfile}
             onClose={() => setShowProfile(false)}
           />
-          <AIPanel
-            isOpen={showAIPanel}
-            onClose={() => setShowAIPanel(false)}
-          />
+          <AIPanel isOpen={showAIPanel} onClose={() => setShowAIPanel(false)} />
         </>
       )}
     </div>

@@ -13,13 +13,12 @@ import {
   Sparkles,
   Brain,
   BookOpen,
-  Zap,
-  Heart,
-  Gauge,
   Waves,
   BarChart3,
   Radio,
+  Gauge,
   Music2,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,6 +32,7 @@ import {
 } from "@/services/lyrics-api";
 import { translateText } from "@/services/translation-api";
 import { useToast } from "@/hooks/use-toast";
+import { gooeyToast } from "goey-toast";
 import { useVocalRemover } from "@/hooks/useVocalRemover";
 import {
   fetchSongTrivia,
@@ -40,7 +40,6 @@ import {
   fetchSongAnalysis,
   type AIAnalysisResult,
 } from "@/services/trivia-api";
-import { AlertCircle } from "lucide-react";
 import { lyricsStore } from "@/hooks/useLyricsStore";
 
 interface LyricsContentProps {
@@ -48,10 +47,34 @@ interface LyricsContentProps {
 }
 type Mode = "lyrics" | "info" | "analysis" | "trivia";
 
-function getWeightedActiveIndex<T extends { text: string }>(words: T[], progress: number): number {
+// ── Vocal pitch & tone detection heuristics ─────────────────────────────
+const isChorusLike = (text: string): boolean => {
+  return /^\(/.test(text.trim()) || /^\[/.test(text.trim());
+};
+
+const detectHighPitch = (word: string): boolean => {
+  const w = word.replace(/[^a-zA-Z]/g, "");
+  if (w.length < 2) return false;
+  return w === w.toUpperCase() || word.includes("!");
+};
+
+const detectLowPitch = (word: string): boolean => {
+  return /[…]$/.test(word) || /\*/.test(word) || word.startsWith("~");
+};
+
+const detectVibrato = (word: string): boolean => {
+  return /([aeiouy])\1{2,}/i.test(word);
+};
+
+function getWeightedActiveIndex<T extends { text: string }>(
+  words: T[],
+  progress: number
+): number {
   if (progress <= 0) return -1;
   if (progress >= 1) return words.length;
-  const weights = words.map((word) => Math.max(0.7, Math.sqrt(word.text.replace(/[^\w]/g, "").length || 1)));
+  const weights = words.map((word) =>
+    Math.max(0.7, Math.sqrt(word.text.replace(/[^\w]/g, "").length || 1))
+  );
   const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
   const target = total * progress;
   let acc = 0;
@@ -68,7 +91,7 @@ export default function LyricsContent({
   const [mode, setMode] = useState<Mode>("lyrics");
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [translatedLyrics, setTranslatedLyrics] = useState<Map<number, string>>(
-    new Map(),
+    new Map()
   );
   const [showTranslation, setShowTranslation] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -87,7 +110,10 @@ export default function LyricsContent({
   const containerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const userScrollRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const playbackRateRef = useRef(1);
 
   const { data: playbackState } = usePlaybackState();
   const currentTrack = playbackState?.item || localTrack;
@@ -99,55 +125,90 @@ export default function LyricsContent({
     ? playbackState.progress_ms / 1000
     : 0;
 
-  // Real-time timer to drive smooth 60fps animations
+  // ── High-precision 60fps clock ──────────────────────────────────────────
   const [activeTime, setActiveTime] = useState(0);
-  const syncRef = useRef<{ baseTime: number; updatedAt: number }>({
+  const syncRef = useRef<{ baseTime: number; updatedAt: number; rate: number }>({
     baseTime: 0,
     updatedAt: performance.now(),
+    rate: 1,
   });
 
-  // Dynamic container height tracker for perfect pixel-centered vertical spacers
-  const [containerHeight, setContainerHeight] = useState(300);
+  const [containerHeight, setContainerHeight] = useState(400);
 
-  // Sync activeTime with playbackState updates
+  // ── Background Screen Wake Lock API ───────────────────────────────────────
   useEffect(() => {
-    syncRef.current = { baseTime: currentTime, updatedAt: performance.now() };
+    if (mode !== "lyrics") return;
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => {});
+        }
+      } catch (err) {
+        console.warn("Screen Wake Lock error:", err);
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && mode === "lyrics") {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLMediaElement>("audio, video");
+    let rate = 1;
+    els.forEach((el) => {
+      if (el.playbackRate && el.playbackRate !== 1) rate = el.playbackRate;
+    });
+    playbackRateRef.current = rate;
+    syncRef.current = { baseTime: currentTime, updatedAt: performance.now(), rate };
     setActiveTime(currentTime);
   }, [currentTime]);
 
-  // Tick activeTime locally if playing using high-precision requestAnimationFrame
+  // High precision rAF tick
   useEffect(() => {
     if (!isPlaying) return;
-    let animationFrameId: number;
+    let animId: number;
     const tick = () => {
       const now = performance.now();
       const elapsed = (now - syncRef.current.updatedAt) / 1000;
-      const latencyCompensation = 0.12;
-      setActiveTime(syncRef.current.baseTime + elapsed + latencyCompensation);
-      animationFrameId = requestAnimationFrame(tick);
+      const rate = syncRef.current.rate;
+      setActiveTime(syncRef.current.baseTime + elapsed * rate + 0.12 * rate);
+      animId = requestAnimationFrame(tick);
     };
-    animationFrameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrameId);
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
   }, [isPlaying]);
 
-  // Monitor exact container height dynamically to center the lyrics vertically
+  // Dynamic container height tracker
   useEffect(() => {
     if (!containerRef.current) return;
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        setContainerHeight(entry.contentRect.height);
-      }
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerHeight(entry.contentRect.height);
     });
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
   }, [lyrics]);
 
-  // ── Carica testo ──────────────────────────────────────────────────────────
+  // ── Load lyrics ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentTrack) return;
     const trackId = (currentTrack as any)?.id;
-    const title =
-      (currentTrack as any).name || (currentTrack as any).title || "";
+    const title = (currentTrack as any).name || (currentTrack as any).title || "";
     const artist =
       (currentTrack as any).artists?.[0]?.name ||
       (currentTrack as any).artist ||
@@ -184,7 +245,6 @@ export default function LyricsContent({
       setTrivia(res);
       setLoadingTrivia(false);
     });
-
     setLoadingAnalysis(true);
     fetchSongAnalysis(artist, title).then((res) => {
       setAnalysis(res);
@@ -192,7 +252,7 @@ export default function LyricsContent({
     });
   }, [(currentTrack as any)?.id]);
 
-  // ── Aggiorna riga corrente ────────────────────────────────────────────────
+  // ── Update current line index ─────────────────────────────────────────────
   useEffect(() => {
     if (lyrics.length > 0) {
       const idx = getCurrentLineIndex(lyrics, activeTime);
@@ -200,41 +260,66 @@ export default function LyricsContent({
     }
   }, [activeTime, lyrics]);
 
-  // ── Scroll al centro ──────────────────────────────────────────────────────
-  const scrollToCurrentLine = useCallback(() => {
-    if (!centerMode || userScrollRef.current) return;
-    const container = containerRef.current;
-    const line = lineRefs.current[currentLineIndex];
-    if (!container || !line) return;
+  // ── Discrete Line-by-Line Auto-Centering (Scrolls UP when line finishes) ──
+  const scrollToLine = useCallback(
+    (lineIndex: number, animate = true) => {
+      if (!centerMode || userScrollRef.current || !containerRef.current) return;
+      const container = containerRef.current;
+      const lineEl = lineRefs.current[lineIndex];
+      if (!lineEl) return;
 
-    // Recursively accumulate offsets relative to the scrolling container to ensure dead-center placement
-    let actualOffsetTop = 120;
-    let currentEl: HTMLElement | null = line;
-    while (currentEl && currentEl !== container) {
-      actualOffsetTop += currentEl.offsetTop;
-      currentEl = currentEl.offsetParent as HTMLElement | null;
-    }
+      const containerRect = container.getBoundingClientRect();
+      const lineRect = lineEl.getBoundingClientRect();
 
-    const targetScroll =
-      actualOffsetTop - container.clientHeight / 2 + line.clientHeight / 2;
-    container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
-  }, [centerMode, currentLineIndex]);
+      const containerCenterY = containerRect.top + containerRect.height / 2;
+      const lineCenterY = lineRect.top + lineRect.height / 2;
+      const delta = lineCenterY - containerCenterY;
 
+      const targetScroll = container.scrollTop + delta;
+
+      isProgrammaticScrollRef.current = true;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
+        behavior: animate ? "smooth" : "auto",
+      });
+
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 450);
+    },
+    [centerMode]
+  );
+
+  // Center active line when currentLineIndex updates
   useEffect(() => {
-    scrollToCurrentLine();
-  }, [currentLineIndex, centerMode, scrollToCurrentLine]);
+    if (!centerMode || mode !== "lyrics" || lyrics.length === 0) return;
+    scrollToLine(currentLineIndex, true);
+  }, [currentLineIndex, centerMode, mode, lyrics.length, scrollToLine]);
+
+  // Trigger smooth scroll slide-up as the line is finishing (~350ms before next line)
+  useEffect(() => {
+    if (!centerMode || mode !== "lyrics" || lyrics.length === 0 || !isPlaying) return;
+    const currentLine = lyrics[currentLineIndex];
+    const nextLine = lyrics[currentLineIndex + 1];
+    if (!currentLine || !nextLine) return;
+
+    const timeUntilNext = nextLine.time - activeTime;
+    if (timeUntilNext <= 0.35 && timeUntilNext > 0) {
+      scrollToLine(currentLineIndex + 1, true);
+    }
+  }, [activeTime, currentLineIndex, centerMode, mode, lyrics, isPlaying, scrollToLine]);
 
   const handleScroll = useCallback(() => {
-    if (!centerMode) return;
+    if (!centerMode || isProgrammaticScrollRef.current) return;
     userScrollRef.current = true;
     setUserScrolling(true);
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
       userScrollRef.current = false;
       setUserScrolling(false);
-      scrollToCurrentLine();
+      scrollToLine(currentLineIndex, true);
     }, 3000);
-  }, [centerMode, scrollToCurrentLine]);
+  }, [centerMode, currentLineIndex, scrollToLine]);
 
   const handleLineClick = async (line: LyricLine) => {
     try {
@@ -243,8 +328,8 @@ export default function LyricsContent({
       setUserScrolling(false);
     } catch {
       toast({
-        title: "Seek failed",
-        description: "Make sure a device is playing",
+        title: "Seek non riuscito",
+        description: "Assicurati che un dispositivo sia in riproduzione",
         variant: "destructive",
       });
     }
@@ -260,22 +345,10 @@ export default function LyricsContent({
       return;
     }
     setIsTranslating(true);
+    const systemLang = navigator.language?.split("-")[0] || "it";
 
-    const systemLang =
-      typeof navigator !== "undefined" && navigator.language
-        ? navigator.language.split("-")[0]
-        : "it";
-
-    const langDisplay = systemLang.toUpperCase();
-
-    toast({
-      title: `Traduzione in corso (${langDisplay})…`,
-      description:
-        "Traduzione intelligente in corso alla lingua del tuo sistema...",
-    });
-
-    const map = new Map<number, string>();
-    try {
+    const translatePromise = (async () => {
+      const map = new Map<number, string>();
       for (let i = 0; i < lyrics.length; i++) {
         const l = lyrics[i];
         if (l.text.trim() && !l.text.includes("♪")) {
@@ -286,16 +359,18 @@ export default function LyricsContent({
       }
       setTranslatedLyrics(map);
       setShowTranslation(true);
-      toast({
-        title: "✓ Traduzione completata",
-        description: `${map.size} righe tradotte in ${langDisplay}`,
+      return map;
+    })();
+
+    try {
+      gooeyToast.promise(translatePromise, {
+        loading: `Traduzione in corso (${systemLang.toUpperCase()})`,
+        success: (map: any) => `Traduzione completata (${map.size} righe)`,
+        error: "Errore durante la traduzione",
       });
-    } catch (err) {
-      toast({
-        title: "Errore di traduzione",
-        description: "Impossibile tradurre i testi, riprova più tardi.",
-        variant: "destructive",
-      });
+      await translatePromise;
+    } catch {
+      // toast error handled by promise
     } finally {
       setIsTranslating(false);
     }
@@ -321,104 +396,111 @@ export default function LyricsContent({
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col animate-fade-in">
-      {/* ── Header ── */}
+      {/* ── Elegant Header Layout ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 pt-4 pb-3 shrink-0 border-b border-border/30">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative shrink-0">
-            <img
-              src={
-                (currentTrack as any).album?.images?.[0]?.url ||
-                (currentTrack as any).cover ||
-                ""
-              }
-              alt=""
-              className="w-11 h-11 rounded-lg object-cover shadow-md"
-            />
-            {isPlaying && (
-              <motion.div
-                className="absolute inset-0 rounded-lg ring-2 ring-primary/50"
-                animate={{ opacity: [0.4, 0.9, 0.4] }}
-                transition={{ duration: 2, repeat: Infinity }}
+        {/* LEFT COLUMN: Track Info (Row 1) & Action Buttons (Row 2 under title) */}
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
+          {/* Row 1: Image, Title, Artist, Synced Badge */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
+              <img
+                src={
+                  (currentTrack as any).album?.images?.[0]?.url ||
+                  (currentTrack as any).cover ||
+                  ""
+                }
+                alt=""
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover shadow-md"
               />
-            )}
+              {isPlaying && (
+                <motion.div
+                  className="absolute inset-0 rounded-xl ring-2 ring-primary/50"
+                  animate={{ opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-sm sm:text-base truncate text-foreground">
+                {(currentTrack as any).name || (currentTrack as any).title}
+              </p>
+              <span className="text-muted-foreground/60 font-normal text-xs">•</span>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate font-medium">
+                {(currentTrack as any).artists?.[0]?.name ||
+                  (currentTrack as any).artist}
+              </p>
+              {isSynced && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 shrink-0 border border-emerald-500/20 ml-1">
+                  <Clock className="w-3 h-3 text-emerald-400" />
+                  <span className="text-[11px] font-semibold">Synced</span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-bold truncate text-sm">
-              {(currentTrack as any).name || (currentTrack as any).title}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {(currentTrack as any).artists?.[0]?.name ||
-                (currentTrack as any).artist}
-            </p>
-            {mode === "lyrics" && (
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                {isSynced && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5 text-green-500" />
-                    <span className="text-[10px] text-green-500 font-medium">
-                      Synced
-                    </span>
-                  </div>
-                )}
-                {isSynced && (
-                  <Button
-                    size="sm"
-                    variant={centerMode ? "default" : "outline"}
-                    onClick={() => {
-                      setCenterMode((v) => {
-                        const next = !v;
-                        if (next) {
-                          userScrollRef.current = false;
-                          setTimeout(() => scrollToCurrentLine(), 50);
-                        }
-                        return next;
-                      });
-                    }}
-                    className="h-6 px-2 text-[10px] gap-1"
-                  >
-                    {centerMode ? (
-                      <AlignCenter className="w-2.5 h-2.5" />
-                    ) : (
-                      <AlignLeft className="w-2.5 h-2.5" />
-                    )}
-                    {centerMode ? "Centered" : "Free"}
-                  </Button>
-                )}
-                {lyrics.length > 0 && !isTranslating && (
-                  <Button
-                    size="sm"
-                    variant={showTranslation ? "default" : "outline"}
-                    onClick={handleTranslate}
-                    className="h-6 px-2 text-[10px] gap-1"
-                  >
-                    <Languages className="w-2.5 h-2.5" />
-                    {showTranslation ? "Original" : "Translate"}
-                  </Button>
-                )}
+
+          {/* Row 2: Action Buttons placed directly UNDER Title & Artist */}
+          {mode === "lyrics" && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none sm:pl-[3.75rem]">
+              {isSynced && (
                 <Button
                   size="sm"
-                  variant={isKaraokeActive ? "default" : "outline"}
-                  onClick={toggleKaraoke}
-                  className={`h-6 px-2 text-[10px] gap-1 ${isKaraokeActive ? "bg-pink-600 text-white hover:bg-pink-700" : "text-muted-foreground"}`}
+                  variant={centerMode ? "default" : "outline"}
+                  onClick={() => {
+                    setCenterMode((v) => {
+                      const next = !v;
+                      if (next) {
+                        userScrollRef.current = false;
+                        setTimeout(() => scrollToLine(currentLineIndex, true), 50);
+                      }
+                      return next;
+                    });
+                  }}
+                  className="h-6 px-2.5 text-[11px] gap-1 shrink-0 rounded-full"
                 >
-                  <Mic2 className="w-2.5 h-2.5" />
-                  {isKaraokeActive ? "Karaoke ON" : "Karaoke Mode"}
+                  {centerMode ? (
+                    <AlignCenter className="w-3 h-3" />
+                  ) : (
+                    <AlignLeft className="w-3 h-3" />
+                  )}
+                  {centerMode ? "Centered" : "Free"}
                 </Button>
-                {isTranslating && (
-                  <div className="flex items-center gap-1">
-                    <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
-                    <span className="text-[10px] text-primary">
-                      Translating…
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+              {lyrics.length > 0 && !isTranslating && (
+                <Button
+                  size="sm"
+                  variant={showTranslation ? "default" : "outline"}
+                  onClick={handleTranslate}
+                  className="h-6 px-2.5 text-[11px] gap-1 shrink-0 rounded-full"
+                >
+                  <Languages className="w-3 h-3" />
+                  {showTranslation ? "Original" : "Translate"}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={isKaraokeActive ? "default" : "outline"}
+                onClick={toggleKaraoke}
+                className={`h-6 px-2.5 text-[11px] gap-1 shrink-0 rounded-full transition-all ${
+                  isKaraokeActive
+                    ? "bg-pink-600 text-white hover:bg-pink-700 shadow-md shadow-pink-600/30"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <Mic2 className="w-3 h-3" />
+                {isKaraokeActive ? "Karaoke ON" : "Karaoke Mode"}
+              </Button>
+              {isTranslating && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                  <span className="text-[11px] font-medium">Translating…</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary self-start sm:self-auto shrink-0">
+        {/* RIGHT COLUMN: Mode Navigation Tabs (Lyrics, About, Info, Analysis) */}
+        <div className="flex items-center gap-0.5 p-1 rounded-full bg-secondary shrink-0 self-start sm:self-center overflow-x-auto">
           {[
             { id: "lyrics" as Mode, label: "Lyrics", icon: Mic2 },
             { id: "trivia" as Mode, label: "About", icon: Lightbulb },
@@ -428,14 +510,14 @@ export default function LyricsContent({
             <button
               key={tab.id}
               onClick={() => setMode(tab.id)}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                 mode === tab.id
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <tab.icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -467,7 +549,7 @@ export default function LyricsContent({
               </div>
             ) : (
               <>
-                {/* Dynamic spacer that perfectly targets the vertical center of the container */}
+                {/* Vertical spacer ensuring 1st stanza starts dead center */}
                 <div
                   style={{ height: `${containerHeight / 2}px` }}
                   aria-hidden
@@ -479,9 +561,9 @@ export default function LyricsContent({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="sticky top-2 z-10 mx-auto mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center w-fit"
+                      className="sticky top-2 z-10 mx-auto mb-2 py-1.5 px-3 bg-secondary/90 backdrop-blur-sm rounded-full text-center w-fit shadow-lg"
                     >
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[10px] text-muted-foreground font-medium">
                         Auto-scroll paused · resumes in 3s
                       </p>
                     </motion.div>
@@ -512,23 +594,30 @@ export default function LyricsContent({
                       openParen += opens;
                       openParen -= closes;
                       openParen = Math.max(0, openParen);
-                      return { text: w, index: i, isChorus };
+
+                      // Vocal pitch variation detection
+                      const isHigh = detectHighPitch(w);
+                      const isLow = detectLowPitch(w);
+                      const isVib = detectVibrato(w);
+
+                      return { text: w, index: i, isChorus, isHigh, isLow, isVib };
                     });
-                    const mainWords = categorizedWords.filter(
-                      (w) => !w.isChorus,
-                    );
-                    const chorusWords = categorizedWords.filter(
-                      (w) => w.isChorus,
-                    );
+
+                    const mainWords = categorizedWords.filter((w) => !w.isChorus);
+                    const chorusWords = categorizedWords.filter((w) => w.isChorus);
+
                     const nextLine = lyrics[index + 1];
                     const lineEndTime =
                       line.endTime ??
                       nextLine?.time ??
-                      Math.min(trackDurationSeconds, line.time + Math.max(2.5, words.length * 0.45));
+                      Math.min(
+                        trackDurationSeconds,
+                        line.time + Math.max(2.5, words.length * 0.45)
+                      );
                     const lineDuration = Math.max(0.25, lineEndTime - line.time);
                     const lineProgress = Math.max(
                       0,
-                      Math.min(1, (activeTime - line.time) / lineDuration),
+                      Math.min(1, (activeTime - line.time) / lineDuration)
                     );
 
                     let activeWordIndex = -1;
@@ -539,7 +628,7 @@ export default function LyricsContent({
                     let isChorusAtEnd = false;
                     if (mainWords.length > 0 && chorusWords.length > 0) {
                       const firstChorus = categorizedWords.findIndex(
-                        (w) => w.isChorus,
+                        (w) => w.isChorus
                       );
                       const lastMain =
                         categorizedWords.length -
@@ -558,7 +647,7 @@ export default function LyricsContent({
                             .reverse()
                             .findIndex((w) => w.isChorus);
                         const firstMain = categorizedWords.findIndex(
-                          (w) => !w.isChorus,
+                          (w) => !w.isChorus
                         );
                         if (lastChorus < firstMain) {
                           isStrictlySequential = true;
@@ -569,7 +658,7 @@ export default function LyricsContent({
 
                     if (hasSyncWords) {
                       const nextFutureIndex = line.words!.findIndex(
-                        (w) => w.time > activeTime,
+                        (w) => w.time > activeTime
                       );
                       if (nextFutureIndex === -1) {
                         activeWordIndex = line.words!.length;
@@ -580,8 +669,10 @@ export default function LyricsContent({
                       }
                     } else {
                       if (isStrictlySequential) {
-                        const globalActiveIndex =
-                          getWeightedActiveIndex(categorizedWords, lineProgress);
+                        const globalActiveIndex = getWeightedActiveIndex(
+                          categorizedWords,
+                          lineProgress
+                        );
                         if (isChorusAtEnd) {
                           if (globalActiveIndex < mainWords.length) {
                             activeMainIndex = globalActiveIndex;
@@ -602,12 +693,45 @@ export default function LyricsContent({
                           }
                         }
                       } else {
-                        activeMainIndex =
-                          getWeightedActiveIndex(mainWords, lineProgress);
-                        activeChorusIndex =
-                          getWeightedActiveIndex(chorusWords, lineProgress);
+                        activeMainIndex = getWeightedActiveIndex(
+                          mainWords,
+                          lineProgress
+                        );
+                        activeChorusIndex = getWeightedActiveIndex(
+                          chorusWords,
+                          lineProgress
+                        );
                       }
                     }
+
+                    // ── Tone & Pitch color class generator ────────────────────
+                    const getWordPitchStyle = (
+                      wInfo: { isHigh: boolean; isLow: boolean; isVib: boolean },
+                      isActive: boolean,
+                      isPastWord: boolean,
+                      isChorusWord = false
+                    ): string => {
+                      if (isPastWord) {
+                        return isChorusWord
+                          ? "text-muted-foreground/25 opacity-40"
+                          : "text-muted-foreground/30 opacity-50";
+                      }
+                      if (isActive) {
+                        if (wInfo.isHigh) {
+                          return "text-amber-300 font-black drop-shadow-[0_0_16px_rgba(251,191,36,0.9)] animate-pulse";
+                        }
+                        if (wInfo.isLow) {
+                          return "text-cyan-300 font-semibold italic drop-shadow-[0_0_14px_rgba(6,182,212,0.8)]";
+                        }
+                        if (wInfo.isVib) {
+                          return "text-pink-400 font-extrabold drop-shadow-[0_0_18px_rgba(244,63,94,0.9)] animate-bounce-short";
+                        }
+                        return isChorusWord
+                          ? "text-violet-300 font-bold drop-shadow-[0_0_12px_rgba(167,139,250,0.8)]"
+                          : "text-primary font-black drop-shadow-[0_0_14px_hsl(var(--primary)/0.5)]";
+                      }
+                      return isChorusWord ? "text-foreground/50 italic" : "text-foreground/75";
+                    };
 
                     return (
                       <div
@@ -619,7 +743,7 @@ export default function LyricsContent({
                         className={`
                           w-full px-4 py-3 rounded-2xl transition-all duration-300 flex flex-col items-center md:items-start justify-center text-center md:text-left
                           ${isSynced ? "cursor-pointer hover:bg-secondary/40 active:scale-[0.98]" : "cursor-default"}
-                          ${isCurrent ? "bg-primary/10" : ""}
+                          ${isCurrent ? "bg-primary/10 border border-primary/20 shadow-[0_0_24px_rgba(0,0,0,0.2)]" : ""}
                         `}
                       >
                         {isBreak ? (
@@ -638,7 +762,7 @@ export default function LyricsContent({
                           </div>
                         ) : (
                           <div className="space-y-1.5 flex flex-col items-center md:items-start justify-center w-full text-center md:text-left">
-                            {/* Subtitle Translation - Explicitly centered horizontally and given full width */}
+                            {/* Translation */}
                             {showTranslation && translation && (
                               <p
                                 className={`leading-snug transition-all duration-300 font-medium text-center md:text-left w-full md:w-auto px-2 md:px-0 ${
@@ -653,11 +777,11 @@ export default function LyricsContent({
                               </p>
                             )}
 
-                            {/* Bouncy word-magnification Karaoke Rendering */}
+                            {/* Karaoke bouncy rendering (ONLY ACTIVE WHEN KARAOKE MODE IS ON) */}
                             {isCurrent && isKaraokeActive ? (
                               <div className="flex flex-col items-center md:items-start w-full gap-2">
                                 {mainWords.length > 0 && (
-                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-1">
+                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2.5 gap-y-1.5 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-1">
                                     {mainWords.map((wInfo, localIdx) => {
                                       const isWordActive = hasSyncWords
                                         ? wInfo.index === activeWordIndex
@@ -669,20 +793,18 @@ export default function LyricsContent({
                                         <motion.span
                                           key={wInfo.index}
                                           animate={{
-                                            scale: isWordActive ? 1.25 : 1,
-                                            y: isWordActive ? -2 : 0,
+                                            scale: isWordActive ? (wInfo.isHigh ? 1.35 : 1.25) : 1,
+                                            y: isWordActive ? -3 : 0,
                                           }}
                                           transition={{
                                             duration: 0.15,
                                             ease: "easeOut",
                                           }}
-                                          className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none text-center md:text-left ${
-                                            isWordActive
-                                              ? "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
-                                              : isWordPast
-                                                ? "text-muted-foreground/30"
-                                                : "text-foreground/80"
-                                          }`}
+                                          className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none ${getWordPitchStyle(
+                                            wInfo,
+                                            isWordActive,
+                                            isWordPast
+                                          )}`}
                                         >
                                           {wInfo.text}
                                         </motion.span>
@@ -692,7 +814,7 @@ export default function LyricsContent({
                                 )}
 
                                 {chorusWords.length > 0 && (
-                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-1.5 gap-y-1 w-full md:w-auto text-center md:text-left px-4 md:px-0 py-0.5 opacity-80">
+                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-0.5 opacity-90">
                                     {chorusWords.map((wInfo, localIdx) => {
                                       const isWordActive = hasSyncWords
                                         ? wInfo.index === activeWordIndex
@@ -704,20 +826,19 @@ export default function LyricsContent({
                                         <motion.span
                                           key={wInfo.index}
                                           animate={{
-                                            scale: isWordActive ? 1.15 : 1,
-                                            y: isWordActive ? -1 : 0,
+                                            scale: isWordActive ? 1.18 : 1,
+                                            y: isWordActive ? -1.5 : 0,
                                           }}
                                           transition={{
                                             duration: 0.15,
                                             ease: "easeOut",
                                           }}
-                                          className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none text-center md:text-left ${
-                                            isWordActive
-                                              ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.4)]"
-                                              : isWordPast
-                                                ? "text-muted-foreground/25"
-                                                : "text-foreground/60"
-                                          }`}
+                                          className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none ${getWordPitchStyle(
+                                            wInfo,
+                                            isWordActive,
+                                            isWordPast,
+                                            true
+                                          )}`}
                                         >
                                           {wInfo.text}
                                         </motion.span>
@@ -727,7 +848,7 @@ export default function LyricsContent({
                                 )}
                               </div>
                             ) : (
-                              /* Standard Plain Text Rendering - Centered horizontally explicitly inside <p> */
+                              /* Standard Plain Text Line Rendering (WHEN KARAOKE MODE IS OFF) */
                               <div className="flex flex-col items-center md:items-start w-full">
                                 {mainWords.length > 0 && (
                                   <p
@@ -771,9 +892,9 @@ export default function LyricsContent({
                   })}
                 </div>
 
-                {/* Dynamic spacer that perfectly targets the vertical center of the container */}
+                {/* Bottom spacer */}
                 <div
-                  style={{ height: `${containerHeight / 2 + 650}px` }}
+                  style={{ height: `${containerHeight / 2 + 60}px` }}
                   aria-hidden
                 />
               </>
@@ -814,7 +935,7 @@ export default function LyricsContent({
                       {
                         label: "Duration",
                         value: formatTime(
-                          Math.floor(spotifyTrack.duration_ms / 1000),
+                          Math.floor(spotifyTrack.duration_ms / 1000)
                         ),
                       },
                     ].map(({ label, value }) => (
@@ -848,273 +969,229 @@ export default function LyricsContent({
           </div>
         )}
 
-        {/* ── ANALYSIS ── */}
-        {mode === "analysis" && (
-          <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
+        {/* ── TRIVIA / ABOUT ── */}
+        {mode === "trivia" && (
+          <div className="absolute inset-0 overflow-y-auto p-4">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6 max-w-2xl mx-auto pb-10"
+              className="space-y-4 max-w-2xl mx-auto"
             >
-              {/* Titolo sezione */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
-                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-inner shrink-0 relative">
-                  <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+              {loadingTrivia ? (
+                <div className="flex items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Caricamento curiosità…</p>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center md:justify-start gap-2">
-                    <h2 className="text-xl font-bold tracking-tight">
-                      Analisi Musicale AI
-                    </h2>
-                    <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
-                      Live
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-                    Analisi armonica, strutturale e strumentale elaborata
-                    dall'intelligenza artificiale in tempo reale.
-                  </p>
-                </div>
-              </div>
-
-              {loadingAnalysis ? (
-                <div className="flex flex-col items-center justify-center h-40">
-                  <div className="relative">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                    <Sparkles className="w-4 h-4 text-cyan-400 absolute top-0 right-0 animate-ping" />
-                  </div>
-                  <p className="text-sm text-muted-foreground font-semibold">
-                    Elaborazione analisi in corso…
-                  </p>
-                </div>
-              ) : !analysis ? (
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <AlertCircle className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Analisi non disponibile.
+              ) : trivia.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Lightbulb className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">
+                    Nessuna curiosità disponibile per questo brano
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Pill metriche principali */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {(
-                      [
-                        {
-                          label: "BPM Stimato",
-                          value: analysis.bpm,
-                          icon: Gauge,
-                          color: "#f97316",
-                        },
-                        {
-                          label: "Tonalità",
-                          value: analysis.key,
-                          icon: Music2,
-                          color: "#a78bfa",
-                        },
-                        {
-                          label: "Umore",
-                          value: analysis.mood,
-                          icon: Heart,
-                          color: "#facc15",
-                        },
-                        {
-                          label: "Stile",
-                          value: analysis.style,
-                          icon: Zap,
-                          color: "#34d399",
-                        },
-                      ] as const
-                    ).map(({ label, value, icon: Icon, color }) => (
-                      <Card
-                        key={label}
-                        className="flex flex-col items-center justify-center gap-2 p-4 border border-border/30 bg-card/25 hover:bg-card/40 transition-colors text-center"
-                      >
-                        <Icon className="w-6 h-6 shrink-0" style={{ color }} />
-                        <p
-                          className="font-bold text-sm leading-tight line-clamp-2"
-                          style={{ color }}
-                        >
-                          {value}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                          {label}
-                        </p>
-                      </Card>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
-                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Disc className="w-4 h-4" /> Descrizione Sonora
-                      </h4>
-                      <p className="text-sm text-foreground/90 leading-relaxed font-medium">
-                        {analysis.description}
+                trivia.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                  >
+                    <Card className="p-4 space-y-2 border border-border/40 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{item.emoji || "🎵"}</span>
+                          <h3 className="font-semibold text-sm">{item.title}</h3>
+                        </div>
+                        {item.type && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+                            {item.type.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {item.extract || item.content}
                       </p>
+                      {item.source && (
+                        <p className="text-[10px] text-muted-foreground/60 font-mono pt-1">
+                          Fonte: {item.source}
+                        </p>
+                      )}
                     </Card>
-                    <Card className="p-5 border border-border/30 bg-card/25 space-y-2">
-                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Radio className="w-4 h-4" /> Strumentazione
-                      </h4>
-                      <p className="text-sm text-foreground/90 leading-relaxed">
-                        {analysis.instruments}
-                      </p>
-                    </Card>
-                  </div>
-                </div>
+                  </motion.div>
+                ))
               )}
             </motion.div>
           </div>
         )}
 
-        {/* ── TRIVIA ── */}
-        {mode === "trivia" && (
-          <div className="absolute inset-0 overflow-y-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-background/30">
+        {/* ── ANALYSIS ── */}
+        {mode === "analysis" && (
+          <div className="absolute inset-0 overflow-y-auto p-4">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6 max-w-2xl mx-auto pb-10"
+              className="space-y-4 max-w-2xl mx-auto"
             >
-              {/* Header Banner */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600/10 via-primary/10 to-cyan-500/10 border border-primary/10 p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 text-center md:text-left backdrop-blur-sm">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
-                <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-inner shrink-0 relative">
-                  <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 15,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                    className="absolute -inset-1 border border-dashed border-primary/30 rounded-2xl pointer-events-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center md:justify-start gap-2">
-                    <h2 className="text-xl font-bold tracking-tight">
-                      AI Insights & Curiosità
-                    </h2>
-                    <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
-                      Live
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-                    Analisi intelligente in tempo reale per scoprire fatti
-                    incredibili, aneddoti storici e dettagli di produzione su
-                    questa canzone e sul suo interprete.
+              {loadingAnalysis ? (
+                <div className="flex items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">
+                    Analisi musicale in corso…
                   </p>
                 </div>
-              </div>
-
-              {loadingTrivia ? (
-                <div className="flex flex-col items-center justify-center h-52 space-y-4">
-                  <div className="relative flex items-center justify-center">
-                    <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                    <Sparkles className="w-5 h-5 text-cyan-400 absolute animate-pulse" />
-                  </div>
-                  <div className="text-center space-y-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      Elaborazione in corso...
-                    </p>
-                    <p className="text-xs text-muted-foreground animate-pulse">
-                      Sintesi dei dati musicali in tempo reale...
-                    </p>
-                  </div>
-                </div>
-              ) : trivia.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5">
-                  {trivia.map((item, idx) => {
-                    const isAI = item.type === "ai";
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: idx * 0.08 }}
-                      >
-                        <Card className="p-6 border border-border/30 hover:border-primary/30 bg-card/25 backdrop-blur-md hover:bg-card/35 transition-all duration-300 relative group overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5">
-                          {/* Top accent line */}
-                          <div
-                            className={`absolute top-0 inset-x-0 h-[2px] transition-all duration-300 ${
-                              isAI
-                                ? "bg-gradient-to-r from-violet-500 via-primary to-cyan-400"
-                                : "bg-gradient-to-r from-muted-foreground/20 to-muted-foreground/10"
-                            }`}
-                          />
-
-                          {/* Corner glow */}
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                          <div className="flex items-start gap-4">
-                            <div
-                              className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
-                                isAI
-                                  ? "bg-violet-500/10 border-violet-500/20 text-violet-400"
-                                  : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
-                              }`}
-                            >
-                              {isAI ? (
-                                <Brain className="w-4.5 h-4.5" />
-                              ) : (
-                                <BookOpen className="w-4.5 h-4.5" />
-                              )}
-                            </div>
-
-                            <div className="space-y-2.5 flex-1 min-w-0">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                <h3 className="font-bold text-base leading-snug group-hover:text-primary transition-colors pr-2">
-                                  {item.title}
-                                </h3>
-
-                                <span
-                                  className={`text-[9px] font-bold px-2 py-0.5 rounded-md border tracking-wide w-fit uppercase shrink-0 ${
-                                    isAI
-                                      ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
-                                      : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                                  }`}
-                                >
-                                  {isAI ? "AI Synthesized" : "Official Bio"}
-                                </span>
-                              </div>
-
-                              <p className="text-sm leading-relaxed text-muted-foreground font-normal">
-                                {item.extract}
-                              </p>
-
-                              <div className="pt-2 flex items-center justify-between text-[10px] text-muted-foreground/60 border-t border-border/10">
-                                <span className="flex items-center gap-1">
-                                  <Lightbulb className="w-3.5 h-3.5 text-yellow-500/70" />
-                                  <span>Fonte verificata</span>
-                                </span>
-                                <span className="font-medium italic text-primary/70">
-                                  {item.source}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
+              ) : !analysis ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <BarChart3 className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground">
+                    Nessuna analisi disponibile
+                  </p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-                  <div className="p-4 bg-muted/40 rounded-full">
-                    <Music className="w-10 h-10 text-muted-foreground/30" />
+                <>
+                  {/* Technical Specs Header Card (BPM, Key, Style) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {analysis.bpm && (
+                      <Card className="p-3 flex flex-col justify-center border border-primary/20 bg-primary/5">
+                        <div className="flex items-center gap-1.5 text-xs text-primary font-medium mb-0.5">
+                          <Gauge className="w-3.5 h-3.5 text-primary" /> Tempo / BPM
+                        </div>
+                        <p className="text-base font-bold tracking-tight">{analysis.bpm}</p>
+                      </Card>
+                    )}
+                    {analysis.key && (
+                      <Card className="p-3 flex flex-col justify-center border border-purple-500/20 bg-purple-500/5">
+                        <div className="flex items-center gap-1.5 text-xs text-purple-400 font-medium mb-0.5">
+                          <Music2 className="w-3.5 h-3.5 text-purple-400" /> Tonalità
+                        </div>
+                        <p className="text-base font-bold tracking-tight">{analysis.key}</p>
+                      </Card>
+                    )}
+                    {analysis.style && (
+                      <Card className="p-3 flex flex-col justify-center border border-amber-500/20 bg-amber-500/5 col-span-2 sm:col-span-1">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium mb-0.5">
+                          <Disc className="w-3.5 h-3.5 text-amber-400" /> Genere
+                        </div>
+                        <p className="text-sm font-bold truncate">{analysis.style}</p>
+                      </Card>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">
-                      Nessuna curiosità trovata
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Trivia non disponibile per questo brano in questo momento.
-                    </p>
-                  </div>
-                </div>
+
+                  {/* Instruments */}
+                  {analysis.instruments && (
+                    <Card className="p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-emerald-400" />
+                        <h3 className="font-semibold text-sm">Strumentazione & Sound Design</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.instruments}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* Production & Structure */}
+                  {analysis.description && (
+                    <Card className="p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-cyan-400" />
+                        <h3 className="font-semibold text-sm">Arrangiamento & Struttura</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.description}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* Mood */}
+                  {analysis.mood && (
+                    <Card className="p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Waves className="w-4 h-4 text-pink-500" />
+                        <h3 className="font-semibold text-sm">Mood & Atmosfera</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {analysis.mood}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* Themes */}
+                  {analysis.themes && analysis.themes.length > 0 && (
+                    <Card className="p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <h3 className="font-semibold text-sm">
+                          Temi principali
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.themes.map((theme, i) => (
+                          <span
+                            key={i}
+                            className="px-2.5 py-1 bg-secondary rounded-full text-xs font-medium text-foreground"
+                          >
+                            {theme}
+                          </span>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Summary / Interpretation */}
+                  {analysis.summary && (
+                    <Card className="p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-violet-400" />
+                        <h3 className="font-semibold text-sm">
+                          Interpretazione Lirica
+                        </h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.summary}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* Literary Devices */}
+                  {analysis.literaryDevices &&
+                    analysis.literaryDevices.length > 0 && (
+                      <Card className="p-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-emerald-400" />
+                          <h3 className="font-semibold text-sm">
+                            Figure Retoriche & Stile Lirico
+                          </h3>
+                        </div>
+                        <ul className="space-y-1">
+                          {analysis.literaryDevices.map((d, i) => (
+                            <li
+                              key={i}
+                              className="text-sm text-muted-foreground flex items-start gap-2"
+                            >
+                              <span className="text-emerald-400 mt-0.5">•</span>
+                              <span>{d}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </Card>
+                    )}
+
+                  {/* Cultural Context */}
+                  {analysis.culturalContext && (
+                    <Card className="p-4 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Radio className="w-4 h-4 text-blue-400" />
+                        <h3 className="font-semibold text-sm">
+                          Contesto Culturale & Impatto
+                        </h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.culturalContext}
+                      </p>
+                    </Card>
+                  )}
+                </>
               )}
             </motion.div>
           </div>

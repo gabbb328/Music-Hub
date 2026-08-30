@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import "goey-toast/styles.css";
 import "./index.css";
 
 // Rilevamento manuale veloce dell'ambiente Alexa per disabilitare PWA

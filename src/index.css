@@ -654,3 +654,26 @@ input[type="range"]::-moz-range-thumb {
   z-index: 0;
   animation: glass-sparkle ease-in-out infinite;
 }
+
+/* ── Gooey Toast Overrides ─────────────────────────────────────────────────── */
+/* Strip ALL old Sonner container card styles (borders, backgrounds, shadows) */
+[data-sonner-toast] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+[data-sonner-toast] > * {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure progress bar & loading animations do NOT pause when mouse hovers over toast */
+.gooey-wrapper *,
+[data-sonner-toast] * {
+  animation-play-state: running !important;
+}
