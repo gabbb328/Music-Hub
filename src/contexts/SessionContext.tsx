@@ -67,7 +67,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     globalChannel
       .on("broadcast", { event: "jam_session_broadcast" }, ({ payload }) => {
-        if (payload && payload.sessionId && payload.deviceId !== DEVICE_ID) {
+        if (!payload || payload.deviceId === DEVICE_ID) return;
+
+        if (payload.sessionId) {
           console.log("[ListenAlong] Global cross-device session received:", payload);
           setListenAlongSessionIdState(payload.sessionId);
           try {
@@ -78,6 +80,18 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           toast({
             title: "Jam Sincronizzata tra Dispositivi!",
             description: `Stanza ${payload.sessionId} ricevuta in tempo reale da un altro dispositivo (${payload.deviceType || "Remoto"}).`,
+          });
+        } else if (payload.sessionId === null || payload.type === "SESSION_CLOSED") {
+          console.log("[ListenAlong] Global cross-device session teardown received");
+          setListenAlongSessionIdState(null);
+          try {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+          } catch {}
+          setIsMultiDeviceSynced(false);
+          setActiveDevicesCount(1);
+          toast({
+            title: "Jam Disattivata",
+            description: "La sessione Jam è stata disattivata da un altro dispositivo del tuo account.",
           });
         }
       })
@@ -92,7 +106,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [toast]);
 
   const setListenAlongSessionId = (id: string | null) => {
+    const previousSessionId = listenAlongSessionIdState;
     setListenAlongSessionIdState(id);
+
     try {
       if (id) {
         localStorage.setItem(LOCAL_STORAGE_KEY, id);
@@ -101,6 +117,38 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     } catch (e) {
       console.warn("Could not save session to localStorage", e);
+    }
+
+    // Se si sta disattivando la Jam (id === null), trasmetti STOP_SESSION a tutti i dispositivi connessi alla stanza
+    if (id === null && previousSessionId) {
+      if (channelRef.current) {
+        try {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "sync",
+            payload: { type: "STOP_SESSION", deviceId: DEVICE_ID },
+          });
+        } catch (err) {
+          console.warn("Errore invio STOP_SESSION su canale stanza:", err);
+        }
+      }
+
+      // Canale temporaneo di sicurezza per garantire la ricezione del segnale di STOP
+      try {
+        const tempRoomChannel = supabase.channel(`listen-along-${previousSessionId}`, {
+          config: { broadcast: { self: false } },
+        });
+        tempRoomChannel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            tempRoomChannel.send({
+              type: "broadcast",
+              event: "sync",
+              payload: { type: "STOP_SESSION", deviceId: DEVICE_ID },
+            });
+            setTimeout(() => tempRoomChannel.unsubscribe(), 1500);
+          }
+        });
+      } catch (_) {}
     }
 
     // Local tab broadcast
@@ -113,12 +161,14 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // Global Supabase Realtime broadcast across different devices & browsers
-    if (globalRadarChannelRef.current && id) {
+    if (globalRadarChannelRef.current) {
       globalRadarChannelRef.current.send({
         type: "broadcast",
         event: "jam_session_broadcast",
         payload: {
           sessionId: id,
+          targetRoomId: previousSessionId,
+          type: id ? "SESSION_ACTIVE" : "SESSION_CLOSED",
           deviceId: DEVICE_ID,
           deviceType: DEVICE_TYPE,
           timestamp: Date.now(),
@@ -137,12 +187,19 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (event.data?.type === "SESSION_CHANGE") {
           const newId = event.data.sessionId;
           setListenAlongSessionIdState(newId);
-          setIsMultiDeviceSynced(true);
-          setActiveDevicesCount((prev) => Math.max(2, prev + 1));
           if (newId) {
+            setIsMultiDeviceSynced(true);
+            setActiveDevicesCount((prev) => Math.max(2, prev + 1));
             toast({
               title: "Jam Sincronizzata",
               description: `Connesso alla sessione ${newId} da un'altra scheda/dispositivo.`,
+            });
+          } else {
+            setIsMultiDeviceSynced(false);
+            setActiveDevicesCount(1);
+            toast({
+              title: "Jam Disattivata",
+              description: "Sessione terminata da un'altra scheda/dispositivo.",
             });
           }
         }
@@ -153,6 +210,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setListenAlongSessionIdState(e.newValue);
           if (e.newValue) {
             setIsMultiDeviceSynced(true);
+          } else {
+            setIsMultiDeviceSynced(false);
           }
         }
       };
@@ -183,24 +242,29 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const devices: any[] = devs?.devices || [];
           const activeDevice = devices.find((d: any) => d.is_active)?.id || devices[0]?.id;
 
-          if (!activeDevice) return;
-
           if (payload.type === "PLAY") {
-            await spotifyApi.play(activeDevice, undefined, payload.uris, payload.offset);
+            if (activeDevice) await spotifyApi.play(activeDevice, undefined, payload.uris, payload.offset);
           } else if (payload.type === "PAUSE") {
-            await spotifyApi.pause(activeDevice);
+            if (activeDevice) await spotifyApi.pause(activeDevice);
           } else if (payload.type === "SEEK") {
-            await spotifyApi.seek(payload.position_ms);
+            if (activeDevice) await spotifyApi.seek(payload.position_ms);
+          } else if (payload.type === "STOP_SESSION" || payload.type === "SESSION_CLOSED") {
+            if (activeDevice) await spotifyApi.pause(activeDevice).catch(() => null);
+            setListenAlongSessionIdState(null);
+            try { localStorage.removeItem(LOCAL_STORAGE_KEY); } catch {}
+            setIsMultiDeviceSynced(false);
+            setActiveDevicesCount(1);
+            toast({
+              title: "Jam Disattivata",
+              description: "La sessione Jam è stata terminata da un altro dispositivo.",
+              variant: "warning",
+            });
           }
         } catch (err) {
           console.error("[ListenAlong] Error applying sync:", err);
         }
       })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          toast({ title: "Listen Along", description: `Connesso alla sessione ${listenAlongSessionId}` });
-        }
-      });
+      .subscribe();
 
     channelRef.current = channel;
 

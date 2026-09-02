@@ -88,7 +88,7 @@ const features = [
   },
   {
     id: "listen-along",
-    label: "Insieme",
+    label: "Listen Along",
     icon: Users,
     color: "text-cyan-400",
     bg: "bg-cyan-400/10",

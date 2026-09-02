@@ -3,6 +3,9 @@ import { supabase } from "@/services/supabase-api";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
 import { useToast } from "@/hooks/use-toast";
 import * as spotifyApi from "@/services/spotify-api";
+import { useUserProfile } from "@/hooks/useSpotify";
+
+export type JamMode = "control" | "simultaneous" | null;
 
 export interface NearbyUser {
   id: string;
@@ -15,8 +18,6 @@ export interface NearbyUser {
   isHost?: boolean;
   status: "listening" | "party" | "open";
 }
-
-
 
 function getAnonUserId(): string {
   const key = "harmony_hub_anon_uid";
@@ -31,33 +32,44 @@ function getAnonUserId(): string {
 function getDeviceName(): string {
   if (typeof window === "undefined") return "Dispositivo Harmony";
   const ua = navigator.userAgent;
-  if (/iphone/i.test(ua)) return "iPhone nelle Vicinanze";
-  if (/android/i.test(ua)) return "Android nelle Vicinanze";
-  if (/macintosh/i.test(ua)) return "MacBook nelle Vicinanze";
-  if (/windows/i.test(ua)) return "PC Windows nelle Vicinanze";
-  return "Dispositivo nelle Vicinanze";
+  if (/iphone/i.test(ua)) return "iPhone";
+  if (/android/i.test(ua)) return "Android";
+  if (/macintosh/i.test(ua)) return "MacBook";
+  if (/windows/i.test(ua)) return "PC Windows";
+  return "Dispositivo";
 }
 
 const ANON_USER_ID = getAnonUserId();
 const DEVICE_NAME = getDeviceName();
 
-export const useListenAlong = (sessionId: string | null) => {
+export const useListenAlong = (
+  sessionId: string | null,
+  jamMode: JamMode = null,
+  onJamInvite?: (user: NearbyUser) => void
+) => {
   const { player, deviceId, playbackState, isPlaying } = useSpotifyContext();
+  const { data: userProfile } = useUserProfile();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
   const radarChannelRef = useRef<any>(null);
+  const knownJamHostsRef = useRef<Set<string>>(new Set());
   const [participants, setParticipants] = useState<string[]>([]);
   const [isRadarActive, setIsRadarActive] = useState<boolean>(true);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
-  const [isScanning, setIsScanning] = useState<boolean>(true); // Inizia scansione subito
-  const [scanDone, setScanDone] = useState<boolean>(false); // Diventa true dopo 10s
+  const [isScanning, setIsScanning] = useState<boolean>(true);
+  const [scanDone, setScanDone] = useState<boolean>(false);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const spotifyAvatar =
+    userProfile?.images?.[0]?.url ||
+    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userProfile?.display_name || DEVICE_NAME)}`;
+  const spotifyName = userProfile?.display_name || userProfile?.id || DEVICE_NAME;
 
   const generateSessionId = () => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
   };
 
-  // Avvia timer di scansione da 10 secondi
+  // -- Timer 10s di scansione iniziale --
   useEffect(() => {
     if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
     setIsScanning(true);
@@ -71,42 +83,45 @@ export const useListenAlong = (sessionId: string | null) => {
     };
   }, [isRadarActive]);
 
-  // Real Supabase Presence Radar
+  // -- Supabase Presence Radar --
+  // Mostra SOLO chi ha una Jam attiva (status === "party")
   useEffect(() => {
     if (!isRadarActive) return;
 
     const radarChannel = supabase.channel("harmony-hub-global-radar", {
-      config: {
-        presence: { key: ANON_USER_ID },
-      },
+      config: { presence: { key: ANON_USER_ID } },
     });
 
     const updatePresenceList = () => {
       const state = radarChannel.presenceState();
-      const realUsers: NearbyUser[] = [];
+      const activeJamHosts: NearbyUser[] = [];
 
       Object.entries(state).forEach(([key, presences]) => {
-        if (key === ANON_USER_ID) return; // Ignora se stesso
+        if (key === ANON_USER_ID) return;
         const p = (presences as any[])?.[0];
-        if (p) {
-          realUsers.push({
+        if (p && p.status === "party" && p.jamCode) {
+          const user: NearbyUser = {
             id: p.userId || key,
-            name: p.name || "Utente Harmony Live",
-            avatar:
-              p.avatar ||
-              "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
-            currentTrack: p.currentTrack || "In riproduzione",
-            artist: p.artist || "Harmony Hub",
-            distance: "Dispositivo Connesso Live (Supabase Presence)",
-            jamCode: p.jamCode || `JAM-${key.slice(-4).toUpperCase()}`,
-            isHost: p.isHost ?? true,
-            status: p.status || "listening",
-          });
+            name: p.name || "Utente Harmony",
+            avatar: p.avatar || spotifyAvatar,
+            currentTrack: p.currentTrack || undefined,
+            artist: p.artist || undefined,
+            distance: "Rilevato nelle vicinanze",
+            jamCode: p.jamCode,
+            isHost: true,
+            status: "party",
+          };
+          activeJamHosts.push(user);
+
+          // Notifica invito solo se Jam nuova per l'utente esterno
+          if (!knownJamHostsRef.current.has(key)) {
+            knownJamHostsRef.current.add(key);
+            onJamInvite?.(user);
+          }
         }
       });
 
-      // Solo utenti reali, niente placeholder
-      setNearbyUsers(realUsers);
+      setNearbyUsers(activeJamHosts);
     };
 
     radarChannel
@@ -117,13 +132,14 @@ export const useListenAlong = (sessionId: string | null) => {
         if (status === "SUBSCRIBED") {
           await radarChannel.track({
             userId: ANON_USER_ID,
-            name: DEVICE_NAME,
-            avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
-            currentTrack: playbackState?.item?.name || "Musica in Ascolto",
-            artist: playbackState?.item?.artists?.[0]?.name || "Harmony Hub",
-            jamCode: sessionId || `JAM-${ANON_USER_ID.slice(-4).toUpperCase()}`,
+            name: spotifyName,
+            avatar: spotifyAvatar,
+            currentTrack: playbackState?.item?.name || undefined,
+            artist: playbackState?.item?.artists?.[0]?.name || undefined,
+            jamCode: sessionId || null,
             isHost: !!sessionId,
             status: sessionId ? "party" : "open",
+            jamMode: jamMode || null,
             onlineAt: new Date().toISOString(),
           });
         }
@@ -135,77 +151,97 @@ export const useListenAlong = (sessionId: string | null) => {
       radarChannel.unsubscribe();
       radarChannelRef.current = null;
     };
-  }, [isRadarActive, sessionId, playbackState]);
+  }, [isRadarActive, sessionId, jamMode, playbackState, onJamInvite, spotifyAvatar, spotifyName]);
 
   const refreshNearbyUsers = useCallback(() => {
+    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
     setIsScanning(true);
-    if (radarChannelRef.current) {
-      radarChannelRef.current.track({
-        userId: ANON_USER_ID,
-        name: DEVICE_NAME,
-        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
-        currentTrack: playbackState?.item?.name || "Musica in Ascolto",
-        artist: playbackState?.item?.artists?.[0]?.name || "Harmony Hub",
-        jamCode: sessionId || `JAM-${ANON_USER_ID.slice(-4).toUpperCase()}`,
-        isHost: !!sessionId,
-        status: sessionId ? "party" : "open",
-        onlineAt: new Date().toISOString(),
-      });
-    }
-    setTimeout(() => {
+    setScanDone(false);
+    radarChannelRef.current?.track({
+      userId: ANON_USER_ID,
+      name: spotifyName,
+      avatar: spotifyAvatar,
+      currentTrack: playbackState?.item?.name || undefined,
+      artist: playbackState?.item?.artists?.[0]?.name || undefined,
+      jamCode: sessionId || null,
+      isHost: !!sessionId,
+      status: sessionId ? "party" : "open",
+      jamMode: jamMode || null,
+      onlineAt: new Date().toISOString(),
+    });
+    scanTimerRef.current = setTimeout(() => {
       setIsScanning(false);
-    }, 1200);
-  }, [sessionId, playbackState]);
+      setScanDone(true);
+    }, 10000);
+  }, [sessionId, jamMode, playbackState, spotifyAvatar, spotifyName]);
 
+  // -- Canale Jam attiva --
   useEffect(() => {
     if (!sessionId) return;
 
     const channel = supabase.channel(`listen-along-${sessionId}`, {
       config: {
         broadcast: { self: false },
-        presence: { key: "user" }
-      }
+        presence: { key: ANON_USER_ID },
+      },
     });
 
     channel
       .on("broadcast", { event: "sync" }, async ({ payload }) => {
-        console.log("[ListenAlong] Received sync:", payload);
         try {
+          const targetDeviceId = deviceId || undefined;
           if (payload.type === "PLAY") {
-            await spotifyApi.play(deviceId, undefined, payload.uris, payload.offset);
+            await spotifyApi.play(targetDeviceId, undefined, payload.uris, payload.offset);
           } else if (payload.type === "PAUSE") {
-            await spotifyApi.pause(deviceId);
+            await spotifyApi.pause(targetDeviceId);
           } else if (payload.type === "SEEK") {
             await spotifyApi.seek(payload.position_ms);
+          } else if (payload.type === "STOP_SESSION" || payload.type === "SESSION_CLOSED") {
+            await spotifyApi.pause(targetDeviceId).catch(() => null);
           }
         } catch (err) {
-          console.error("[ListenAlong] Error applying sync:", err);
+          console.warn("[ListenAlong] Error applying playback sync:", err);
         }
       })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         setParticipants(Object.keys(state));
       })
+      .on("presence", { event: "join" }, ({ newPresences }) => {
+        // Quando un altro utente/dispositivo si collega alla Jam
+        if (newPresences && newPresences.length > 0) {
+          newPresences.forEach((p: any) => {
+            if (p.userId && p.userId !== ANON_USER_ID) {
+              toast({
+                title: "Dispositivo Collegato!",
+                description: `Dispositivo ${p.deviceName || "Remoto"} (Account ${p.userName || "Spotify"}) collegato alla Jam.`,
+                variant: "success",
+              });
+            }
+          });
+        }
+      })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          await channel.track({ online_at: new Date().toISOString() });
-          toast({ title: "Connesso!", description: `Ti sei unito alla sessione ${sessionId}` });
+          await channel.track({
+            userId: ANON_USER_ID,
+            userName: spotifyName,
+            deviceName: DEVICE_NAME,
+            online_at: new Date().toISOString(),
+          });
         }
       });
 
     channelRef.current = channel;
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [sessionId, deviceId, toast]);
+    return () => { channel.unsubscribe(); };
+  }, [sessionId, deviceId, toast, spotifyName]);
 
   const broadcastEvent = useCallback((type: string, data: any) => {
     if (channelRef.current) {
       channelRef.current.send({
         type: "broadcast",
         event: "sync",
-        payload: { type, ...data }
+        payload: { type, ...data },
       });
     }
   }, []);
@@ -218,6 +254,7 @@ export const useListenAlong = (sessionId: string | null) => {
     setIsRadarActive,
     nearbyUsers,
     isScanning,
+    scanDone,
     refreshNearbyUsers,
   };
 };

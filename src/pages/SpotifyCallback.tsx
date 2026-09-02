@@ -61,6 +61,19 @@ export default function SpotifyCallback() {
           description: "Benvenuto su Music Hub!",
         });
 
+        // Auto-check dev mode permissions upon login
+        try {
+          const [{ getUserProfile }, { getCollabUsers }, { checkIsUserDev }] = await Promise.all([
+            import("@/services/spotify-api"),
+            import("@/services/supabase-api"),
+            import("@/App"),
+          ]);
+          const [profile, users] = await Promise.all([getUserProfile(), getCollabUsers()]);
+          if (checkIsUserDev(profile, users)) {
+            localStorage.setItem("harmony_dev_mode", "true");
+          }
+        } catch (_) {}
+
         const returnPath = localStorage.getItem("return_path") || "/";
         localStorage.removeItem("return_path");
         navigate(returnPath);

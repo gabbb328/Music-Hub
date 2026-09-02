@@ -85,7 +85,7 @@ export const play = async (
   }
 };
 
-export const pause    = async () => { try { return await api("/me/player/pause",    { method: "PUT" }); } catch { return null; } };
+export const pause    = async (deviceId?: string) => { try { const q = deviceId ? `?device_id=${deviceId}` : ""; return await api(`/me/player/pause${q}`, { method: "PUT" }); } catch { return null; } };
 export const next     = async () => { try { return await api("/me/player/next",     { method: "POST" }); } catch { return null; } };
 export const previous = async () => { try { return await api("/me/player/previous", { method: "POST" }); } catch { return null; } };
 export const seek     = async (ms: number) => { try { return await api(`/me/player/seek?position_ms=${Math.floor(ms)}`, { method: "PUT" }); } catch { return null; } };

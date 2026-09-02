@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +19,33 @@ import VersionUpdatePage from "@/components/VersionUpdatePage";
 
 const queryClient = new QueryClient();
 
+export function checkIsUserDev(profile: any, users: any[]): boolean {
+  if (!profile || !Array.isArray(users)) return false;
+
+  const spotifyName = (profile.display_name || "").trim().toLowerCase();
+  const spotifyId = (profile.id || "").trim().toLowerCase();
+  const spotifyEmail = (profile.email || "").trim().toLowerCase();
+
+  const me = users.find((u: any) => {
+    if (u.id === "system_settings") return false;
+    const name = (u.name || "").trim().toLowerCase();
+    const username = (u.credentials?.username || "").trim().toLowerCase();
+    const id = (u.id || "").trim().toLowerCase();
+
+    return (
+      (spotifyName && name === spotifyName) ||
+      (spotifyId && name === spotifyId) ||
+      (spotifyId && id === spotifyId) ||
+      (spotifyId && username === spotifyId) ||
+      (spotifyName && username === spotifyName) ||
+      (spotifyEmail && username === spotifyEmail) ||
+      (spotifyEmail && name === spotifyEmail)
+    );
+  });
+
+  return Boolean(me?.isDev);
+}
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = getToken();
@@ -25,24 +53,50 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Public Route Guard (blocks app during version update mode)
-// i dev con harmony_dev_mode=true bypassano sempre la schermata di aggiornamento
+// i dev con harmony_dev_mode=true bypassano sempre la schermata di aggiornamento.
+// Se un utente è loggato con Spotify ed è contrassegnato come Dev in Supabase, imposta automaticamente harmony_dev_mode.
 const PublicRouteGuard = ({ children }: { children: React.ReactNode }) => {
   const { isUpdateActive, targetVersion } = useVersionUpdate();
-  const isDevMode = localStorage.getItem("harmony_dev_mode") === "true";
-  if (isUpdateActive && !isDevMode) {
+  const [isDevMode, setIsDevMode] = useState<boolean>(
+    () => localStorage.getItem("harmony_dev_mode") === "true"
+  );
+  const [checkingDev, setCheckingDev] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isUpdateActive && !isDevMode && getToken() && !checkingDev) {
+      setCheckingDev(true);
+      Promise.all([
+        import("@/services/spotify-api").then((m) => m.getUserProfile()),
+        import("@/services/supabase-api").then((m) => m.getCollabUsers()),
+      ])
+        .then(([profile, users]) => {
+          if (checkIsUserDev(profile, users)) {
+            localStorage.setItem("harmony_dev_mode", "true");
+            setIsDevMode(true);
+          }
+        })
+        .catch((err) => {
+          console.warn("PublicRouteGuard dev check error:", err);
+        })
+        .finally(() => {
+          setCheckingDev(false);
+        });
+    }
+  }, [isUpdateActive, isDevMode, checkingDev]);
+
+  if (isUpdateActive && !isDevMode && !checkingDev) {
     return <VersionUpdatePage targetVersion={targetVersion} />;
   }
   return <>{children}</>;
 };
 
-// Dev Route Guard — portale di login per sviluppatori
-// Dopo un login riuscito imposta harmony_dev_mode e ridirige a / (l'app normale senza blocco aggiornamento)
+// Dev Route Guard — portale di login / verifica per sviluppatori
 const DevRouteGuard = () => {
   const [status, setStatus] = useState<"idle" | "checking" | "ok" | "denied">(() => {
     // Dev già confermato in sessione precedente → vai subito all'app
     if (localStorage.getItem("harmony_dev_mode") === "true") return "ok";
-    // Appena tornato dal callback Spotify
-    if (localStorage.getItem("pending_dev_check") === "true" && getToken()) return "checking";
+    // Se l'utente è già loggato o è appena tornato dal callback Spotify → verifica i permessi dev
+    if (getToken() || localStorage.getItem("pending_dev_check") === "true") return "checking";
     return "idle";
   });
 
@@ -58,13 +112,7 @@ const DevRouteGuard = () => {
 
         localStorage.removeItem("pending_dev_check");
 
-        const me = users.find(
-          (u: any) =>
-            u.name.toLowerCase() === (profile?.display_name ?? "").toLowerCase() &&
-            u.id !== "system_settings"
-        );
-
-        if (me?.isDev) {
+        if (checkIsUserDev(profile, users)) {
           localStorage.setItem("harmony_dev_mode", "true");
           setStatus("ok");
         } else {
@@ -81,7 +129,7 @@ const DevRouteGuard = () => {
     verify();
   }, [status]);
 
-  // Login ok → ridirige alla home normale (che ora non è bloccata grazie al flag in PublicRouteGuard)
+  // Login ok → ridirige alla home normale
   if (status === "ok") {
     return <Navigate to="/" replace />;
   }
@@ -96,7 +144,7 @@ const DevRouteGuard = () => {
     );
   }
 
-  // "idle" o "denied" → mostra pagina di login dedicata (con eventuale messaggio di errore)
+  // "idle" o "denied" → mostra pagina di login dedicata
   return <DevLoginPage denied={status === "denied"} onRetry={() => setStatus("idle")} />;
 };
 
