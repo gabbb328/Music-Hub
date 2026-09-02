@@ -85,7 +85,16 @@
   }
   button,
   a,
-  [role="button"] {
+  select,
+  summary,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  label[for] {
+    cursor: pointer;
     transition:
       color var(--dur-fast) var(--ease-standard),
       background var(--dur-fast) var(--ease-standard),
@@ -93,6 +102,17 @@
       transform var(--dur-fast) var(--ease-standard),
       box-shadow var(--dur-normal) var(--ease-standard);
     -webkit-tap-highlight-color: transparent;
+  }
+
+  button:disabled,
+  a[aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  [aria-disabled="true"],
+  .disabled,
+  .cursor-not-allowed {
+    cursor: not-allowed !important;
   }
 
   :focus-visible {
@@ -426,12 +446,14 @@ input[type="range"]::-webkit-slider-thumb {
   background: white;
   margin-top: -6px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
   transition:
     transform var(--dur-fast) var(--ease-spring),
     box-shadow var(--dur-fast) var(--ease-standard);
 }
 
 input[type="range"]:active::-webkit-slider-thumb {
+  cursor: grabbing;
   transform: scale(1.35);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
@@ -444,6 +466,11 @@ input[type="range"]::-moz-range-thumb {
   background: white;
   border: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+
+input[type="range"]:active::-moz-range-thumb {
+  cursor: grabbing;
 }
 
 /* Thumb dorato in Super Mode */

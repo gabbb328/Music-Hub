@@ -84,7 +84,7 @@ export default function WaveformProgress({ progress, isPlaying, onSeek }: Wavefo
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center gap-[3px] h-10 cursor-pointer group touch-none"
+      className={`relative flex items-center gap-[3px] h-10 group touch-none ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
       onMouseDown={handleInteractionStart}
       onTouchStart={handleInteractionStart}
       onMouseMove={(e) => !isDragging && handleInteractionMove(e.nativeEvent)}

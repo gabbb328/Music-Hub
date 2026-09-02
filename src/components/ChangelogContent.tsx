@@ -14,6 +14,9 @@ export const changelogData: ChangelogEntry[] = [
     date: "12 Settembre 2026",
     version: "2.0.0",
     commits: [
+      "Potenziamento Listen Along stile Spotify Jam: scanner radar per la ricerca automatica di utenti nelle vicinanze",
+      "Sincronizzazione della sessione Listen Along in tempo reale su più schede e dispositivi dello stesso account",
+      "Nuovo canvas animato per reazioni emoji galleggianti a schermo condiviso in diretta",
       "Modifica dei toast di notifica e autenticazione",
       "Nuova interfaccia Dark Glass con sfondi sfocati ed elementi fluttuanti",
       "Pulsante Impostazioni traslucido fluttuante in basso a destra nella sidebar",
@@ -22,7 +25,7 @@ export const changelogData: ChangelogEntry[] = [
       "Risoluzione bug riproduzione video su NowPlayingView (ora funzionante)",
       "Nuove animazioni particellari interattive ('Sparkles') per i report musicali",
       "Ottimizzazione e riorganizzazione UI/UX",
-      "Mpdifica e miglioraento della sezione dei testi, ora piu precisi e piu veloci"
+      "Modifica e miglioramento della sezione dei testi, ora più precisi e veloci"
     ],
   },
   {

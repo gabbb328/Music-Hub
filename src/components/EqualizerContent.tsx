@@ -479,7 +479,7 @@ export default function EqualizerContent() {
                     style={{ color: gain !== 0 ? col : "var(--muted-foreground)" }}>
                     {gain > 0 ? `+${Math.round(gain)}` : Math.round(gain)}
                   </span>
-                  <div className="relative flex-1 w-full cursor-ns-resize touch-none select-none"
+                  <div className={`relative flex-1 w-full touch-none select-none ${dragging === i ? 'cursor-grabbing' : 'cursor-ns-resize'}`}
                     onPointerDown={e => startDrag(i, e)}>
                     <div className="absolute inset-0 flex justify-center">
                       <div className="w-1.5 h-full rounded-full bg-secondary/60" />

@@ -57,6 +57,8 @@
     "@vercel/analytics": "^2.0.1",
     "ask-sdk-core": "^2.14.0",
     "ask-sdk-model": "^1.86.0",
+    "baseline-browser-mapping": "^2.11.20",
+    "caniuse-lite": "^1.0.30001810",
     "chromaprint-wasm": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
