@@ -20,6 +20,28 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = "harmony_hub_active_jam_session";
 const BROADCAST_CHANNEL_NAME = "harmony_hub_jam_sync";
+const GLOBAL_RADAR_CHANNEL = "harmony_hub_global_radar";
+
+function getDeviceType(): string {
+  if (typeof window === "undefined") return "Desktop";
+  const ua = navigator.userAgent;
+  if (/mobile/i.test(ua)) return "Smartphone";
+  if (/tablet|ipad/i.test(ua)) return "Tablet";
+  return "Desktop";
+}
+
+function getDeviceId(): string {
+  const key = "harmony_hub_device_uid";
+  let id = sessionStorage.getItem(key);
+  if (!id) {
+    id = `device-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    sessionStorage.setItem(key, id);
+  }
+  return id;
+}
+
+const DEVICE_ID = getDeviceId();
+const DEVICE_TYPE = getDeviceType();
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [listenAlongSessionId, setListenAlongSessionIdState] = useState<string | null>(() => {
@@ -33,8 +55,41 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeDevicesCount, setActiveDevicesCount] = useState<number>(1);
   const [isMultiDeviceSynced, setIsMultiDeviceSynced] = useState<boolean>(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const globalRadarChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const { toast } = useToast();
+
+  // Supabase Global Radar & Multi-Device Sync Channel
+  useEffect(() => {
+    const globalChannel = supabase.channel(GLOBAL_RADAR_CHANNEL, {
+      config: { broadcast: { self: false } },
+    });
+
+    globalChannel
+      .on("broadcast", { event: "jam_session_broadcast" }, ({ payload }) => {
+        if (payload && payload.sessionId && payload.deviceId !== DEVICE_ID) {
+          console.log("[ListenAlong] Global cross-device session received:", payload);
+          setListenAlongSessionIdState(payload.sessionId);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, payload.sessionId);
+          } catch {}
+          setIsMultiDeviceSynced(true);
+          setActiveDevicesCount((prev) => Math.max(2, prev + 1));
+          toast({
+            title: "Jam Sincronizzata tra Dispositivi!",
+            description: `Stanza ${payload.sessionId} ricevuta in tempo reale da un altro dispositivo (${payload.deviceType || "Remoto"}).`,
+          });
+        }
+      })
+      .subscribe();
+
+    globalRadarChannelRef.current = globalChannel;
+
+    return () => {
+      globalChannel.unsubscribe();
+      globalRadarChannelRef.current = null;
+    };
+  }, [toast]);
 
   const setListenAlongSessionId = (id: string | null) => {
     setListenAlongSessionIdState(id);
@@ -48,11 +103,26 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.warn("Could not save session to localStorage", e);
     }
 
+    // Local tab broadcast
     if (broadcastChannelRef.current) {
       broadcastChannelRef.current.postMessage({
         type: "SESSION_CHANGE",
         sessionId: id,
         timestamp: Date.now(),
+      });
+    }
+
+    // Global Supabase Realtime broadcast across different devices & browsers
+    if (globalRadarChannelRef.current && id) {
+      globalRadarChannelRef.current.send({
+        type: "broadcast",
+        event: "jam_session_broadcast",
+        payload: {
+          sessionId: id,
+          deviceId: DEVICE_ID,
+          deviceType: DEVICE_TYPE,
+          timestamp: Date.now(),
+        },
       });
     }
   };

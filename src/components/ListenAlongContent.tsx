@@ -136,6 +136,7 @@ export default function ListenAlongContent() {
     setIsRadarActive,
     nearbyUsers,
     isScanning,
+    scanDone,
     refreshNearbyUsers,
   } = useListenAlong(sessionId);
 
@@ -313,53 +314,99 @@ export default function ListenAlongContent() {
                 {/* Lista Utenti Trovati */}
                 <div className="lg:col-span-7 space-y-3">
                   <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground px-1">
-                    <span>JAM TROVATE NELLE VICINANZE ({nearbyUsers.length})</span>
+                    <span>JAM TROVATE NELLE VICINANZE ({isScanning ? "..." : nearbyUsers.length})</span>
                     <span>AUTOMATICO</span>
                   </div>
 
                   <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                    {nearbyUsers.map((user) => (
-                      <motion.div
-                        key={user.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        whileHover={{ scale: 1.01 }}
-                        className="p-4 rounded-2xl bg-secondary/30 hover:bg-secondary/60 border border-white/5 flex items-center justify-between gap-4 transition-all"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="relative">
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="w-11 h-11 rounded-full object-cover border-2 border-primary/40 shadow-sm"
-                            />
-                            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background" />
-                          </div>
-
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-sm truncate">{user.name}</h3>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
-                              <Music className="w-3 h-3 text-primary shrink-0" />
-                              <span className="truncate">
-                                {user.currentTrack ? `${user.currentTrack} - ${user.artist}` : "In ascolto"}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-emerald-400 font-mono font-medium">
-                              {user.distance}
-                            </span>
+                    {/* Stato: scansione in corso */}
+                    {isScanning && nearbyUsers.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+                        <div className="relative w-16 h-16">
+                          <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
+                          <div className="absolute inset-2 rounded-full border-2 border-primary/40 animate-ping" style={{ animationDelay: '0.3s' }} />
+                          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+                            <Signal className="w-7 h-7 text-primary animate-pulse" />
                           </div>
                         </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Scansione in corso...</p>
+                          <p className="text-xs text-muted-foreground mt-1">Ricerca utenti Harmony Hub nelle vicinanze</p>
+                        </div>
+                      </div>
+                    )}
 
-                        <Button
-                          size="sm"
-                          onClick={() => handleJoin(user.jamCode)}
-                          className="shrink-0 gap-1.5 text-xs font-semibold shadow-md"
+                    {/* Stato: scansione finita, nessun utente */}
+                    {scanDone && nearbyUsers.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                        <div className="w-16 h-16 rounded-full bg-secondary/50 border border-border/40 flex items-center justify-center">
+                          <Users className="w-7 h-7 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Nessun utente trovato</p>
+                          <p className="text-xs text-muted-foreground mt-1">Nessun altro dispositivo Harmony Hub rilevato nelle vicinanze.</p>
+                          <p className="text-xs text-muted-foreground">Premi <span className="font-semibold text-foreground">Aggiorna</span> per riprovare.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Utenti reali trovati */}
+                    {nearbyUsers.map((user) => {
+                      const isRealLiveDevice = user.distance.includes("Supabase") || user.distance.includes("Live");
+                      return (
+                        <motion.div
+                          key={user.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          whileHover={{ scale: 1.01 }}
+                          className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition-all ${
+                            isRealLiveDevice
+                              ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 shadow-md"
+                              : "bg-secondary/30 hover:bg-secondary/60 border-white/5"
+                          }`}
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Unisciti alla Jam
-                        </Button>
-                      </motion.div>
-                    ))}
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="relative">
+                              <img
+                                src={user.avatar}
+                                alt={user.name}
+                                className="w-11 h-11 rounded-full object-cover border-2 border-primary/40 shadow-sm"
+                              />
+                              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-sm truncate">{user.name}</h3>
+                                {isRealLiveDevice && (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-black uppercase tracking-wider">
+                                    LIVE DEVICE
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                                <Music className="w-3 h-3 text-primary shrink-0" />
+                                <span className="truncate">
+                                  {user.currentTrack ? `${user.currentTrack} - ${user.artist}` : "In ascolto"}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-emerald-400 font-mono font-medium">
+                                {user.distance}
+                              </span>
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            onClick={() => handleJoin(user.jamCode)}
+                            className="shrink-0 gap-1.5 text-xs font-semibold shadow-md"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Unisciti alla Jam
+                          </Button>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
