@@ -283,7 +283,7 @@ export default function ListenAlongContent() {
                       onClick={() => handleCreate("simultaneous")}
                       className="w-full gap-2 min-h-[44px] h-auto py-2.5 px-3 text-xs leading-snug font-semibold shadow-md bg-primary hover:bg-primary/90 flex items-center justify-center text-center"
                     >
-                      <Volume2 className="w-4 h-4 shrink-0" /> Contemporanea (Stereo Sync)
+                      <Volume2 className="w-4 h-4 shrink-0" /> Stereo Syncz
                     </Button>
                     <Button
                       onClick={() => handleCreate("control")}

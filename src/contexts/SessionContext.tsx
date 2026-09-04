@@ -119,7 +119,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setListenAlongSessionId = (id: string | null) => {
     const cleanId = sanitizeSessionId(id);
-    const previousSessionId = listenAlongSessionIdState;
+    const previousSessionId = listenAlongSessionId;
     setListenAlongSessionIdState(cleanId);
 
     try {
@@ -193,7 +193,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const forceResetSession = () => {
-    const previousSessionId = listenAlongSessionIdState;
+    const previousSessionId = listenAlongSessionId;
     setListenAlongSessionIdState(null);
     setIsMultiDeviceSynced(false);
     setActiveDevicesCount(1);
