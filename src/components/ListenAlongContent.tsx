@@ -126,20 +126,46 @@ export default function ListenAlongContent() {
   const {
     listenAlongSessionId: sessionId,
     setListenAlongSessionId: setSessionId,
+    forceResetSession,
     isMultiDeviceSynced,
     activeDevicesCount,
   } = useSessionContext();
 
   const [jamMode, setJamMode] = useState<"control" | "simultaneous">("simultaneous");
-  const [isHost, setIsHost] = useState<boolean>(false);
-  const [joinId, setJoinId] = useState<string>("");
-  const [incomingInvite, setIncomingInvite] = useState<NearbyUser | null>(null);
+  const [isHost, setIsHostState] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem("harmony_hub_is_host") === "true";
+    } catch {
+      return false;
+    }
+  });
 
-  // Notifica invito quando viene rilevata una nuova Jam nelle vicinanze da utente esterno
-  const handleJamInvite = useCallback((user: NearbyUser) => {
-    if (sessionId === user.jamCode) return;
-    setIncomingInvite(user);
-  }, [sessionId]);
+  const setIsHost = (val: boolean) => {
+    setIsHostState(val);
+    try {
+      if (val) {
+        sessionStorage.setItem("harmony_hub_is_host", "true");
+      } else {
+        sessionStorage.removeItem("harmony_hub_is_host");
+      }
+    } catch (_) {}
+  };
+
+  const [joinId, setJoinId] = useState<string>("");
+
+  // Notifica invito Goofy Toast quando viene rilevata una nuova Jam nelle vicinanze da utente esterno
+  const handleJamInvite = useCallback(
+    (user: NearbyUser) => {
+      if (!user.jamCode || sessionId === user.jamCode) return;
+      toast({
+        title: `Nuova Jam: ${user.name}`,
+        description: `Stanza ${user.jamCode}. Tocca 'Unisciti' nella lista Radar per ascoltare insieme.`,
+        variant: "success",
+        duration: 7000,
+      });
+    },
+    [sessionId, toast]
+  );
 
   const {
     generateSessionId,
@@ -164,15 +190,18 @@ export default function ListenAlongContent() {
     setJamMode(selectedMode);
     setIsHost(true);
     setSessionId(id);
-    // Nessun toast ridondante sul dispositivo Host che ha appena avviato la Jam
+    toast({
+      title: "Jam Avviata!",
+      description: `Stanza ${id} creata con successo.`,
+      variant: "success",
+    });
   };
 
   const handleJoin = (codeToJoin?: string) => {
     const targetCode = codeToJoin || joinId;
-    if (targetCode && targetCode.length >= 4) {
+    if (targetCode && targetCode.length >= 3) {
       setIsHost(false);
       setSessionId(targetCode.toUpperCase());
-      setIncomingInvite(null);
       toast({
         title: "Sincronizzato alla Jam!",
         description: `Stanza: ${targetCode.toUpperCase()}`,
@@ -186,64 +215,14 @@ export default function ListenAlongContent() {
       navigator.clipboard.writeText(sessionId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      toast({ title: "Copiato!", description: "Codice sessione copiato negli appunti." });
+      toast({ title: "Copiato!", description: "Codice sessione copiato negli appunti.", variant: "info" });
     }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 sm:space-y-8 relative">
+    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 sm:space-y-8 relative max-w-full">
       {/* Particle Canvas Floating Emojis */}
       <FloatingEmojiParticleCanvas reactions={reactions} />
-
-      {/* ── Banner Notifica Invito Jam (Con bottoni "Collegati" e "Annulla") ── */}
-      <AnimatePresence>
-        {incomingInvite && (
-          <motion.div
-            initial={{ opacity: 0, y: -40, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -30, scale: 0.95 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4"
-          >
-            <div className="p-4 sm:p-5 rounded-2xl bg-card/95 border-2 border-emerald-500/50 backdrop-blur-2xl shadow-[0_10px_40px_rgba(16,185,129,0.3)] flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <img
-                  src={incomingInvite.avatar}
-                  alt={incomingInvite.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-emerald-400 shrink-0 shadow-md"
-                />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                    <h3 className="font-bold text-sm text-foreground truncate">
-                      {incomingInvite.name} ha avviato una Jam!
-                    </h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    Stanza: <span className="font-mono text-emerald-400 font-bold">{incomingInvite.jamCode}</span> • Tocca per sincronizzare la musica.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-                <Button
-                  onClick={() => handleJoin(incomingInvite.jamCode)}
-                  className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-4 h-9 shadow-md gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Collegati
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIncomingInvite(null)}
-                  className="flex-1 sm:flex-initial text-xs font-semibold px-3.5 h-9 border-border text-muted-foreground hover:text-foreground"
-                >
-                  Annulla
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
         {/* Header con badge Multi-Device Sync */}
@@ -327,15 +306,15 @@ export default function ListenAlongContent() {
                     Inserisci il codice unico della Jam o scansiona il QR code inviato da un amico.
                   </p>
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <Input
-                    placeholder="Es: MARCO-JAM"
+                    placeholder="Es: JAM-789X"
                     value={joinId}
                     onChange={(e) => setJoinId(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-                    className="font-mono uppercase h-11 sm:h-12 text-sm sm:text-base tracking-wider"
+                    className="font-mono uppercase h-11 sm:h-12 text-sm sm:text-base tracking-wider flex-1"
                   />
-                  <Button onClick={() => handleJoin()} variant="secondary" className="h-11 sm:h-12 px-5 sm:px-6 font-semibold shrink-0 text-xs sm:text-sm">
+                  <Button onClick={() => handleJoin()} variant="secondary" className="w-full sm:w-auto h-11 sm:h-12 px-5 sm:px-6 font-semibold shrink-0 text-xs sm:text-sm">
                     Unisciti
                   </Button>
                 </div>
@@ -606,7 +585,7 @@ export default function ListenAlongContent() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setSessionId(null);
+                      forceResetSession();
                       setIsHost(false);
                     }}
                     className="text-destructive border-destructive/30 hover:bg-destructive/10 text-xs font-semibold h-10 px-4"

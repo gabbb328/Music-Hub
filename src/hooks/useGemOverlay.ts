@@ -13,6 +13,11 @@ export function useGemOverlay({ sessionId, userId }: UseGemOverlayOptions) {
   const [reactions, setReactions] = useState<GemReaction[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  const cleanSessionId =
+    sessionId && sessionId !== "null" && sessionId !== "undefined" && sessionId.trim() !== ""
+      ? sessionId.trim()
+      : "global-radar-jam";
+
   useEffect(() => {
     if (reactions.length === 0) return;
     const timer = setTimeout(() => {
@@ -23,15 +28,13 @@ export function useGemOverlay({ sessionId, userId }: UseGemOverlayOptions) {
   }, [reactions]);
 
   useEffect(() => {
-    if (!sessionId) return;
-
-    const channel = supabase.channel(`gem-overlay-${sessionId}`, {
+    const channel = supabase.channel(`gem-overlay-${cleanSessionId}`, {
       config: { broadcast: { self: true } },
     });
 
     channel
       .on<GemPayload>("broadcast", { event: "gem" }, ({ payload }) => {
-        if (payload.type !== "GEM_REACTION") return;
+        if (payload?.type !== "GEM_REACTION" || !payload.reaction) return;
         setReactions((prev) => [...prev, payload.reaction]);
       })
       .subscribe();
@@ -42,27 +45,34 @@ export function useGemOverlay({ sessionId, userId }: UseGemOverlayOptions) {
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [sessionId]);
+  }, [cleanSessionId]);
 
   const sendReaction = useCallback(
     (emoji: GemEmoji) => {
-      if (!channelRef.current) return;
-
       const reaction: GemReaction = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         emoji,
-        userId,
+        userId: userId || "anon",
         timestamp: Date.now(),
         x: 10 + Math.random() * 80,
       };
 
       const payload: GemPayload = { type: "GEM_REACTION", reaction };
 
-      channelRef.current.send({
-        type: "broadcast",
-        event: "gem",
-        payload,
-      });
+      // Mostra immediatamente in locale
+      setReactions((prev) => [...prev, reaction]);
+
+      if (channelRef.current) {
+        try {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "gem",
+            payload,
+          });
+        } catch (e) {
+          console.warn("[GemOverlay] Error sending reaction:", e);
+        }
+      }
     },
     [userId]
   );

@@ -145,7 +145,8 @@ export default function NowPlayingView(
     typeof window !== "undefined" && window.innerWidth >= 768 ? "lyrics" : null,
   );
   // ── GEM Overlay / Listen Along session ────────────────────────
-  const { listenAlongSessionId, setListenAlongSessionId } = useSessionContext();
+  const { listenAlongSessionId, setListenAlongSessionId, forceResetSession } = useSessionContext();
+  const [nowPlayingJoinId, setNowPlayingJoinId] = useState("");
   const gemUserId = useMemo(
     () => `user-${Math.random().toString(36).slice(2, 8)}`,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1260,43 +1261,94 @@ export default function NowPlayingView(
                 <div className="p-4 space-y-4">
                   {/* Link sessione */}
                   {!listenAlongSessionId ? (
-                    <div className="space-y-2 text-center">
+                    <div className="space-y-3 text-center">
                       <p className="text-xs text-muted-foreground">
-                        Avvia una sessione per condividere la musica in sincrono con gli amici.
+                        Avvia o unisciti a una Jam per ascoltare in tempo reale con i tuoi amici.
                       </p>
                       <button
                         onClick={() => {
-                          const id = `user-${Date.now().toString().slice(-6)}`;
+                          const id = `JAM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                          try { sessionStorage.setItem("harmony_hub_is_host", "true"); } catch (_) {}
                           setListenAlongSessionId(id);
+                          toast({
+                            title: "Jam Avviata!",
+                            description: `Stanza: ${id}`,
+                            variant: "success",
+                          });
                         }}
-                        className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                        className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-md"
                       >
-                        🎧 Avvia sessione
+                        <Zap className="w-4 h-4" /> Avvia Nuova Jam (Host)
                       </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="bg-background/50 border border-border p-2 rounded-lg flex items-center justify-between">
-                        <span className="text-xs font-mono text-muted-foreground truncate flex-1 text-left px-1">
-                          {`${typeof window !== "undefined" ? window.location.origin : ""}/listen?session=${listenAlongSessionId}`}
-                        </span>
+
+                      <div className="flex gap-1.5 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Codice Jam (Es: JAM-89X)..."
+                          value={nowPlayingJoinId}
+                          onChange={(e) => setNowPlayingJoinId(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && nowPlayingJoinId.trim().length >= 3) {
+                              const code = nowPlayingJoinId.trim().toUpperCase();
+                              try { sessionStorage.removeItem("harmony_hub_is_host"); } catch (_) {}
+                              setListenAlongSessionId(code);
+                              setNowPlayingJoinId("");
+                              toast({
+                                title: "Sincronizzato alla Jam!",
+                                description: `Stanza: ${code}`,
+                                variant: "success",
+                              });
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 rounded-xl bg-background/60 border border-border/50 text-xs font-mono uppercase focus:outline-none focus:border-primary"
+                        />
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(
-                              `${typeof window !== "undefined" ? window.location.origin : ""}/listen?session=${listenAlongSessionId}`,
-                            );
-                            toast({ title: "✓ Link copiato!" });
+                            if (nowPlayingJoinId.trim().length >= 3) {
+                              const code = nowPlayingJoinId.trim().toUpperCase();
+                              try { sessionStorage.removeItem("harmony_hub_is_host"); } catch (_) {}
+                              setListenAlongSessionId(code);
+                              setNowPlayingJoinId("");
+                              toast({
+                                title: "Sincronizzato alla Jam!",
+                                description: `Stanza: ${code}`,
+                                variant: "success",
+                              });
+                            }
                           }}
-                          className="p-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded transition-colors shrink-0 ml-1"
+                          className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          Unisciti
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div className="bg-background/50 border border-border/60 p-2.5 rounded-xl flex items-center justify-between">
+                        <div className="min-w-0 flex-1 text-left">
+                          <span className="text-[10px] text-muted-foreground block font-bold uppercase tracking-wider">
+                            Codice Stanza Jam
+                          </span>
+                          <span className="text-sm font-mono font-black text-primary truncate block">
+                            {listenAlongSessionId}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(listenAlongSessionId);
+                            toast({ title: "Copiato!", description: "Codice stanza copiato.", variant: "info" });
+                          }}
+                          className="p-2 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg transition-colors shrink-0 ml-1"
+                          aria-label="Copia codice"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
                       </div>
                       <button
-                        onClick={() => setListenAlongSessionId(null)}
+                        onClick={() => forceResetSession()}
                         className="w-full py-1.5 rounded-xl bg-destructive/15 text-destructive text-xs font-semibold hover:bg-destructive/25 transition-colors"
                       >
-                        Termina sessione
+                        Abbandona Jam
                       </button>
                     </div>
                   )}

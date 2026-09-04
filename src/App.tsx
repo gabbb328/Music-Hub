@@ -16,6 +16,7 @@ import CollabApprove from "./pages/CollabApprove";
 
 import { useVersionUpdate } from "@/hooks/useVersionUpdate";
 import VersionUpdatePage from "@/components/VersionUpdatePage";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const queryClient = new QueryClient();
 
@@ -184,6 +185,7 @@ const App = () => (
     <ThemeProvider>
       <TooltipProvider>
         <Toaster />
+        <SpeedInsights />
         <BrowserRouter
           future={{
             v7_startTransition: true,

@@ -31,11 +31,16 @@ const GemOverlay: React.FC<GemOverlayProps> = ({ sessionId, sendReaction }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [customInput, setCustomInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const disabled = !sessionId;
+  const isPrivateSession = !!(
+    sessionId &&
+    sessionId !== "null" &&
+    sessionId !== "undefined" &&
+    sessionId.trim() !== ""
+  );
 
   const handleSend = (emoji: string) => {
     const e = emoji.trim();
-    if (!e || disabled) return;
+    if (!e) return;
     sendReaction(e);
     setShowPicker(false);
     setCustomInput("");
@@ -44,15 +49,16 @@ const GemOverlay: React.FC<GemOverlayProps> = ({ sessionId, sendReaction }) => {
   return (
     <div className="flex flex-col items-center gap-3 select-none">
       {/* Indicatore stato */}
-      {sessionId ? (
+      {isPrivateSession ? (
         <div className="flex items-center gap-1.5 text-[11px] text-green-400 font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Pioggia emoji attiva sulla copertina
+          Pioggia emoji attiva nella Jam ({sessionId})
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground text-center">
-          🔒 Avvia una sessione per inviare reazioni
-        </p>
+        <div className="flex items-center gap-1.5 text-[11px] text-primary/80 font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Pioggia emoji globale attiva
+        </div>
       )}
 
       {/* Bottoni emoji */}
@@ -63,17 +69,11 @@ const GemOverlay: React.FC<GemOverlayProps> = ({ sessionId, sendReaction }) => {
             onClick={() => handleSend(emoji)}
             variants={BTN}
             initial="idle"
-            whileHover={disabled ? undefined : "hover"}
-            whileTap={disabled ? undefined : "tap"}
+            whileHover="hover"
+            whileTap="tap"
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className={[
-              "w-14 h-14 rounded-2xl text-2xl",
-              "bg-card/80 backdrop-blur-sm border border-border/40",
-              "shadow-md hover:shadow-lg hover:border-primary/30 transition-shadow cursor-pointer",
-              disabled && "opacity-40 pointer-events-none",
-            ].filter(Boolean).join(" ")}
+            className="w-14 h-14 rounded-2xl text-2xl bg-card/80 backdrop-blur-sm border border-border/40 shadow-md hover:shadow-lg hover:border-primary/30 transition-shadow cursor-pointer"
             aria-label={`Invia ${emoji}`}
-            disabled={disabled}
           >
             {emoji}
           </motion.button>
@@ -83,22 +83,16 @@ const GemOverlay: React.FC<GemOverlayProps> = ({ sessionId, sendReaction }) => {
         <div className="relative">
           <motion.button
             onClick={() => {
-              if (disabled) return;
               setShowPicker((v) => !v);
               setTimeout(() => inputRef.current?.focus(), 80);
             }}
             variants={BTN}
             initial="idle"
-            whileHover={!disabled ? "hover" : undefined}
-            whileTap={!disabled ? "tap" : undefined}
+            whileHover="hover"
+            whileTap="tap"
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
-            className={[
-              "w-14 h-14 rounded-2xl text-xl font-bold flex items-center justify-center",
-              "bg-primary/20 border-2 border-primary/40 hover:border-primary/70 shadow-md transition-all cursor-pointer",
-              disabled && "opacity-40 pointer-events-none",
-            ].filter(Boolean).join(" ")}
+            className="w-14 h-14 rounded-2xl text-xl font-bold flex items-center justify-center bg-primary/20 border-2 border-primary/40 hover:border-primary/70 shadow-md transition-all cursor-pointer"
             aria-label="Emoji personalizzata"
-            disabled={disabled}
           >
             ＋
           </motion.button>
