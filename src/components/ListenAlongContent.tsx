@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, Plus, Copy, Check, Radio, Signal, Smartphone,
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useListenAlong, NearbyUser } from "@/hooks/useListenAlong";
+import { usePlaybackState, useAudioFeatures } from "@/hooks/useSpotify";
 import { QRCodeSVG } from "qrcode.react";
 import { useToast } from "@/hooks/use-toast";
 import GemOverlay from "@/components/GemOverlay";
@@ -185,6 +186,11 @@ export default function ListenAlongContent() {
     userId: ANON_USER_ID,
   });
 
+  // Audio features per bottoni mood dinamici in GemOverlay
+  const { data: playbackState } = usePlaybackState();
+  const currentTrackId = (playbackState?.item as any)?.id || "";
+  const { data: audioFeatures } = useAudioFeatures(currentTrackId);
+
   const handleCreate = (selectedMode: "control" | "simultaneous" = "simultaneous") => {
     const id = generateSessionId();
     setJamMode(selectedMode);
@@ -283,7 +289,7 @@ export default function ListenAlongContent() {
                       onClick={() => handleCreate("simultaneous")}
                       className="w-full gap-2 min-h-[44px] h-auto py-2.5 px-3 text-xs leading-snug font-semibold shadow-md bg-primary hover:bg-primary/90 flex items-center justify-center text-center"
                     >
-                      <Volume2 className="w-4 h-4 shrink-0" /> Stereo Syncz
+                      <Volume2 className="w-4 h-4 shrink-0" /> Stereo Sync
                     </Button>
                     <Button
                       onClick={() => handleCreate("control")}
@@ -585,7 +591,7 @@ export default function ListenAlongContent() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      forceResetSession();
+                      forceResetSession(isHost);
                       setIsHost(false);
                     }}
                     className="text-destructive border-destructive/30 hover:bg-destructive/10 text-xs font-semibold h-10 px-4"
@@ -606,7 +612,7 @@ export default function ListenAlongContent() {
                   </p>
                 </div>
 
-                <GemOverlay sessionId={sessionId} sendReaction={sendReaction} />
+                <GemOverlay sessionId={sessionId} sendReaction={sendReaction} audioFeatures={audioFeatures} />
               </Card>
             </motion.div>
           </AnimatePresence>

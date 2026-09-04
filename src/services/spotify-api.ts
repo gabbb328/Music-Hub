@@ -88,7 +88,7 @@ export const play = async (
 export const pause    = async (deviceId?: string) => { try { const q = deviceId ? `?device_id=${deviceId}` : ""; return await api(`/me/player/pause${q}`, { method: "PUT" }); } catch { return null; } };
 export const next     = async () => { try { return await api("/me/player/next",     { method: "POST" }); } catch { return null; } };
 export const previous = async () => { try { return await api("/me/player/previous", { method: "POST" }); } catch { return null; } };
-export const seek     = async (ms: number) => { try { return await api(`/me/player/seek?position_ms=${Math.floor(ms)}`, { method: "PUT" }); } catch { return null; } };
+export const seek     = async (ms: number, deviceId?: string) => { try { const q = deviceId ? `&device_id=${deviceId}` : ""; return await api(`/me/player/seek?position_ms=${Math.floor(ms)}${q}`, { method: "PUT" }); } catch { return null; } };
 export const setVolume = async (v: number) => { try { return await api(`/me/player/volume?volume_percent=${Math.max(0,Math.min(100,Math.floor(v)))}`, { method: "PUT" }); } catch { return null; } };
 export const setShuffle = async (s: boolean) => { try { return await api(`/me/player/shuffle?state=${s}`, { method: "PUT" }); } catch { return null; } };
 export const setRepeat  = async (s: "track"|"context"|"off") => { try { return await api(`/me/player/repeat?state=${s}`, { method: "PUT" }); } catch { return null; } };

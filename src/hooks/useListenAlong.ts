@@ -189,15 +189,41 @@ export const useListenAlong = (
     channel
       .on("broadcast", { event: "sync" }, async ({ payload }) => {
         try {
-          const targetDeviceId = deviceId || undefined;
+          const devs = await spotifyApi.getAvailableDevices().catch(() => null);
+          const devices: any[] = devs?.devices || [];
+
           if (payload.type === "PLAY") {
-            await spotifyApi.play(targetDeviceId, undefined, payload.uris, payload.offset);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) =>
+                  spotifyApi.play(d.id, undefined, payload.uris, payload.offset).catch(() => null)
+                )
+              );
+            } else {
+              await spotifyApi.play(deviceId || undefined, undefined, payload.uris, payload.offset).catch(() => null);
+            }
           } else if (payload.type === "PAUSE") {
-            await spotifyApi.pause(targetDeviceId);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) => spotifyApi.pause(d.id).catch(() => null))
+              );
+            } else {
+              await spotifyApi.pause(deviceId || undefined).catch(() => null);
+            }
           } else if (payload.type === "SEEK") {
-            await spotifyApi.seek(payload.position_ms);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) => spotifyApi.seek(payload.position_ms, d.id).catch(() => null))
+              );
+            } else {
+              await spotifyApi.seek(payload.position_ms, deviceId || undefined).catch(() => null);
+            }
           } else if (payload.type === "STOP_SESSION" || payload.type === "SESSION_CLOSED") {
-            await spotifyApi.pause(targetDeviceId).catch(() => null);
+            if (devices.length > 0) {
+              await Promise.all(devices.map((d: any) => spotifyApi.pause(d.id).catch(() => null)));
+            } else {
+              await spotifyApi.pause(deviceId || undefined).catch(() => null);
+            }
           }
         } catch (err) {
           console.warn("[ListenAlong] Error applying playback sync:", err);

@@ -11,7 +11,7 @@ import * as spotifyApi from "@/services/spotify-api";
 interface SessionContextType {
   listenAlongSessionId: string | null;
   setListenAlongSessionId: (id: string | null) => void;
-  forceResetSession: () => void;
+  forceResetSession: (isHostOverride?: boolean) => void;
   broadcastAction: (type: string, payload?: any) => void;
   isMultiDeviceSynced: boolean;
   activeDevicesCount: number;
@@ -192,8 +192,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const forceResetSession = () => {
+  const forceResetSession = (isHostOverride?: boolean) => {
+    const isHost = isHostOverride ?? (sessionStorage.getItem("harmony_hub_is_host") === "true");
     const previousSessionId = listenAlongSessionId;
+
     setListenAlongSessionIdState(null);
     setIsMultiDeviceSynced(false);
     setActiveDevicesCount(1);
@@ -204,14 +206,34 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       sessionStorage.removeItem("harmony_hub_is_host");
     } catch (_) {}
 
-    if (previousSessionId && channelRef.current) {
-      try {
-        channelRef.current.send({
-          type: "broadcast",
-          event: "sync",
-          payload: { type: "STOP_SESSION", deviceId: DEVICE_ID },
-        });
-      } catch (_) {}
+    // SOLO SE L'UTENTE È HOST: disconnetti anche gli altri partecipanti alla Jam
+    if (isHost && previousSessionId) {
+      if (channelRef.current) {
+        try {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "sync",
+            payload: { type: "STOP_SESSION", deviceId: DEVICE_ID },
+          });
+        } catch (_) {}
+      }
+
+      if (globalRadarChannelRef.current) {
+        try {
+          globalRadarChannelRef.current.send({
+            type: "broadcast",
+            event: "jam_session_broadcast",
+            payload: {
+              sessionId: null,
+              targetRoomId: previousSessionId,
+              type: "SESSION_CLOSED",
+              deviceId: DEVICE_ID,
+              deviceType: DEVICE_TYPE,
+              timestamp: Date.now(),
+            },
+          });
+        } catch (_) {}
+      }
     }
 
     if (broadcastChannelRef.current) {
@@ -224,27 +246,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (_) {}
     }
 
-    if (globalRadarChannelRef.current) {
-      try {
-        globalRadarChannelRef.current.send({
-          type: "broadcast",
-          event: "jam_session_broadcast",
-          payload: {
-            sessionId: null,
-            targetRoomId: previousSessionId,
-            type: "SESSION_CLOSED",
-            deviceId: DEVICE_ID,
-            deviceType: DEVICE_TYPE,
-            timestamp: Date.now(),
-          },
-        });
-      } catch (_) {}
-    }
-
     toast({
-      title: "Sessione Resettata",
-      description: "La sessione Jam è stata completamente rimossa da questo dispositivo.",
-      variant: "success",
+      title: isHost ? "Jam Terminata" : "Uscito dalla Jam",
+      description: isHost
+        ? "Hai terminato la Jam per tutti i partecipanti."
+        : "Sei uscito dalla Jam. La stanza rimane attiva per l'Host.",
+      variant: "info",
     });
   };
 
@@ -300,23 +307,50 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
           const devs = await spotifyApi.getAvailableDevices().catch(() => null);
           const devices: any[] = devs?.devices || [];
-          const activeDevice = devices.find((d: any) => d.is_active)?.id || devices[0]?.id;
 
           if (payload.type === "PLAY") {
-            if (activeDevice) await spotifyApi.play(activeDevice, undefined, payload.uris, payload.offset);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) =>
+                  spotifyApi.play(d.id, undefined, payload.uris, payload.offset).catch(() => null)
+                )
+              );
+            } else {
+              await spotifyApi.play(undefined, undefined, payload.uris, payload.offset).catch(() => null);
+            }
           } else if (payload.type === "PAUSE") {
-            if (activeDevice) await spotifyApi.pause(activeDevice);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) => spotifyApi.pause(d.id).catch(() => null))
+              );
+            } else {
+              await spotifyApi.pause().catch(() => null);
+            }
           } else if (payload.type === "SEEK") {
-            if (activeDevice) await spotifyApi.seek(payload.position_ms);
+            if (devices.length > 0) {
+              await Promise.all(
+                devices.map((d: any) => spotifyApi.seek(payload.position_ms, d.id).catch(() => null))
+              );
+            } else {
+              await spotifyApi.seek(payload.position_ms).catch(() => null);
+            }
           } else if (payload.type === "STOP_SESSION" || payload.type === "SESSION_CLOSED") {
-            if (activeDevice) await spotifyApi.pause(activeDevice).catch(() => null);
+            if (devices.length > 0) {
+              await Promise.all(devices.map((d: any) => spotifyApi.pause(d.id).catch(() => null)));
+            } else {
+              await spotifyApi.pause().catch(() => null);
+            }
             setListenAlongSessionIdState(null);
-            try { localStorage.removeItem(LOCAL_STORAGE_KEY); } catch {}
+            try {
+              localStorage.removeItem(LOCAL_STORAGE_KEY);
+              sessionStorage.removeItem(LOCAL_STORAGE_KEY);
+              sessionStorage.removeItem("harmony_hub_is_host");
+            } catch {}
             setIsMultiDeviceSynced(false);
             setActiveDevicesCount(1);
             toast({
-              title: "Jam Disattivata",
-              description: "La sessione Jam è stata terminata da un altro dispositivo.",
+              title: "Jam Disattivata dall'Host",
+              description: "L'Host ha terminato la sessione Jam. Sei stato disconnesso.",
               variant: "warning",
             });
           }

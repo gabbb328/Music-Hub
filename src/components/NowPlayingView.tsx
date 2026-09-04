@@ -1345,7 +1345,10 @@ export default function NowPlayingView(
                         </button>
                       </div>
                       <button
-                        onClick={() => forceResetSession()}
+                        onClick={() => {
+                          const isHost = sessionStorage.getItem("harmony_hub_is_host") === "true";
+                          forceResetSession(isHost);
+                        }}
                         className="w-full py-1.5 rounded-xl bg-destructive/15 text-destructive text-xs font-semibold hover:bg-destructive/25 transition-colors"
                       >
                         Abbandona Jam
@@ -1353,10 +1356,11 @@ export default function NowPlayingView(
                     </div>
                   )}
 
-                  {/* GEM Overlay — solo bottoni, pioggia sulla copertina principale */}
+                  {/* GEM Overlay — bottoni dinamici sul mood della traccia */}
                   <GemOverlay
                     sessionId={listenAlongSessionId}
                     sendReaction={sendReaction}
+                    audioFeatures={audioFeatures}
                   />
                 </div>
               </motion.div>
