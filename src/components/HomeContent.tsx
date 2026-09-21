@@ -17,6 +17,8 @@ import { groupRecentTracks } from "@/lib/spotify-utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { detectEasterEgg } from "@/hooks/useEasterEgg";
 
+import { GeminiAIButton } from "@/components/GeminiAIButton";
+
 interface HomeContentProps {
   onPlayTrack: (track: Track) => void;
   onOpenSettings?: () => void;
@@ -45,201 +47,6 @@ const SkeletonCard = () => (
     </CardContent>
   </Card>
 );
-
-/* ---------------------------------------------------------------------- */
-/* Gemini-style AI button: rainbow gradient border glow + scattering stars */
-/* ---------------------------------------------------------------------- */
-
-interface SparkleParticle {
-  id: number;
-  angle: number;
-  distance: number;
-  size: number;
-  color: string;
-  delay: number;
-}
-
-const STAR_COLORS = [
-  "#FF6B6B",
-  "#4ECDC4",
-  "#FFD93D",
-  "#A78BFA",
-  "#60A5FA",
-  "#F472B6",
-  "#34D399",
-  "#FB923C",
-];
-
-let sparkleIdCounter = 0;
-
-const FourPointStar = ({ color, size }: { color: string; size: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    style={{ filter: `drop-shadow(0 0 3px ${color}90)` }}
-  >
-    <path
-      d="M12 0C12 6.6 12 12 12 12C12 12 6.6 12 0 12C6.6 12 12 12 12 12C12 12 12 17.4 12 24C12 17.4 12 12 12 12C12 12 17.4 12 24 12C17.4 12 12 12 12 12C12 12 12 6.6 12 0Z"
-      fill={color}
-    />
-  </svg>
-);
-
-const GeminiAIButton = ({ onOpenAI }: { onOpenAI?: () => void }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [sparkles, setSparkles] = useState<SparkleParticle[]>([]);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-
-    const newSparkles: SparkleParticle[] = Array.from({ length: 10 }, () => ({
-      id: sparkleIdCounter++,
-      angle: Math.random() * 360,
-      distance: 28 + Math.random() * 34,
-      size: 6 + Math.random() * 8,
-      color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
-      delay: Math.random() * 0.25,
-    }));
-
-    setSparkles((prev) => [...prev, ...newSparkles]);
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    // scompaiono dopo circa 1 secondo dalla loro comparsa
-    timeoutRef.current = setTimeout(() => {
-      setSparkles((prev) =>
-        prev.filter((s) => !newSparkles.some((ns) => ns.id === s.id)),
-      );
-    }, 1000);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-  }, []);
-
-  return (
-    <div
-      id="lyra-ai-btn"
-      className="relative w-12 h-12 flex items-center justify-center shrink-0"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Bordo animato arcobaleno stile Gemini */}
-      <motion.div
-        className="absolute inset-[-3px] rounded-full pointer-events-none"
-        style={{
-          background:
-            "conic-gradient(from 0deg, #FF6B6B, #FFD93D, #34D399, #4ECDC4, #60A5FA, #A78BFA, #F472B6, #FF6B6B)",
-          filter: "blur(3px)",
-          opacity: isHovered ? 1 : 0,
-        }}
-        animate={
-          isHovered ? { rotate: 360, opacity: 1 }: {rotate: 0,opacity: 0}
-        }
-        transition={{
-          rotate: {
-            duration: 3,
-            repeat: Infinity,
-            ease: "linear",
-          },
-          opacity: {
-            duration: 0.3,
-          },
-        }}
-      />
-
-      {/* Secondo bordo, più nitido, in controrotazione per effetto "fade" cangiante */}
-      <motion.div
-        className="absolute inset-[-1px] rounded-full pointer-events-none"
-        style={{
-          background:
-            "conic-gradient(from 90deg, #A78BFA, #60A5FA, #4ECDC4, #34D399, #FFD93D, #FF6B6B, #F472B6, #A78BFA)",
-          opacity: isHovered ? 0.9 : 0,
-        }}
-        animate={isHovered ? { rotate: 360 } : { rotate: 0 }}
-        transition={{
-          rotate: {
-            duration: 4,
-            repeat: Infinity,
-            ease: "linear",
-          },
-          opacity: {
-            duration: 0.3,
-          },
-        }}
-      />
-
-      <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        transition={{
-          type: "spring",
-          stiffness: 500,
-          damping: 30,
-          mass: 0.5,
-        }}
-        onClick={() => onOpenAI?.()}
-        className="relative z-10 w-12 h-12 rounded-full border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground"
-      >
-        <Sparkle className="w-5 h-5" />
-      </motion.button>
-
-      {/* Stelline che si disperdono intorno al bottone */}
-      <div className="absolute inset-0 pointer-events-none overflow-visible">
-        <AnimatePresence>
-          {sparkles.map((sparkle) => {
-            const rad = (sparkle.angle * Math.PI) / 180;
-            const targetX = Math.cos(rad) * sparkle.distance;
-            const targetY = Math.sin(rad) * sparkle.distance;
-
-            return (
-              <motion.div
-                key={sparkle.id}
-                initial={{
-                  x: 0,
-                  y: 0,
-                  opacity: 0,
-                  scale: 0.3,
-                  rotate: 0,
-                }}
-                animate={{
-                  x: targetX,
-                  y: targetY,
-                  opacity: [0, 1, 1, 0],
-                  scale: [0.3, 1, 1, 0.5],
-                  rotate: 180,
-                }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  delay: sparkle.delay,
-                  duration: 0.9,
-                  ease: [0.16, 1, 0.3, 1],
-                  opacity: {
-                    delay: sparkle.delay,
-                    duration: 0.9,
-                    times: [0, 0.2, 0.7, 1],
-                  },
-                }}
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  top: "50%",
-                  marginLeft: -sparkle.size / 2,
-                  marginTop: -sparkle.size / 2,
-                }}
-              >
-                <FourPointStar color={sparkle.color} size={sparkle.size} />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-};
 
 /* ---------------------------------------------------------------------- */
 /* HomeContent                                                            */
@@ -327,7 +134,7 @@ function HomeContent({
     <div className="flex-1 overflow-y-auto p-6 space-y-8 relative">
       {/* Header */}
       <motion.div
-        className={`flex items-start justify-between pointer-events-none ${
+        className={`flex items-center justify-between pointer-events-none ${
           isGlass
             ? "sticky top-[-25px] z-[60] -mx-6 px-6 pt-4 pb-3 backdrop-blur-xl shadow-sm transition-all duration-300 ease-in-out"
             : "mb-8"
@@ -337,113 +144,129 @@ function HomeContent({
         transition={{ type: "tween", duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
       >
         <div className="flex-1 flex items-center min-w-0 pr-4 overflow-hidden h-[52px] pointer-events-auto">
-          <AnimatePresence mode="wait">
-            {!showSearch || !isGlass ? (
-              <motion.div
-                key="welcome"
-                variants={textContainerVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="space-y-1"
-              >
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight flex whitespace-pre">
-                  {"Welcome to Music Hub".split("").map((char, index) => (
-                    <motion.span key={index}>{char}</motion.span>
-                  ))}
-                </h1>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="search"
-                initial={{ x: -50, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full flex items-center"
-              >
-                <div className="relative w-full max-w-3xl">
-                  <input
-                    type="text"
-                    placeholder="Cerca brani, artisti o podcast... (Premi Invio per cercare)"
-                    className={`w-full bg-secondary/50 border border-border rounded-full px-5 py-3 text-sm focus:outline-none focus:border-primary transition-colors pl-11 shadow-sm ${
-                      detectedEgg
-                        ? "border-primary/60 ring-1 ring-primary/30 bg-primary/5"
-                        : ""
-                    }`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                  />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    {detectedEgg ? (
-                      <motion.div
-                        animate={{ rotate: 360, scale: [1, 1.3, 1] }}
-                        transition={{ duration: 0.8, repeat: Infinity }}
-                      >
-                        <Sparkle className="h-5 w-5 text-primary" />
-                      </motion.div>
-                    ) : (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        <div className="flex gap-2 shrink-0 z-[70] items-start relative pointer-events-auto">
-          <GeminiAIButton onOpenAI={onOpenAI} />
-          {isGlass ? (
-            <motion.button
-              id="profile-btn"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => onOpenProfile?.()}
-              className="w-12 h-12 rounded-full overflow-hidden hover:ring-2 hover:ring-primary/60 transition-all flex items-center justify-center shrink-0 bg-transparent border-none"
-              title="Profilo"
-            >
-              {userAvatar ? (
-                <img
-                  src={userAvatar}
-                  alt="profilo"
-                  className="w-full h-full object-cover"
-                />
+          {/* Titolo su mobile: Harmony Hub */}
+          <div className="md:hidden">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Harmony Hub
+            </h1>
+          </div>
+
+          {/* Titolo e Ricerca su Desktop */}
+          <div className="hidden md:flex flex-1 items-center min-w-0">
+            <AnimatePresence mode="wait">
+              {!showSearch || !isGlass ? (
+                <motion.div
+                  key="welcome"
+                  variants={textContainerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="space-y-1"
+                >
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight flex whitespace-pre">
+                    {"Welcome to Music Hub".split("").map((char, index) => (
+                      <motion.span key={index}>{char}</motion.span>
+                    ))}
+                  </h1>
+                </motion.div>
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary-foreground">
-                    {userInitial}
-                  </span>
-                </div>
+                <motion.div
+                  key="search"
+                  initial={{ x: -50, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="w-full flex items-center"
+                >
+                  <div className="relative w-full max-w-3xl">
+                    <input
+                      type="text"
+                      placeholder="Cerca brani, artisti o podcast... (Premi Invio per cercare)"
+                      className={`w-full bg-secondary/50 border border-border rounded-full px-5 py-3 text-sm focus:outline-none focus:border-primary transition-colors pl-11 shadow-sm ${
+                        detectedEgg
+                          ? "border-primary/60 ring-1 ring-primary/30 bg-primary/5"
+                          : ""
+                      }`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={handleSearchKeyDown}
+                    />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {detectedEgg ? (
+                        <motion.div
+                          animate={{ rotate: 360, scale: [1, 1.3, 1] }}
+                          transition={{ duration: 0.8, repeat: Infinity }}
+                        >
+                          <Sparkle className="h-5 w-5 text-primary" />
+                        </motion.div>
+                      ) : (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <path d="m21 21-4.3-4.3" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
               )}
-            </motion.button>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{
-                type: "spring",
-                stiffness: 500,
-                damping: 30,
-                mass: 0.5,
-              }}
-              onClick={() => onOpenSettings?.()}
-              className="w-12 h-12 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground flex bg-transparent"
-            >
-              <Settings className="w-5 h-5" />
-            </motion.button>
-          )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="flex gap-2 shrink-0 z-[70] items-center relative pointer-events-auto">
+          {/* Bottone AI condiviso con layoutId per animazione fluida tra Home e Altro */}
+          <GeminiAIButton onOpenAI={onOpenAI} layoutId="gemini-ai-btn" />
+          
+          {/* Icona Profilo / Impostazioni visibile SOLO su Desktop */}
+          <div className="hidden md:flex items-center gap-2">
+            {isGlass ? (
+              <motion.button
+                id="profile-btn"
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={() => onOpenProfile?.()}
+                className="w-12 h-12 rounded-full overflow-hidden hover:ring-2 hover:ring-primary/60 transition-all flex items-center justify-center shrink-0 bg-transparent border-none"
+                title="Profilo"
+              >
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt="profilo"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center">
+                    <span className="text-sm font-bold text-primary-foreground">
+                      {userInitial}
+                    </span>
+                  </div>
+                )}
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 30,
+                  mass: 0.5,
+                }}
+                onClick={() => onOpenSettings?.()}
+                className="w-12 h-12 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground flex bg-transparent"
+              >
+                <Settings className="w-5 h-5" />
+              </motion.button>
+            )}
+          </div>
         </div>
       </motion.div>
 

@@ -21,6 +21,10 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 const queryClient = new QueryClient();
 
 export function checkIsUserDev(profile: any, users: any[]): boolean {
+  if (typeof window !== "undefined" && localStorage.getItem("harmony_dev_mode") === "true") {
+    return true;
+  }
+
   if (!profile || !Array.isArray(users)) return false;
 
   const spotifyName = (profile.display_name || "").trim().toLowerCase();
@@ -32,6 +36,7 @@ export function checkIsUserDev(profile: any, users: any[]): boolean {
     const name = (u.name || "").trim().toLowerCase();
     const username = (u.credentials?.username || "").trim().toLowerCase();
     const id = (u.id || "").trim().toLowerCase();
+    const email = (u.email || "").trim().toLowerCase();
 
     return (
       (spotifyName && name === spotifyName) ||
@@ -39,6 +44,7 @@ export function checkIsUserDev(profile: any, users: any[]): boolean {
       (spotifyId && id === spotifyId) ||
       (spotifyId && username === spotifyId) ||
       (spotifyName && username === spotifyName) ||
+      (spotifyEmail && email === spotifyEmail) ||
       (spotifyEmail && username === spotifyEmail) ||
       (spotifyEmail && name === spotifyEmail)
     );
@@ -59,16 +65,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const PublicRouteGuard = ({ children }: { children: React.ReactNode }) => {
   const { isUpdateActive, targetVersion } = useVersionUpdate();
   const [isDevMode, setIsDevMode] = useState<boolean>(
-    () => localStorage.getItem("harmony_dev_mode") === "true"
+    () => typeof window !== "undefined" && localStorage.getItem("harmony_dev_mode") === "true"
   );
   const [checkingDev, setCheckingDev] = useState<boolean>(false);
 
   useEffect(() => {
-    if (isUpdateActive && !isDevMode && getToken() && !checkingDev) {
+    if (isUpdateActive && !isDevMode && !checkingDev) {
       setCheckingDev(true);
       Promise.all([
-        import("@/services/spotify-api").then((m) => m.getUserProfile()),
-        import("@/services/supabase-api").then((m) => m.getCollabUsers()),
+        import("@/services/spotify-api").then((m) => m.getUserProfile()).catch(() => null),
+        import("@/services/supabase-api").then((m) => m.getCollabUsers()).catch(() => []),
       ])
         .then(([profile, users]) => {
           if (checkIsUserDev(profile, users)) {

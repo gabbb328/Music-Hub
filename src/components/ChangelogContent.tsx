@@ -25,7 +25,9 @@ export const changelogData: ChangelogEntry[] = [
       "Risoluzione bug riproduzione video su NowPlayingView (ora funzionante)",
       "Nuove animazioni particellari interattive ('Sparkles') per i report musicali",
       "Ottimizzazione e riorganizzazione UI/UX",
-      "Modifica e miglioramento della sezione dei testi, ora più precisi e veloci"
+      "Modifica e miglioramento della sezione dei testi, ora più precisi e veloci",
+      "Modifica del dominio da <a href=\"https://music-hub-three.vercel.app/\" target=\"_blank\" rel=\"noopener noreferrer\">harmonyhub.vercel.app</a> a <a href=\"https://harmonyhub.it/\" target=\"_blank\" rel=\"noopener noreferrer\">harmonyhub.it</a> (il vecchio dominio continuerà a funzionare)",
+      "Fix funzionamento app da dispostivi IOS e IPadOS"
     ],
   },
   {
@@ -214,6 +216,42 @@ export const changelogData: ChangelogEntry[] = [
   },
 ];
 
+function parseCommitText(text: string) {
+  if (!text) return text;
+  const aTagRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+  const parts: (string | React.ReactNode)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = aTagRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    const url = match[1];
+    const linkText = match[2];
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline font-medium hover:opacity-80 transition-opacity cursor-pointer relative z-10"
+        onClick={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
+        {linkText}
+      </a>
+    );
+    lastIndex = aTagRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
 export default function ChangelogContent() {
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -265,7 +303,7 @@ export default function ChangelogContent() {
                           >
                             <GitCommit className="w-4 h-4 mt-1 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                             <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors leading-relaxed">
-                              {commit}
+                              {parseCommitText(commit)}
                             </span>
                           </li>
                         ))}

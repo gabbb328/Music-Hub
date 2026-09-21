@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Hourglass, Sparkles } from "lucide-react";
+import { Hourglass, Sparkles, Zap } from "lucide-react";
 import { APP_VERSION } from "@/hooks/version";
 
 interface VersionUpdatePageProps {
@@ -165,6 +165,12 @@ export default function VersionUpdatePage({
             <span className="update-progress-text">
               Sincronizzazione pacchetti in corso...
             </span>
+          </div>
+
+          <div style={{ marginTop: "16px" }}>
+            <a href="/dev" className="update-admin-link">
+              <Zap size={13} /> Accesso Sviluppatore / Dev Mode
+            </a>
           </div>
         </div>
       </motion.div>

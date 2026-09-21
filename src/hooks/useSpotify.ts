@@ -153,7 +153,7 @@ export const usePlayMutation = () => {
 export const usePauseMutation = () => {
   const qc = useQueryClient();
   const { broadcastAction } = useSessionContext();
-  return useMutation({ mutationFn: spotifyApi.pause, onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("PAUSE"); } });
+  return useMutation({ mutationFn: (deviceId?: string | void) => spotifyApi.pause(deviceId || undefined), onSuccess: () => { qc.invalidateQueries({ queryKey: ["playbackState"] }); broadcastAction("PAUSE"); } });
 };
 
 export const useNextMutation = () => {

@@ -59,6 +59,7 @@ export default function AdminPage() {
   }, []);
 
   const handleLoginSuccess = (username: string) => {
+    localStorage.setItem("harmony_dev_mode", "true");
     setAdminSession(username);
     setSession(getAdminSession());
   };

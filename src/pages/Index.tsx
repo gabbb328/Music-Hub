@@ -6,6 +6,7 @@ import { useLyricsPreloader } from "@/hooks/useLyricsPreloader";
 import { useDynamicTheme } from "@/hooks/useDynamicTheme";
 import { useTimeMachineSettings } from "@/hooks/useTimeMachineSettings";
 import Sidebar from "@/components/Sidebar";
+import { trackFeatureUsage } from "@/hooks/useFeatureUsage";
 import MobileNav from "@/components/MobileNav";
 import PlayerBar from "@/components/PlayerBar";
 import HomeContent from "@/components/HomeContent";
@@ -234,6 +235,12 @@ const IndexInner = () => {
   useLyricsPreloader();
   useDynamicTheme();
   useTimeMachineSettings();
+
+  useEffect(() => {
+    if (activeSection) {
+      trackFeatureUsage(activeSection);
+    }
+  }, [activeSection]);
 
   const { data: playbackState } = usePlaybackState();
   const playMutation = usePlayMutation();

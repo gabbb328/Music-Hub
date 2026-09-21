@@ -16,11 +16,16 @@ import {
   Users,
   ScrollText,
   Calendar,
-  Glasses,
+  Sliders,
+  Gamepad2,
+  AppWindow,
+  ArrowRight,
+  Zap,
 } from "lucide-react";
 import { useSquish } from "@/hooks/useSquish";
-
 import { useUserProfile } from "@/hooks/useSpotify";
+import { GeminiAIButton } from "@/components/GeminiAIButton";
+import { useFeatureUsage } from "@/hooks/useFeatureUsage";
 
 interface MoreContentProps {
   onSectionChange: (section: string) => void;
@@ -29,7 +34,7 @@ interface MoreContentProps {
   onOpenAI?: () => void;
 }
 
-const features = [
+const ALL_FEATURES = [
   {
     id: "ai-dj",
     label: "AI DJ",
@@ -149,7 +154,18 @@ export default function MoreContent({
   onOpenProfile,
   onOpenAI,
 }: MoreContentProps) {
-  const featureSquish = useSquish(features.length, GRID_SQUISH);
+  const { usageCounts } = useFeatureUsage();
+
+  // Filtra e ordina le funzionalità in base a quelle più utilizzate dall'utente
+  const mostUsedFeatures = ALL_FEATURES.filter(
+    (f) => (usageCounts[f.id] || 0) > 0 || (f.id === "games" && (usageCounts["quiz"] || 0) > 0)
+  ).sort((a, b) => {
+    const countA = (usageCounts[a.id] || 0) + (a.id === "games" ? usageCounts["quiz"] || 0 : 0);
+    const countB = (usageCounts[b.id] || 0) + (b.id === "games" ? usageCounts["quiz"] || 0 : 0);
+    return countB - countA;
+  });
+
+  const featureSquish = useSquish(Math.max(mostUsedFeatures.length, 1), GRID_SQUISH);
   const libSquish = useSquish(libraryItems.length, LIB_SQUISH);
   const { data: userProfile } = useUserProfile();
 
@@ -170,15 +186,7 @@ export default function MoreContent({
 
         {/* Due bottoni circolare in alto a destra: LyraAI e Profilo Utente Spotify */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <motion.button
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            onClick={onOpenAI}
-            className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500/20 to-primary/20 border border-primary/30 flex items-center justify-center text-primary shadow-sm hover:ring-2 hover:ring-primary/40 transition-all shrink-0"
-            title="LyraAI Chatbot"
-          >
-            <Sparkles className="w-5 h-5 text-amber-400" />
-          </motion.button>
+          <GeminiAIButton onOpenAI={onOpenAI} layoutId="gemini-ai-btn" />
 
           <motion.button
             whileHover={{ scale: 1.08 }}
@@ -198,47 +206,77 @@ export default function MoreContent({
         </div>
       </div>
 
-      {/* Feature grid — squish a 2 colonne */}
+      {/* Funzionalità più utilizzate (Dinamiche) */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
-          Funzionalità
+          Funzionalità più utilizzate
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          {features.map((item, i) => (
+
+        {mostUsedFeatures.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-surface rounded-2xl p-6 text-center space-y-4 border border-border/40 shadow-md"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto border border-primary/20">
+              <AppWindow className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-base text-foreground">
+                Nessuna applicazione aperta
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                Inizia ad utilizzare le tue estensioni musicali preferite per ritrovarle qui in primo piano!
+              </p>
+            </div>
             <motion.button
-              key={item.id}
-              onClick={() => onSectionChange(item.id)}
-              className="glass-surface rounded-2xl p-4 flex flex-col items-center gap-2.5 text-center min-h-[88px] focus:outline-none"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                ...featureSquish.getProps(i).animate,
-              }}
-              transition={{
-                delay: i * 0.03,
-                ...featureSquish.getProps(i).transition,
-              }}
-              onPointerDown={featureSquish.getProps(i).onPointerDown}
-              onPointerUp={featureSquish.getProps(i).onPointerUp}
-              onPointerLeave={featureSquish.getProps(i).onPointerLeave}
-              onPointerCancel={featureSquish.getProps(i).onPointerCancel}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onSectionChange("extensions")}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all cursor-pointer"
             >
-              <motion.div
-                className={`w-11 h-11 rounded-xl ${item.bg} flex items-center justify-center`}
-                animate={{
-                  scale: featureSquish.pressedIndex === i ? 1.12 : 1,
-                }}
-                transition={featureSquish.getProps(i).transition}
-              >
-                <item.icon className={`w-5 h-5 ${item.color}`} />
-              </motion.div>
-              <span className="text-xs font-semibold leading-tight">
-                {item.label}
-              </span>
+              <span>Apri la tua prima applicazione</span>
+              <ArrowRight className="w-4 h-4" />
             </motion.button>
-          ))}
-        </div>
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {mostUsedFeatures.map((item, i) => (
+              <motion.button
+                key={item.id}
+                onClick={() => onSectionChange(item.id)}
+                className="glass-surface rounded-2xl p-4 flex flex-col items-center gap-2.5 text-center min-h-[88px] focus:outline-none relative overflow-hidden"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  ...featureSquish.getProps(i).animate,
+                }}
+                transition={{
+                  delay: i * 0.03,
+                  ...featureSquish.getProps(i).transition,
+                }}
+                onPointerDown={featureSquish.getProps(i).onPointerDown}
+                onPointerUp={featureSquish.getProps(i).onPointerUp}
+                onPointerLeave={featureSquish.getProps(i).onPointerLeave}
+                onPointerCancel={featureSquish.getProps(i).onPointerCancel}
+              >
+                <motion.div
+                  className={`w-11 h-11 rounded-xl ${item.bg} flex items-center justify-center`}
+                  animate={{
+                    scale: featureSquish.pressedIndex === i ? 1.12 : 1,
+                  }}
+                  transition={featureSquish.getProps(i).transition}
+                >
+                  <item.icon className={`w-5 h-5 ${item.color}`} />
+                </motion.div>
+                <span className="text-xs font-semibold leading-tight">
+                  {item.label}
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Libreria — squish a 3 colonne */}
