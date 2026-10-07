@@ -39,9 +39,9 @@ const TUTORIAL_STEPS = [
   {
     id: "lyra",
     title: "LyraAI: Assistente Chatbot",
-    subtitle: "Analisi brani, BPM, mood e chat conversazionale",
+    subtitle: "Analisi brani, BPM, mood e intelligenza artificiale",
     description:
-      "Clicca sull'icona Gemini/LyraAI in alto a destra per aprire l'assistente musicale. Puoi chiedergli i BPM del brano in riproduzione, l'atmosfera o 10 consigli giocabili!",
+      "Clicca sull'icona Gemini/LyraAI in alto a destra per aprire l'assistente musicale intelligente. Puoi fargli qualsiasi domanda con l'AI, chiedere i BPM del brano o ricevere consigli musicali personalizzati senza duplicati!",
     icon: Bot,
     color: "from-pink-500 to-purple-600",
     badge: "Intelligenza Artificiale",

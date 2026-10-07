@@ -54,6 +54,7 @@ import ExtensionsContent from "@/components/ExtensionsContent";
 import { APP_VERSION } from "@/hooks/version";
 import type { EasterEggType } from "@/hooks/useEasterEgg";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
+//import TouchBar from "@/components/TouchBar";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Crown, Zap, Smartphone } from "lucide-react";
 import { useAlexa } from "@/hooks/useAlexa";
@@ -263,9 +264,15 @@ const IndexInner = () => {
       }
     : player.currentTrack;
 
+  // Posizione corrente in secondi (per la Touch Bar e il MediaSession scrubber)
+  const currentPositionSec = spotifyTrack
+    ? (playbackState?.progress_ms || 0) / 1000
+    : ((player.progress || 0) / 100) * (currentTrack?.duration || 0);
+
   const mediaActions = {
     play: () => (spotifyTrack ? playMutation.mutate({}) : player.play()),
     pause: () => (spotifyTrack ? pauseMutation.mutate() : player.pause()),
+    stop: () => (spotifyTrack ? pauseMutation.mutate() : player.pause()),
     nextTrack: () =>
       spotifyTrack ? nextMutation.mutate() : player.nextTrack(),
     prevTrack: () =>
@@ -274,9 +281,19 @@ const IndexInner = () => {
       if (spotifyTrack) seekMutation.mutate(Math.floor(time * 1000));
       else player.setProgress((time / (currentTrack?.duration || 1)) * 100);
     },
+    seekBackward: (offset = 10) => {
+      const to = Math.max(0, currentPositionSec - offset);
+      if (spotifyTrack) seekMutation.mutate(Math.floor(to * 1000));
+      else player.setProgress((to / (currentTrack?.duration || 1)) * 100);
+    },
+    seekForward: (offset = 10) => {
+      const to = Math.min(currentTrack?.duration || 0, currentPositionSec + offset);
+      if (spotifyTrack) seekMutation.mutate(Math.floor(to * 1000));
+      else player.setProgress((to / (currentTrack?.duration || 1)) * 100);
+    },
   };
 
-  useMediaSession(currentTrack, isPlaying, mediaActions);
+  useMediaSession(currentTrack, isPlaying, mediaActions, currentPositionSec);
 
   const handleDismissEgg = useCallback(() => setActiveEgg(null), []);
 
@@ -675,6 +692,20 @@ const IndexInner = () => {
             onClose={() => setShowProfile(false)}
           />
           <AIPanel isOpen={showAIPanel} onClose={() => setShowAIPanel(false)} />
+          {/*<TouchBar
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            currentPosition={currentPositionSec}
+            activeSection={activeSection}
+            onPlay={() => mediaActions.play()}
+            onPause={() => mediaActions.pause()}
+            onStop={() => mediaActions.stop?.()}
+            onNext={() => mediaActions.nextTrack()}
+            onPrev={() => mediaActions.prevTrack()}
+            onSeek={(t) => mediaActions.seekTo(t)}
+            onOpenAI={() => setShowAIPanel(true)}
+            onSectionChange={setActiveSection}
+          />*/}
         </>
       )}
     </div>

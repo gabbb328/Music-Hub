@@ -20,6 +20,73 @@ export interface SyncedLyrics {
   source: string;
 }
 
+export interface FormattedWordPart {
+  leadPunct: string;
+  word: string;
+  trailPunct: string;
+  isPunctOnly: boolean;
+  isHigh: boolean;
+  isLow: boolean;
+  isVib: boolean;
+  isChorus: boolean;
+  rawText: string;
+  index: number;
+}
+
+export const detectHighPitch = (word: string): boolean => {
+  const w = word.replace(/[^a-zA-Z]/g, "");
+  if (w.length < 2) return false;
+  return w === w.toUpperCase() || word.includes("!");
+};
+
+export const detectLowPitch = (word: string): boolean => {
+  return /[…]$/.test(word) || /\*/.test(word) || word.startsWith("~");
+};
+
+export const detectVibrato = (word: string): boolean => {
+  return /([aeiouy])\1{2,}/i.test(word);
+};
+
+export function parseWordParts(
+  rawText: string,
+  index: number = 0,
+  isChorus: boolean = false
+): FormattedWordPart {
+  const trimmed = rawText.trim();
+  // Isola simboli e punteggiatura iniziale, parola alfabetica/numerica (incluso apostrofo o trattino interno), e punteggiatura finale (, ; . : - _)
+  const match = trimmed.match(/^([^\p{L}\p{N}]+)?([\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*)?([^\p{L}\p{N}]+)?$/u);
+
+  let leadPunct = "";
+  let coreWord = "";
+  let trailPunct = "";
+  let isPunctOnly = false;
+
+  if (match && match[2]) {
+    leadPunct = match[1] || "";
+    coreWord = match[2];
+    trailPunct = match[3] || "";
+    isPunctOnly = false;
+  } else {
+    leadPunct = "";
+    coreWord = trimmed;
+    trailPunct = "";
+    isPunctOnly = true;
+  }
+
+  return {
+    leadPunct,
+    word: coreWord,
+    trailPunct,
+    isPunctOnly,
+    isHigh: detectHighPitch(coreWord),
+    isLow: detectLowPitch(coreWord),
+    isVib: detectVibrato(coreWord),
+    isChorus,
+    rawText: trimmed,
+    index,
+  };
+}
+
 // Clean and normalize text for better matching
 const normalizeText = (text: string): string => {
   return text
@@ -37,6 +104,11 @@ export const parseLRC = (lrcContent: string): LyricLine[] => {
 
   const lines: LyricLine[] = [];
   const lrcLines = lrcContent.split('\n');
+
+  // Leggi eventuale tag offset [offset: +/-ms] (standard formato LRC)
+  const offsetMatch = lrcContent.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
+  const offsetMs = offsetMatch ? parseInt(offsetMatch[1], 10) : 0;
+  const offsetSec = offsetMs / 1000;
   
   for (const line of lrcLines) {
     try {
@@ -46,7 +118,17 @@ export const parseLRC = (lrcContent: string): LyricLine[] => {
       
       if (timeMatches.length > 0) {
         // Remove the line-level timestamps to get the text
-        const rawText = line.replace(timeRegex, '').trim();
+        let rawText = line.replace(timeRegex, '').trim();
+
+        // Standardizza i cori / backing vocals: converti [Coro: ...], [Backing: ...], [Backing Vocals: ...] o parentesi quadre in parentesi tonde ()
+        rawText = rawText
+          .replace(/\[(?:backing(?:\s*vocals?)?|coro|vocals?|harmonies?|chorus)\s*:\s*([^\]]+)\]/gi, '($1)')
+          .replace(/\[([^[\]]+)\]/g, (match, inner) => {
+            if (/^(instrumental|musica|solo|guitar solo|intro|outro|break|drop|interlude)$/i.test(inner.trim())) {
+              return `[${inner.trim()}]`;
+            }
+            return `(${inner.trim()})`;
+          });
         
         let words: LyricWord[] | undefined = undefined;
         // Parse enhanced LRC word-level timestamps like <01:23.45> Word
@@ -60,7 +142,7 @@ export const parseLRC = (lrcContent: string): LyricLine[] => {
             const wmMin = parseInt(wm[1], 10);
             const wmSec = parseInt(wm[2], 10);
             const wmMilli = wm[3] ? parseInt(wm[3].padEnd(3, '0'), 10) : 0;
-            const wTime = wmMin * 60 + wmSec + wmMilli / 1000;
+            const wTime = Math.max(0, wmMin * 60 + wmSec + wmMilli / 1000 + offsetSec);
             const wText = wm[4].trim();
             if (wText) {
               words.push({ time: wTime, text: wText });
@@ -79,7 +161,7 @@ export const parseLRC = (lrcContent: string): LyricLine[] => {
           const milliseconds = match[3] ? parseInt(match[3].padEnd(3, '0'), 10) : 0;
           
           if (!isNaN(minutes) && !isNaN(seconds)) {
-            const time = minutes * 60 + seconds + milliseconds / 1000;
+            const time = Math.max(0, minutes * 60 + seconds + milliseconds / 1000 + offsetSec);
             lines.push({ time, text: cleanText, words });
           }
         }
@@ -266,63 +348,121 @@ const searchVariations = async (
   return null;
 };
 
+// Fetch from LRCLIB.net Search Endpoint (when exact /get returns null)
+const fetchFromLRCLIBSearch = async (title: string, artist: string, duration: number): Promise<SyncedLyrics | null> => {
+  try {
+    const cleanTitle = title.replace(/\s*[\(\[].*?[\)\]]/gi, '').trim();
+    const cleanArtist = artist.split(/[,&]|feat/i)[0].trim();
+    const query = `${cleanArtist} ${cleanTitle}`.trim();
+
+    const params = new URLSearchParams({
+      track_name: cleanTitle,
+      artist_name: cleanArtist,
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    let response = await fetch(`${LRCLIB_BASE}/search?${params.toString()}`, {
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      response = await fetch(`${LRCLIB_BASE}/search?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal
+      });
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return null;
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    // Pick best match (syncedLyrics preferred)
+    const syncedMatch = results.find((r: any) => r.syncedLyrics && r.syncedLyrics.length > 20);
+    if (syncedMatch && syncedMatch.syncedLyrics) {
+      const lines = parseLRC(syncedMatch.syncedLyrics);
+      if (lines.length > 0) {
+        return { lines, synced: true, source: 'lrclib-search' };
+      }
+    }
+
+    const plainMatch = results.find((r: any) => r.plainLyrics && r.plainLyrics.length > 20);
+    if (plainMatch && plainMatch.plainLyrics) {
+      const lines = generatePseudoSyncedLyrics(plainMatch.plainLyrics, duration);
+      if (lines.length > 0) {
+        return { lines, synced: false, source: 'lrclib-search' };
+      }
+    }
+
+    return null;
+  } catch (error: any) {
+    if (error.name !== 'AbortError') {
+      console.warn('LRCLIB search error:', error);
+    }
+    return null;
+  }
+};
+
 // Main fetch function with multiple sources
 export const fetchSyncedLyrics = async (
   title: string, 
   artist: string,
   duration: number
 ): Promise<SyncedLyrics> => {
-  // Validation
-  if (!title || !artist || !duration) {
-    console.warn('Invalid params for lyrics fetch:', { title, artist, duration });
+  if (!title || !artist) {
     return { 
-      lines: generatePlaceholderLyrics(title || 'Unknown', duration || 180), 
+      lines: [], 
       synced: false,
-      source: 'placeholder'
+      source: 'none'
     };
   }
 
   try {
-    // Try LRCLIB first (best for synced lyrics)
+    // 1. Tenta LRCLIB direct get con tutte le varianti di titolo/artista
     let result = await searchVariations(title, artist, duration, fetchFromLRCLIB);
-    if (result && result.lines.length > 5) { // Minimum 5 lines
+    if (result && result.lines.length >= 2 && result.synced) {
       return result;
     }
 
-    // Try Lyrics.ovh
-    result = await searchVariations(title, artist, duration, fetchFromLyricsOvh);
-    if (result && result.lines.length > 5) {
+    // 2. Tenta LRCLIB search (cerca con query full-text artista + brano, privilegiando testi sincronizzati)
+    result = await searchVariations(title, artist, duration, fetchFromLRCLIBSearch);
+    if (result && result.lines.length >= 2 && result.synced) {
       return result;
+    }
+
+    // 3. Tenta ricerca globale solo titolo su LRCLIB
+    const cleanTitleOnly = title.replace(/\s*[\(\[].*?[\)\]]/gi, '').trim();
+    if (cleanTitleOnly && cleanTitleOnly.length > 2) {
+      result = await fetchFromLRCLIBSearch(cleanTitleOnly, "", duration);
+      if (result && result.lines.length >= 2 && result.synced) {
+        return result;
+      }
+    }
+
+    // 4. Tenta Lyrics.ovh (API alternativa con testi internazionali)
+    result = await searchVariations(title, artist, duration, fetchFromLyricsOvh);
+    if (result && result.lines.length >= 2) {
+      return result;
+    }
+
+    // 5. Se trovati testi plain non sincronizzati da LRCLIB, usali solo come ultima spiaggia
+    const plainFallback = await fetchFromLRCLIBSearch(title, artist, duration);
+    if (plainFallback && plainFallback.lines.length >= 2) {
+      return plainFallback;
     }
   } catch (error) {
     console.error('Lyrics fetch error:', error);
   }
   
+  // Nessun testo trovato su alcun sito: restituisce lines vuoto così da mostrare esattamente la scritta richiesta
   return {
-    lines: generatePlaceholderLyrics(title, duration),
+    lines: [],
     synced: false,
-    source: 'placeholder'
+    source: 'none'
   };
-};
-
-// Generate placeholder lyrics
-const generatePlaceholderLyrics = (title: string, duration: number): LyricLine[] => {
-  const placeholderLines = [
-    `♪ ${title} ♪`,
-    '',
-    'Lyrics not available for this track',
-    '',
-    'Try searching on Genius.com or AZLyrics'
-  ];
-  
-  const safeDuration = Math.max(30, duration);
-  const timePerLine = safeDuration / placeholderLines.length;
-  
-  return placeholderLines.map((text, index) => ({
-    time: index * timePerLine,
-    text,
-    endTime: (index + 1) * timePerLine
-  }));
 };
 
 // Get current line index

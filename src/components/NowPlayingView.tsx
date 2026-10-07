@@ -926,8 +926,8 @@ export default function NowPlayingView(
                   <span className="font-medium">Testi</span>
                 </motion.div>
                 {lyrics.length === 0 ? (
-                  <div className="py-6 text-center text-muted-foreground text-sm">
-                    Testi non disponibili
+                  <div className="py-6 text-center text-muted-foreground text-sm font-medium">
+                    testi di {currentTrack?.name || "brano"} di {currentTrack?.artists?.[0]?.name || (currentTrack as any)?.artist || "autore"} non disponibili
                   </div>
                 ) : (
                   <div

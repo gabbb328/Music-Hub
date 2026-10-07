@@ -11,6 +11,24 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    date: "8 Ottobre 2026",
+    version: "v2.1.0",
+    commits: [
+      "Ottimizzazioni UI",
+      "Aggiunta verci mode nei testi",
+      "Miglioramento sincronizzazione testi",
+      "Risoluzione bug NowPlayingView",
+    ],
+  },
+  {
+    date: "27 settembre 2026",
+    version: "v2.0.1",
+    commits: [
+      "Ottimizzazioni UI",
+      "Risoluzione bug visualizzazione NowPlayingView",
+    ],
+  },
+  {
     date: "12 Settembre 2026",
     version: "2.0.0",
     commits: [

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic2,
@@ -19,7 +20,9 @@ import {
   Gauge,
   Music2,
   Zap,
+  Maximize2,
 } from "lucide-react";
+import VerciLyricsOverlay from "@/components/VerciLyricsOverlay";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Track } from "@/lib/mock-data";
@@ -66,15 +69,15 @@ const detectVibrato = (word: string): boolean => {
   return /([aeiouy])\1{2,}/i.test(word);
 };
 
-function getWeightedActiveIndex<T extends { text: string }>(
-  words: T[],
-  progress: number
-): number {
+function getWeightedActiveIndex<
+  T extends { text?: string; word?: string; rawText?: string }
+>(words: T[], progress: number): number {
   if (progress <= 0) return -1;
   if (progress >= 1) return words.length;
-  const weights = words.map((word) =>
-    Math.max(0.7, Math.sqrt(word.text.replace(/[^\w]/g, "").length || 1))
-  );
+  const weights = words.map((w) => {
+    const str = w.word || w.rawText || w.text || "";
+    return Math.max(0.7, Math.sqrt(str.replace(/[^\w]/g, "").length || 1));
+  });
   const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
   const target = total * progress;
   let acc = 0;
@@ -83,6 +86,69 @@ function getWeightedActiveIndex<T extends { text: string }>(
     if (target < acc) return i;
   }
   return words.length;
+}
+
+export interface FormattedWordPart {
+  leadPunct: string;
+  word: string;
+  trailPunct: string;
+  isPunctOnly: boolean;
+  isHigh: boolean;
+  isLow: boolean;
+  isVib: boolean;
+  isChorus: boolean;
+  rawText: string;
+  index: number;
+}
+
+export function parseWordParts(
+  rawText: string,
+  index: number,
+  isChorus: boolean
+): FormattedWordPart {
+  // Isola simboli e punteggiatura iniziale, parola alfabetica/numerica (incluso apostrofo), e punteggiatura finale
+  const match = rawText.match(/^([^\p{L}\p{N}]+)?([\p{L}\p{N}'’\-]*[\p{L}\p{N}])?([^\p{L}\p{N}]+)?$/u);
+
+  let leadPunct = "";
+  let coreWord = rawText;
+  let trailPunct = "";
+  let isPunctOnly = false;
+
+  if (match) {
+    leadPunct = match[1] || "";
+    coreWord = match[2] || "";
+    trailPunct = match[3] || "";
+    isPunctOnly = !coreWord;
+    if (isPunctOnly) {
+      coreWord = leadPunct || trailPunct;
+      leadPunct = "";
+      trailPunct = "";
+    }
+  } else {
+    isPunctOnly = !/[\p{L}\p{N}]/u.test(rawText);
+  }
+
+  return {
+    leadPunct,
+    word: coreWord,
+    trailPunct,
+    isPunctOnly,
+    isHigh: detectHighPitch(coreWord),
+    isLow: detectLowPitch(coreWord),
+    isVib: detectVibrato(coreWord),
+    isChorus,
+    rawText,
+    index,
+  };
+}
+
+function formatChorusWords(words: FormattedWordPart[]): string {
+  const inner = words
+    .map((w) => (w.isPunctOnly ? w.word : `${w.leadPunct}${w.word}${w.trailPunct}`))
+    .join(" ")
+    .replace(/^\(+|\)+$/g, "")
+    .trim();
+  return `(${inner})`;
 }
 
 export default function LyricsContent({
@@ -104,6 +170,7 @@ export default function LyricsContent({
   const [loadingTrivia, setLoadingTrivia] = useState(false);
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const { isKaraokeActive, toggleKaraoke } = useVocalRemover();
 
@@ -120,9 +187,12 @@ export default function LyricsContent({
   const seekMutation = useSeekMutation();
   const { toast } = useToast();
 
-  const isPlaying = playbackState?.is_playing;
+  const isPlaying = playbackState?.is_playing ?? false;
+  const rawProgressMs = playbackState?.progress_ms ?? 0;
+  const serverTimestamp = playbackState?.timestamp ?? Date.now();
+  const latencySec = Math.max(0, (Date.now() - serverTimestamp) / 1000);
   const currentTime = playbackState?.progress_ms
-    ? playbackState.progress_ms / 1000
+    ? (rawProgressMs / 1000) + (isPlaying && latencySec > 0 && latencySec < 8 ? latencySec : 0)
     : 0;
 
   // ── High-precision 60fps clock ──────────────────────────────────────────
@@ -179,7 +249,7 @@ export default function LyricsContent({
     setActiveTime(currentTime);
   }, [currentTime]);
 
-  // High precision rAF tick
+  // High precision rAF tick senza offset arbitrario
   useEffect(() => {
     if (!isPlaying) return;
     let animId: number;
@@ -187,7 +257,7 @@ export default function LyricsContent({
       const now = performance.now();
       const elapsed = (now - syncRef.current.updatedAt) / 1000;
       const rate = syncRef.current.rate;
-      setActiveTime(syncRef.current.baseTime + elapsed * rate + 0.12 * rate);
+      setActiveTime(syncRef.current.baseTime + elapsed * rate);
       animId = requestAnimationFrame(tick);
     };
     animId = requestAnimationFrame(tick);
@@ -525,6 +595,23 @@ export default function LyricsContent({
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-hidden relative">
+        {/* Fixed Circular Bottom-Right Ingrandisci (Expand) Action Button */}
+        {mode === "lyrics" && (
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="absolute bottom-6 right-6 z-40 pointer-events-auto"
+          >
+            <Button
+              onClick={() => setIsExpanded(true)}
+              className="w-12 h-12 p-0 rounded-full bg-primary text-primary-foreground shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center border border-white/20"
+              title="Ingrandisci a schermo intero (Stile Verci)"
+            >
+              <Maximize2 className="w-5 h-5" />
+            </Button>
+          </motion.div>
+        )}
+
         {/* ── LYRICS ── */}
         {mode === "lyrics" && (
           <div
@@ -539,12 +626,8 @@ export default function LyricsContent({
               </div>
             ) : lyrics.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-                <Music className="w-14 h-14 text-muted-foreground/30 mb-3" />
-                <h3 className="text-lg font-semibold mb-1">
-                  Lyrics not available
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  No lyrics found for this track
+                <p className="text-base md:text-xl font-medium text-muted-foreground">
+                  testi di {currentTrack?.name || "brano"} di {currentTrack?.artists?.[0]?.name || (currentTrack as any)?.artist || "autore"} non disponibili
                 </p>
               </div>
             ) : (
@@ -575,46 +658,61 @@ export default function LyricsContent({
                     const isCurrent = index === currentLineIndex;
                     const isPast = index < currentLineIndex;
                     const translation = translatedLyrics.get(index);
+                    const trimmedText = line.text.trim();
                     const isBreak =
-                      !line.text.trim() ||
-                      /^\[.*\]$/.test(line.text) ||
-                      /^\(.*\)$/.test(line.text) ||
-                      /instrumental|music/i.test(line.text);
+                      !trimmedText ||
+                      /^\[(?:instrumental|musica|solo|guitar solo|intro|outro|break|interlude|drop)\]$/i.test(trimmedText) ||
+                      /^(?:instrumental|musica|\[instrumental\]|\[musica\]|♪)$/i.test(trimmedText);
 
                     const hasSyncWords = line.words && line.words.length > 0;
-                    const words = hasSyncWords
+                    const rawTokens = hasSyncWords
                       ? line.words!.map((w) => w.text)
-                      : line.text.split(/\s+/);
+                      : trimmedText.split(/\s+/).filter(Boolean);
+
+                    const isEntireLineChorus = /^\s*\(.*\)\s*$/.test(trimmedText);
 
                     let openParen = 0;
-                    const categorizedWords = words.map((w, i) => {
+                    const categorizedWords: FormattedWordPart[] = rawTokens.map((w, i) => {
                       const opens = (w.match(/[\(\[]/g) || []).length;
                       const closes = (w.match(/[\)\]]/g) || []).length;
-                      const isChorus = openParen > 0 || opens > 0;
+                      const isChorus = isEntireLineChorus || openParen > 0 || opens > 0;
                       openParen += opens;
                       openParen -= closes;
                       openParen = Math.max(0, openParen);
 
-                      // Vocal pitch variation detection
-                      const isHigh = detectHighPitch(w);
-                      const isLow = detectLowPitch(w);
-                      const isVib = detectVibrato(w);
-
-                      return { text: w, index: i, isChorus, isHigh, isLow, isVib };
+                      return parseWordParts(w, i, isChorus);
                     });
 
+                    let chorusWords = categorizedWords.filter((w) => w.isChorus);
+                    // Rimuovi eventuali parentesi esterne dai token per racchiudere l'intero gruppo tra parentesi tonde uniformi ()
+                    if (chorusWords.length > 0) {
+                      chorusWords = chorusWords.map((cw, cIdx) => {
+                        let lead = cw.leadPunct;
+                        let trail = cw.trailPunct;
+                        if (cIdx === 0 && lead.startsWith("(")) {
+                          lead = lead.slice(1);
+                        }
+                        if (cIdx === chorusWords.length - 1 && trail.endsWith(")")) {
+                          trail = trail.slice(0, -1);
+                        }
+                        return { ...cw, leadPunct: lead, trailPunct: trail };
+                      });
+                    }
+
                     const mainWords = categorizedWords.filter((w) => !w.isChorus);
-                    const chorusWords = categorizedWords.filter((w) => w.isChorus);
 
                     const nextLine = lyrics[index + 1];
-                    const lineEndTime =
-                      line.endTime ??
-                      nextLine?.time ??
-                      Math.min(
-                        trackDurationSeconds,
-                        line.time + Math.max(2.5, words.length * 0.45)
-                      );
-                    const lineDuration = Math.max(0.25, lineEndTime - line.time);
+                    const totalWordCount = Math.max(1, categorizedWords.length);
+                    // Durata realistica per non estendere la sincronizzazione su lunghe pause musicali
+                    const estimatedSingingDuration = Math.min(
+                      nextLine ? Math.max(1.8, nextLine.time - line.time) : 5.0,
+                      Math.max(2.2, totalWordCount * 0.52)
+                    );
+                    const effectiveEndTime = line.endTime
+                      ? Math.min(line.endTime, line.time + Math.max(2.0, totalWordCount * 0.8))
+                      : (nextLine ? Math.min(nextLine.time, line.time + estimatedSingingDuration) : line.time + estimatedSingingDuration);
+
+                    const lineDuration = Math.max(0.4, effectiveEndTime - line.time);
                     const lineProgress = Math.max(
                       0,
                       Math.min(1, (activeTime - line.time) / lineDuration)
@@ -747,18 +845,12 @@ export default function LyricsContent({
                         `}
                       >
                         {isBreak ? (
-                          <div className="flex items-center justify-center md:justify-start gap-2 py-1 text-center md:text-left w-full">
-                            <Music
-                              className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
-                            />
+                          <div className="flex items-center justify-center md:justify-start py-1 text-center md:text-left w-full">
                             <span
-                              className={`text-sm italic text-center md:text-left ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
+                              className={`text-sm italic text-center md:text-left ${isCurrent ? "text-primary" : "text-muted-foreground/35"}`}
                             >
-                              {line.text.trim() || "Instrumental"}
+                              {trimmedText || "Strumentale"}
                             </span>
-                            <Music
-                              className={`w-4 h-4 ${isCurrent ? "text-primary" : "text-muted-foreground/30"}`}
-                            />
                           </div>
                         ) : (
                           <div className="space-y-1.5 flex flex-col items-center md:items-start justify-center w-full text-center md:text-left">
@@ -781,69 +873,128 @@ export default function LyricsContent({
                             {isCurrent && isKaraokeActive ? (
                               <div className="flex flex-col items-center md:items-start w-full gap-2">
                                 {mainWords.length > 0 && (
-                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2.5 gap-y-1.5 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-1">
+                                  <div className="flex flex-wrap items-baseline justify-center md:justify-start gap-x-2.5 gap-y-1.5 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-1">
                                     {mainWords.map((wInfo, localIdx) => {
-                                      const isWordActive = hasSyncWords
+                                      const isWordActive = !wInfo.isPunctOnly && (hasSyncWords
                                         ? wInfo.index === activeWordIndex
-                                        : localIdx === activeMainIndex;
+                                        : localIdx === activeMainIndex);
                                       const isWordPast = hasSyncWords
                                         ? wInfo.index < activeWordIndex
                                         : localIdx < activeMainIndex;
+
+                                      if (wInfo.isPunctOnly) {
+                                        return (
+                                          <span
+                                            key={wInfo.index}
+                                            className="text-muted-foreground/40 font-normal text-2xl md:text-4xl select-none"
+                                          >
+                                            {wInfo.word}
+                                          </span>
+                                        );
+                                      }
+
                                       return (
-                                        <motion.span
+                                        <span
                                           key={wInfo.index}
-                                          animate={{
-                                            scale: isWordActive ? (wInfo.isHigh ? 1.35 : 1.25) : 1,
-                                            y: isWordActive ? -3 : 0,
-                                          }}
-                                          transition={{
-                                            duration: 0.15,
-                                            ease: "easeOut",
-                                          }}
-                                          className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none ${getWordPitchStyle(
-                                            wInfo,
-                                            isWordActive,
-                                            isWordPast
-                                          )}`}
+                                          className="inline-flex items-baseline select-none"
                                         >
-                                          {wInfo.text}
-                                        </motion.span>
+                                          {wInfo.leadPunct && (
+                                            <span className="text-muted-foreground/40 font-normal select-none text-xl md:text-3xl mr-[1px]">
+                                              {wInfo.leadPunct}
+                                            </span>
+                                          )}
+                                          <motion.span
+                                            animate={{
+                                              scale: isWordActive ? (wInfo.isHigh ? 1.35 : 1.25) : 1,
+                                              y: isWordActive ? -3 : 0,
+                                            }}
+                                            transition={{
+                                              duration: 0.15,
+                                              ease: "easeOut",
+                                            }}
+                                            className={`inline-block font-extrabold text-2xl md:text-4xl transition-colors duration-200 select-none ${getWordPitchStyle(
+                                              wInfo,
+                                              isWordActive,
+                                              isWordPast,
+                                              false
+                                            )}`}
+                                          >
+                                            {wInfo.word}
+                                          </motion.span>
+                                          {wInfo.trailPunct && (
+                                            <span className="text-muted-foreground/40 font-normal select-none text-xl md:text-3xl ml-[1px]">
+                                              {wInfo.trailPunct}
+                                            </span>
+                                          )}
+                                        </span>
                                       );
                                     })}
                                   </div>
                                 )}
 
                                 {chorusWords.length > 0 && (
-                                  <div className="flex flex-wrap justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-0.5 opacity-90">
+                                  <div className="flex flex-wrap items-baseline justify-center md:justify-start gap-x-2 gap-y-1 w-full md:w-auto text-center md:text-left px-2 md:px-0 py-0.5 opacity-90">
+                                    <span className="text-muted-foreground/45 font-normal text-xl md:text-3xl select-none mr-0.5">
+                                      (
+                                    </span>
                                     {chorusWords.map((wInfo, localIdx) => {
-                                      const isWordActive = hasSyncWords
+                                      const isWordActive = !wInfo.isPunctOnly && (hasSyncWords
                                         ? wInfo.index === activeWordIndex
-                                        : localIdx === activeChorusIndex;
+                                        : localIdx === activeChorusIndex);
                                       const isWordPast = hasSyncWords
                                         ? wInfo.index < activeWordIndex
                                         : localIdx < activeChorusIndex;
+
+                                      if (wInfo.isPunctOnly) {
+                                        return (
+                                          <span
+                                            key={wInfo.index}
+                                            className="text-muted-foreground/40 font-normal text-xl md:text-3xl select-none"
+                                          >
+                                            {wInfo.word}
+                                          </span>
+                                        );
+                                      }
+
                                       return (
-                                        <motion.span
+                                        <span
                                           key={wInfo.index}
-                                          animate={{
-                                            scale: isWordActive ? 1.18 : 1,
-                                            y: isWordActive ? -1.5 : 0,
-                                          }}
-                                          transition={{
-                                            duration: 0.15,
-                                            ease: "easeOut",
-                                          }}
-                                          className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none ${getWordPitchStyle(
-                                            wInfo,
-                                            isWordActive,
-                                            isWordPast,
-                                            true
-                                          )}`}
+                                          className="inline-flex items-baseline select-none"
                                         >
-                                          {wInfo.text}
-                                        </motion.span>
+                                          {wInfo.leadPunct && (
+                                            <span className="text-muted-foreground/40 font-normal select-none text-lg md:text-2xl mr-[1px]">
+                                              {wInfo.leadPunct}
+                                            </span>
+                                          )}
+                                          <motion.span
+                                            animate={{
+                                              scale: isWordActive ? 1.2 : 1,
+                                              y: isWordActive ? -2 : 0,
+                                            }}
+                                            transition={{
+                                              duration: 0.15,
+                                              ease: "easeOut",
+                                            }}
+                                            className={`inline-block font-bold italic text-xl md:text-3xl transition-colors duration-200 select-none ${getWordPitchStyle(
+                                              wInfo,
+                                              isWordActive,
+                                              isWordPast,
+                                              true
+                                            )}`}
+                                          >
+                                            {wInfo.word}
+                                          </motion.span>
+                                          {wInfo.trailPunct && (
+                                            <span className="text-muted-foreground/40 font-normal select-none text-lg md:text-2xl ml-[1px]">
+                                              {wInfo.trailPunct}
+                                            </span>
+                                          )}
+                                        </span>
                                       );
                                     })}
+                                    <span className="text-muted-foreground/45 font-normal text-xl md:text-3xl select-none ml-0.5">
+                                      )
+                                    </span>
                                   </div>
                                 )}
                               </div>
@@ -860,7 +1011,7 @@ export default function LyricsContent({
                                           : "text-foreground/65 text-lg md:text-xl"
                                     }`}
                                   >
-                                    {mainWords.map((w) => w.text).join(" ")}
+                                    {mainWords.map((w) => (w.isPunctOnly ? w.word : `${w.leadPunct}${w.word}${w.trailPunct}`)).join(" ")}
                                   </p>
                                 )}
                                 {chorusWords.length > 0 && (
@@ -873,7 +1024,7 @@ export default function LyricsContent({
                                           : "text-foreground/50 text-base md:text-lg"
                                     }`}
                                   >
-                                    {chorusWords.map((w) => w.text).join(" ")}
+                                    ({chorusWords.map((w) => (w.isPunctOnly ? w.word : `${w.leadPunct}${w.word}${w.trailPunct}`)).join(" ")})
                                   </p>
                                 )}
                               </div>
@@ -901,6 +1052,25 @@ export default function LyricsContent({
             )}
           </div>
         )}
+
+        {/* ── VERCI FULL-SCREEN OVERLAY VIA PORTAL DIRECTLY TO DOCUMENT BODY ── */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {isExpanded && (
+                <VerciLyricsOverlay
+                  currentTrack={currentTrack}
+                  lyrics={lyrics}
+                  isSynced={isSynced}
+                  translatedLyrics={translatedLyrics}
+                  showTranslation={showTranslation}
+                  onToggleTranslation={handleTranslate}
+                  onClose={() => setIsExpanded(false)}
+                />
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
 
         {/* ── INFO ── */}
         {mode === "info" && spotifyTrack && (

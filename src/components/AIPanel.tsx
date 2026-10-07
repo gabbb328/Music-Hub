@@ -1,10 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sparkles, Send, Loader2, Music2, RefreshCw, Bot, User, PlayCircle } from "lucide-react";
+import {
+  X,
+  Sparkles,
+  Send,
+  Loader2,
+  RefreshCw,
+  User,
+  PlayCircle,
+  Settings2,
+  Key,
+  Check,
+  Zap,
+} from "lucide-react";
 import { usePlaybackState, useAudioFeatures, useTopTracks, useRecentlyPlayed } from "@/hooks/useSpotify";
 import { usePlayerStore } from "@/hooks/usePlayerStore";
 import { useToast } from "@/hooks/use-toast";
 import * as spotifyApi from "@/services/spotify-api";
+import { buildLyraContext, detectLyraIntent, askLyraAI } from "@/services/lyra-ai";
+import { lookupTrackBpm } from "@/services/track-bpm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface RecommendedTrack {
@@ -37,6 +51,7 @@ interface AIPanelProps {
   onPlayTrack?: (track: any) => void;
 }
 
+// ─── 10 Brani Fallback Curati: 10 artisti e stili rigorosamente unici (0 duplicati) ────
 export const MOOD_RECOMMENDED_TRACKS: RecommendedTrack[] = [
   {
     id: "mood-1",
@@ -68,51 +83,6 @@ export const MOOD_RECOMMENDED_TRACKS: RecommendedTrack[] = [
   {
     id: "mood-4",
     number: 4,
-    title: "Starboy",
-    artist: "The Weeknd ft. Daft Punk",
-    album: "Starboy",
-    cover: "https://i.scdn.co/image/ab67616d0000b2734718e2412451096b0aa79e73",
-    duration: 230,
-  },
-  {
-    id: "mood-5",
-    number: 5,
-    title: "Don't Start Now",
-    artist: "Dua Lipa",
-    album: "Future Nostalgia",
-    cover: "https://i.scdn.co/image/ab67616d0000b273be8252277d3aa05a96030999",
-    duration: 183,
-  },
-  {
-    id: "mood-6",
-    number: 6,
-    title: "Viva La Vida",
-    artist: "Coldplay",
-    album: "Viva La Vida",
-    cover: "https://i.scdn.co/image/ab67616d0000b273a7051f67f70b134810a9f8b4",
-    duration: 242,
-  },
-  {
-    id: "mood-7",
-    number: 7,
-    title: "Save Your Tears",
-    artist: "The Weeknd",
-    album: "After Hours",
-    cover: "https://i.scdn.co/image/ab67616d0000b273886370ce44e60e06521319c3",
-    duration: 215,
-  },
-  {
-    id: "mood-8",
-    number: 8,
-    title: "Midnight City",
-    artist: "M83",
-    album: "Hurry Up, We're Dreaming",
-    cover: "https://i.scdn.co/image/ab67616d0000b27306f52a7d2b63897b713917a2",
-    duration: 243,
-  },
-  {
-    id: "mood-9",
-    number: 9,
     title: "Get Lucky",
     artist: "Daft Punk ft. Pharrell Williams",
     album: "Random Access Memories",
@@ -120,24 +90,96 @@ export const MOOD_RECOMMENDED_TRACKS: RecommendedTrack[] = [
     duration: 248,
   },
   {
-    id: "mood-10",
-    number: 10,
+    id: "mood-5",
+    number: 5,
+    title: "Viva La Vida",
+    artist: "Coldplay",
+    album: "Viva La Vida",
+    cover: "https://i.scdn.co/image/ab67616d0000b273a7051f67f70b134810a9f8b4",
+    duration: 242,
+  },
+  {
+    id: "mood-6",
+    number: 6,
+    title: "Midnight City",
+    artist: "M83",
+    album: "Hurry Up, We're Dreaming",
+    cover: "https://i.scdn.co/image/ab67616d0000b27306f52a7d2b63897b713917a2",
+    duration: 243,
+  },
+  {
+    id: "mood-7",
+    number: 7,
     title: "Shape of You",
     artist: "Ed Sheeran",
     album: "÷ (Divide)",
     cover: "https://i.scdn.co/image/ab67616d0000b273ba5db96f4b4e63635ed03816",
     duration: 233,
   },
+  {
+    id: "mood-8",
+    number: 8,
+    title: "Heat Waves",
+    artist: "Glass Animals",
+    album: "Dreamland",
+    cover: "https://i.scdn.co/image/ab67616d0000b2739e495fb707973f3390850eea",
+    duration: 238,
+  },
+  {
+    id: "mood-9",
+    number: 9,
+    title: "Do I Wanna Know?",
+    artist: "Arctic Monkeys",
+    album: "AM",
+    cover: "https://i.scdn.co/image/ab67616d0000b2734ae1c4c5c45aabe5ece75733",
+    duration: 272,
+  },
+  {
+    id: "mood-10",
+    number: 10,
+    title: "bad guy",
+    artist: "Billie Eilish",
+    album: "WHEN WE ALL FALL ASLEEP, WHERE DO WE GO?",
+    cover: "https://i.scdn.co/image/ab67616d0000b27350a3147b4edd7701a876c6ce",
+    duration: 194,
+  },
 ];
 
-const trackKey = (title?: string, artist?: string) =>
-  `${title || ""}|${artist || ""}`.toLowerCase().replace(/[^\w|]+/g, " ").replace(/\s+/g, " ").trim();
+// ─── Normalizzazione Rigorosa e Anti-Duplicati ─────────────────────────────────
+export function cleanTrackTitle(title?: string): string {
+  if (!title) return "";
+  return title
+    .replace(/\s*[-–—]\s*.*(remaster|live|radio\s*edit|original\s*mix|acoustic|deluxe|version|bonus|extended|mix|edit).*$/gi, "")
+    .replace(/\s*[\(\[].*(feat\.?|ft\.?|with|remaster|live|radio\s*edit|official|version|deluxe|acoustic|edit)[^\)\]]*[\)\]]/gi, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function cleanArtistName(artist?: string): string {
+  if (!artist) return "";
+  const primary = artist.split(/,|\bfeat\.?\b|\bft\.?\b|\bwith\b|&|\bx\b|\bvs\.?\b/i)[0] || artist;
+  return primary
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function trackDeduplicationKey(title?: string, artist?: string): string {
+  return `${cleanTrackTitle(title)}:::${cleanArtistName(artist)}`;
+}
 
 const spotifyTrackToRecommendation = (track: any, number: number): RecommendedTrack => ({
   id: track.id || `spotify-${number}`,
   number,
   title: track.name || "Brano sconosciuto",
-  artist: track.artists?.map((a: any) => a.name).join(", ") || "Artista sconosciuto",
+  artist: track.artists?.map((a: any) => a.name).filter(Boolean).join(", ") || "Artista sconosciuto",
   album: track.album?.name || "Album",
   cover: track.album?.images?.[0]?.url || MOOD_RECOMMENDED_TRACKS[(number - 1) % MOOD_RECOMMENDED_TRACKS.length].cover,
   duration: Math.floor((track.duration_ms || 200000) / 1000),
@@ -177,24 +219,34 @@ function inferMoodProfile(currentTrack: any, topTracks: any[], recentTracks: any
   return profiles[selected];
 }
 
+/**
+ * Ricerca brani consigliati con zero duplicati e quantità flessibile da 2 a 10 brani
+ */
 async function buildMoodRecommendations(
   currentTrack: any,
   topTracks: any[],
   recentTracks: any[],
-  limit = 10,
+  maxLimit = 10,
+  minLimit = 2
 ): Promise<{ mood: MoodProfile; tracks: RecommendedTrack[] }> {
   const mood = inferMoodProfile(currentTrack, topTracks, recentTracks);
   const heardIds = new Set<string>();
   const heardKeys = new Set<string>();
+  const heardTitles = new Set<string>();
 
   const remember = (track: any) => {
     if (!track) return;
     if (track.id) heardIds.add(track.id);
-    heardKeys.add(trackKey(track.name || track.title, track.artists?.[0]?.name || track.artist));
+    const title = track.name || track.title;
+    const artist = track.artists?.[0]?.name || track.artist;
+    if (title) {
+      heardTitles.add(cleanTrackTitle(title));
+      heardKeys.add(trackDeduplicationKey(title, artist));
+    }
   };
 
   topTracks.forEach(remember);
-  recentTracks.forEach((item: any) => remember(item.track));
+  recentTracks.forEach((item: any) => remember(item.track || item));
   remember(currentTrack);
 
   const seedArtist = topTracks[0]?.artists?.[0]?.name || recentTracks[0]?.track?.artists?.[0]?.name || currentTrack?.artist || "";
@@ -210,189 +262,95 @@ async function buildMoodRecommendations(
   const candidates: any[] = [];
   for (let i = 0; i < queries.length; i++) {
     const query = queries[(i + todayOffset) % queries.length];
-    const result = await spotifyApi.search(query, ["track"], 20);
-    candidates.push(...(result.tracks?.items || []));
-    if (candidates.length >= limit * 4) break;
+    try {
+      const result = await spotifyApi.search(query, ["track"], 20);
+      candidates.push(...(result.tracks?.items || []));
+      if (candidates.length >= maxLimit * 4) break;
+    } catch {
+      // Ignora errori di singola query e continua
+    }
   }
 
-  const unique = new Map<string, any>();
+  const selectedTracks: any[] = [];
+  const selectedIds = new Set<string>();
+  const selectedKeys = new Set<string>();
+  const selectedTitles = new Set<string>();
+  const artistCounts = new Map<string, number>();
+
   for (const track of candidates) {
-    const key = trackKey(track.name, track.artists?.[0]?.name);
-    if (!track.id || heardIds.has(track.id) || heardKeys.has(key) || unique.has(key)) continue;
+    if (!track.id || selectedIds.has(track.id) || heardIds.has(track.id)) continue;
     if (!track.album?.images?.[0]?.url) continue;
-    unique.set(key, track);
-    if (unique.size >= limit) break;
+
+    const trackArtist = track.artists?.[0]?.name || "";
+    const cleanTitle = cleanTrackTitle(track.name);
+    const cleanArtist = cleanArtistName(trackArtist);
+    const key = trackDeduplicationKey(track.name, trackArtist);
+
+    if (!cleanTitle || heardTitles.has(cleanTitle) || selectedTitles.has(cleanTitle)) continue;
+    if (heardKeys.has(key) || selectedKeys.has(key)) continue;
+
+    // Massimo 1 brano per singolo artista principale nel set per garantire massima diversità
+    if ((artistCounts.get(cleanArtist) || 0) >= 1) continue;
+
+    selectedIds.add(track.id);
+    selectedKeys.add(key);
+    selectedTitles.add(cleanTitle);
+    artistCounts.set(cleanArtist, 1);
+    selectedTracks.push(track);
+
+    if (selectedTracks.length >= maxLimit) break;
   }
 
-  const tracks = Array.from(unique.values()).map(spotifyTrackToRecommendation);
+  // Se abbiamo trovato da 2 a 10 brani, usiamo esattamente quelli senza forzare duplicati!
+  let finalRaw = selectedTracks;
+  if (finalRaw.length < minLimit) {
+    const fallbackList = MOOD_RECOMMENDED_TRACKS.filter((fb) => {
+      const fbTitle = cleanTrackTitle(fb.title);
+      const fbKey = trackDeduplicationKey(fb.title, fb.artist);
+      const fbArtist = cleanArtistName(fb.artist);
+      return (
+        !heardTitles.has(fbTitle) &&
+        !selectedTitles.has(fbTitle) &&
+        !heardKeys.has(fbKey) &&
+        !selectedKeys.has(fbKey) &&
+        (artistCounts.get(fbArtist) || 0) < 1
+      );
+    });
+
+    for (const fb of fallbackList) {
+      finalRaw.push(fb);
+      selectedTitles.add(cleanTrackTitle(fb.title));
+      if (finalRaw.length >= 3) break;
+    }
+  }
+
+  // Rinumera coerentemente da 1 a N (da 2 a 10)
+  const tracks: RecommendedTrack[] = finalRaw.map((track, idx) => {
+    if ("cover" in track && typeof track.duration === "number") {
+      return { ...track, number: idx + 1 };
+    }
+    return spotifyTrackToRecommendation(track, idx + 1);
+  });
+
   return {
     mood,
-    tracks: tracks.length > 0 ? tracks : MOOD_RECOMMENDED_TRACKS.slice(0, limit),
+    tracks,
   };
-}
-
-// ─── LyraAI Brain ─────────────────────────────────────────────────────────────
-function buildContext(
-  currentTrack: any,
-  audioFeatures: any,
-  topTracks: any[],
-  recentTracks: any[]
-): string {
-  const parts: string[] = [];
-  if (currentTrack) {
-    parts.push(`Brano corrente: "${currentTrack.name}" di ${currentTrack.artists?.[0]?.name}`);
-  }
-  if (audioFeatures) {
-    if (audioFeatures.tempo) parts.push(`BPM: ${Math.round(audioFeatures.tempo)}`);
-    if (audioFeatures.energy !== undefined) parts.push(`Energia: ${Math.round(audioFeatures.energy * 100)}%`);
-    if (audioFeatures.valence !== undefined) parts.push(`Positività: ${Math.round(audioFeatures.valence * 100)}%`);
-  }
-  if (topTracks.length > 0) {
-    const names = topTracks.slice(0, 5).map((t: any) => `"${t.name}" di ${t.artists?.[0]?.name}`);
-    parts.push(`Brani più ascoltati: ${names.join(", ")}`);
-  }
-  return parts.join(" | ");
-}
-
-function generateReply(
-  userText: string,
-  contextStr: string,
-  history: Message[]
-): { text: string; tracks?: RecommendedTrack[] } {
-  const lower = userText.toLowerCase();
-
-  const trackMatch = contextStr.match(/Brano corrente: "([^"]+)" di ([^|]+)/);
-  const trackName = trackMatch ? trackMatch[1] : null;
-  const artistName = trackMatch ? trackMatch[2].trim() : null;
-
-  const bpmMatch = contextStr.match(/BPM: (\d+)/);
-  const bpm = bpmMatch ? parseInt(bpmMatch[1]) : null;
-
-  const energyMatch = contextStr.match(/Energia: (\d+)%/);
-  const energy = energyMatch ? parseInt(energyMatch[1]) : 70;
-
-  const valenceMatch = contextStr.match(/Positività: (\d+)%/);
-  const valence = valenceMatch ? parseInt(valenceMatch[1]) : 65;
-
-  const topArtists: string[] = [];
-  const topTracksMatch = contextStr.match(/Brani più ascoltati: (.+)$/);
-  if (topTracksMatch) {
-    const raw = topTracksMatch[1];
-    const matches = raw.match(/"([^"]+)" di ([^,]+)/g);
-    if (matches) {
-      matches.forEach((m) => {
-        const sub = m.match(/"([^"]+)" di (.+)/);
-        if (sub && sub[2]) topArtists.push(sub[2].trim());
-      });
-    }
-  }
-
-  if (/ciao|salve|hey|buongiorno|buonasera/.test(lower)) {
-    return {
-      text: trackName
-        ? `Ciao! 🎵 Sto monitorando la tua riproduzione di **"${trackName}"** di **${artistName}**. Come posso aiutarti?`
-        : `Ciao! 🌟 Sono **LyraAI**, il tuo assistente musicale. Come posso aiutarti oggi?`,
-    };
-  }
-
-  if (/cosa sto ascoltando|brano corrente|canzone attuale|traccia/.test(lower)) {
-    if (!trackName) return { text: "Non riesco a vedere cosa stai ascoltando in questo momento. Avvia un brano su Spotify!" };
-    const mood = valence > 60 ? "allegro e positivo" : valence > 40 ? "neutro" : "malinconico o intenso";
-    return {
-      text: `Stai ascoltando **"${trackName}"** di **${artistName}**. Il brano ha un ritmo di **${bpm} BPM** con un'energia del **${energy}%**. Il mood è ${mood}.`,
-    };
-  }
-
-  if (/bpm|ritmo|velocit|tempo/.test(lower)) {
-    if (trackName) {
-      return {
-        text: `⏱️ **Analisi BPM Brano**\n\nIl brano corrente **"${trackName}"** di **${artistName}** ha un tempo esatto di **${bpm} BPM**.\n\n${bpm && bpm > 130 ? "⚡ **Ritmo Veloce / Hype**: ideale per allenamento, corsa o momenti di massima carica!" : bpm && bpm > 100 ? "🎶 **Ritmo Medio / Dance**: perfetto per ballare, concentrarsi o guidare!" : "🌙 **Ritmo Chill / Slow**: ideale per momenti rilassati o studio."}`,
-      };
-    }
-    return {
-      text: `⏱️ **Analisi BPM**\n\nIn base ai tuoi ascolti, il ritmo medio delle tue tracce preferite è di **${bpm || 120} BPM**.\n\nAvvia un brano su Spotify e ti dirò i suoi BPM esatti in tempo reale!`,
-    };
-  }
-
-  if (/energia|energico|hype/.test(lower)) {
-    if (energy > 75) return { text: `L'energia di questo brano è al **${energy}%** — altissima! Stai ascoltando qualcosa di molto coinvolgente. ⚡` };
-    if (energy > 50) return { text: `L'energia è al **${energy}%** — bilanciata, né troppo calma né troppo esplosiva. 🔥` };
-    return { text: `L'energia è al **${energy}%** — bassa. Un brano ideale per rilassarsi o concentrarsi. 🧘` };
-  }
-
-  if (/consigli|suggerisci|simile|simili|ascoltare|cosa metti|consigliami/.test(lower)) {
-    return {
-      text: `🎨 **Consigli Personalizzati LyraAI**\n\nEcco le **10 canzoni consigliate** per il tuo profilo musicale. Clicca su qualsiasi card per ascoltarla subito:`,
-      tracks: MOOD_RECOMMENDED_TRACKS,
-    };
-  }
-
-  if (/umore|mood|mi sento|stato d'animo|analizza il mood/.test(lower)) {
-    const moodTitle = valence > 60 ? "Energico & Positivo (Euphoric Vibes) ☀️" : valence > 40 ? "Focus & Chill (Balanced Mood) 🎧" : "Deep & Melancholic (Intense Mood) 🌧️";
-    return {
-      text: `🎨 **Analisi del Mood Musicale**\n\nAttualmente il tuo mood rilevato è: **${moodTitle}** (Positività ${valence}%, Energia ${energy}%).\n\n${bpm ? `Il ritmo attuale ha una frequenza di **${bpm} BPM**, ideale per mantenere alta la carica.` : "Le caratteristiche audio mostrano un eccellente bilanciamento emotivo e ritmico."}`,
-    };
-  }
-
-  if (/crea playlist|crea la playlist|playlist mood/.test(lower)) {
-    return {
-      text: `✅ **Playlist Creata con Successo!** 🎧\n\nHo creato la playlist **"LyraAI Mood Mix"** con i 10 brani consigliati per il tuo mood attuale e l'ho salvata nei tuoi Preferiti su Spotify! Puoi trovarla subito nella tua Libreria.`,
-    };
-  }
-
-  if (/artista|chi.*canta|chi.*suona|band|gruppo/.test(lower)) {
-    if (!artistName) return { text: "Avvia un brano su Spotify per vedere chi sta suonando!" };
-    return {
-      text: `Stai ascoltando **${artistName}**. ${topArtists.length > 0 ? `Tra i tuoi artisti preferiti figurano anche ${topArtists.slice(0,3).join(", ")}.` : ""}`,
-    };
-  }
-
-  if (/playlist|crea|mix|dj/.test(lower)) {
-    return {
-      text: `Per creare mix e playlist con l'AI, scrivi **"Consigliami qualcosa"** per ottenere consigli personalizzati o usa l'**AI DJ**! 🎧`,
-    };
-  }
-
-  if (/grazie|perfetto|ottimo|bravo|bello/.test(lower)) {
-    return { text: `Prego! Sono qui ogni volta che vuoi esplorare la tua musica. 🎵✨` };
-  }
-
-  if (/chi sei|cosa sei|presentati|chi è lyra|lyraai/.test(lower)) {
-    return {
-      text: `Sono **LyraAI** 🌟, la tua assistente musicale integrata in Music Hub. Posso analizzare il brano che stai ascoltando, capire il tuo mood musicale, consigliarti artisti simili e rispondere alle tue domande sulla musica. Cosa vuoi sapere?`,
-    };
-  }
-
-  if (/aiuto|help|cosa puoi fare|cosa sai/.test(lower)) {
-    return {
-      text: `Ecco cosa posso fare per te:\n\n• 🎵 **Analisi brano** — BPM, energia, mood\n• 🎨 **Consigli musicali** — consigli di canzoni + crea playlist\n• 📊 **I tuoi gusti** — artisti e brani che ascolti di più\n• 💬 **Chat libera** — parlami di musica!\n\nProva a chiedermi "analizza il mood" o "quanti BPM ha?".`,
-    };
-  }
-
-  if (trackName) {
-    const generics = [
-      `Interessante! Nel contesto di "${trackName}" (${bpm ? `${bpm} BPM` : "brano corrente"}), posso dirti che ${energy !== null && energy > 60 ? "si tratta di musica energica." : "è un brano più rilassato."} Hai altre domande musicali?`,
-      `Non ho una risposta specifica per questo, ma sono sempre pronta a parlare di musica! Dimmi di più su cosa cerchi. 🎵`,
-    ];
-    return { text: generics[Math.floor(Math.random() * generics.length)] };
-  }
-
-  return { text: `Mmm, non ho capito bene. Puoi riformulare? Sono specializzata in tutto ciò che riguarda la musica — brani, artisti, mood, BPM e molto altro! 🎶` };
 }
 
 const buildInitialMessages = (dailyTrack?: RecommendedTrack, moodLabel?: string): Message[] => [
   {
     id: "welcome-1",
     role: "assistant",
-    content: "Ciao, sono **Lyra**, il tuo assistente musicale personale.",
+    content: "Ciao, sono **LyraAI**, il tuo assistente musicale intelligente. Puoi chiedermi qualsiasi cosa!",
     timestamp: new Date(),
   },
   {
     id: "welcome-2",
     role: "assistant",
     content: dailyTrack
-      ? `Per oggi sento un mood **${moodLabel || "su misura"}**. Ti consiglio questa canzone che non risulta nei tuoi ascolti recenti:`
-      : "Sto leggendo il tuo mood musicale di oggi per consigliarti qualcosa di nuovo.",
+      ? `Per oggi sento un mood **${moodLabel || "su misura"}**. Ti consiglio questo brano selezionato per te:`
+      : "Sto calibrando il tuo mood musicale per consigliarti brani freschi senza duplicati.",
     tracks: dailyTrack ? [dailyTrack] : undefined,
     timestamp: new Date(),
   },
@@ -433,6 +391,19 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
   const [moodLabel, setMoodLabel] = useState("su misura");
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [lookedUpBpm, setLookedUpBpm] = useState<number | null>(null);
+
+  // Impostazioni AI personalizzate (opzionale)
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    return typeof localStorage !== "undefined" ? localStorage.getItem("lyra_ai_api_key") || "" : "";
+  });
+  const [apiProvider, setApiProvider] = useState<"gemini" | "groq" | "openai" | "auto">(() => {
+    return typeof localStorage !== "undefined"
+      ? (localStorage.getItem("lyra_ai_provider") as any) || "auto"
+      : "auto";
+  });
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -440,14 +411,16 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
   const currentTrack = spTrack
     ? {
         name: spTrack.name,
-        artist: spTrack.artists?.[0]?.name || "Artista Sconosciuto",
+        artist: spTrack.artists?.map((a: any) => a.name).filter(Boolean).join(", ") || "Artista Sconosciuto",
         cover: spTrack.album?.images?.[0]?.url || MOOD_RECOMMENDED_TRACKS[0].cover,
+        bpm: player.currentTrack?.bpm,
       }
     : player.currentTrack
     ? {
         name: player.currentTrack.title,
         artist: player.currentTrack.artist,
         cover: player.currentTrack.cover || MOOD_RECOMMENDED_TRACKS[0].cover,
+        bpm: player.currentTrack.bpm,
       }
     : null;
 
@@ -455,7 +428,7 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
   const recentTracks = (recentData as any)?.items || [];
 
   const refreshMoodRecommendations = useCallback(async () => {
-    const result = await buildMoodRecommendations(currentTrack, topTracks, recentTracks, 10);
+    const result = await buildMoodRecommendations(currentTrack, topTracks, recentTracks, 10, 2);
     setMoodRecommendations(result.tracks);
     setMoodLabel(result.mood.label);
     return result;
@@ -474,7 +447,9 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
         });
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, refreshMoodRecommendations]);
 
   useEffect(() => {
@@ -485,45 +460,94 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 400);
   }, [isOpen]);
 
-  const sendMessageText = useCallback(async (textToSubmit: string) => {
-    const trimmed = textToSubmit.trim();
-    if (!trimmed || isTyping) return;
-
-    const userMsg: Message = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      content: trimmed,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
-
-    const delay = 500 + Math.random() * 500;
-    await new Promise((r) => setTimeout(r, delay));
-
-    const context = buildContext(currentTrack, audioFeatures, topTracks, recentTracks);
-    const reply = generateReply(trimmed, context, messages);
-
-    let finalTracks = reply.tracks;
-    if (reply.tracks) {
-      const result = moodRecommendations.length > 0
-        ? { mood: { label: moodLabel }, tracks: moodRecommendations }
-        : await refreshMoodRecommendations();
-      finalTracks = result.tracks;
-      reply.text = `🎨 **Consigli Personalizzati LyraAI**\n\nMood di oggi rilevato: **${result.mood.label}**.\n\nEcco brani simili al tuo momento musicale, pescati dal catalogo Spotify e filtrati per evitare quelli già ascoltati:`;
+  useEffect(() => {
+    if (!isOpen || !currentTrack?.name || !currentTrack?.artist || currentTrack.artist === "Artista Sconosciuto") {
+      return;
     }
-
-    const aiMsg: Message = {
-      id: `a-${Date.now()}`,
-      role: "assistant",
-      content: reply.text,
-      tracks: finalTracks,
-      timestamp: new Date(),
+    let cancelled = false;
+    lookupTrackBpm(currentTrack.name, currentTrack.artist)
+      .then((bpm) => {
+        if (!cancelled) setLookedUpBpm(bpm);
+      })
+      .catch(() => {
+        if (!cancelled) setLookedUpBpm(null);
+      });
+    return () => {
+      cancelled = true;
     };
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsTyping(false);
-  }, [isTyping, currentTrack, audioFeatures, topTracks, recentTracks, messages, moodRecommendations, moodLabel, refreshMoodRecommendations]);
+  }, [isOpen, currentTrack?.name, currentTrack?.artist]);
+
+  const saveSettings = () => {
+    if (typeof localStorage !== "undefined") {
+      if (apiKeyInput.trim()) {
+        localStorage.setItem("lyra_ai_api_key", apiKeyInput.trim());
+      } else {
+        localStorage.removeItem("lyra_ai_api_key");
+      }
+      localStorage.setItem("lyra_ai_provider", apiProvider);
+    }
+    setShowSettings(false);
+    toast({
+      title: "Impostazioni AI salvate",
+      description: apiKeyInput.trim()
+        ? `Configurato provider: ${apiProvider.toUpperCase()}`
+        : "Modalità automatica attiva (gratuita e senza chiavi)",
+    });
+  };
+
+  const sendMessageText = useCallback(
+    async (textToSubmit: string) => {
+      const trimmed = textToSubmit.trim();
+      if (!trimmed || isTyping) return;
+
+      const userMsg: Message = {
+        id: `u-${Date.now()}`,
+        role: "user",
+        content: trimmed,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsTyping(true);
+
+      const intent = detectLyraIntent(trimmed);
+      let extraBpm = lookedUpBpm;
+      if (!extraBpm && currentTrack && (intent.asksBpm || intent.asksNowPlaying)) {
+        extraBpm = await lookupTrackBpm(currentTrack.name, currentTrack.artist);
+        if (extraBpm) setLookedUpBpm(extraBpm);
+      }
+
+      const context = buildLyraContext(currentTrack, audioFeatures, topTracks, extraBpm);
+
+      // Chiamata all'intelligenza artificiale (con API utente o automatica senza chiavi)
+      const currentKey = typeof localStorage !== "undefined" ? localStorage.getItem("lyra_ai_api_key") || undefined : undefined;
+      const currentProv = typeof localStorage !== "undefined" ? (localStorage.getItem("lyra_ai_provider") as any) || undefined : undefined;
+
+      const reply = await askLyraAI(trimmed, context, {
+        apiKey: currentKey,
+        provider: currentProv,
+      });
+
+      let finalTracks: RecommendedTrack[] | undefined;
+      if (reply.wantRecommendations) {
+        // Genera raccomandazioni fresche senza duplicati (da 2 a 10 brani)
+        const result = await refreshMoodRecommendations();
+        finalTracks = result.tracks;
+        reply.text = `🎨 **Consigli Personalizzati LyraAI**\n\nMood rilevato: **${result.mood.label}**.\n\nEcco **${result.tracks.length} brani scelti per te**, selezionati senza ripetizioni dal catalogo Spotify:`;
+      }
+
+      const aiMsg: Message = {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: reply.text,
+        tracks: finalTracks,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setIsTyping(false);
+    },
+    [isTyping, currentTrack, audioFeatures, topTracks, lookedUpBpm, refreshMoodRecommendations]
+  );
 
   const sendMessage = () => sendMessageText(input);
 
@@ -558,6 +582,7 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
             transition={{ type: "spring", damping: 26, stiffness: 280 }}
             className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-background/95 backdrop-blur-2xl border-l border-border/40 z-50 flex flex-col shadow-2xl"
           >
+            {/* Header */}
             <div className="shrink-0 px-5 py-4 border-b border-border flex items-center justify-between bg-secondary/30">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center shadow-md">
@@ -565,12 +590,26 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
                 </div>
                 <div>
                   <h3 className="font-bold text-base flex items-center gap-1.5">
-                    LyraAI <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">Beta</span>
+                    LyraAI
+                    <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 flex items-center gap-1">
+                      <Zap className="w-2.5 h-2.5 text-primary" /> AI
+                    </span>
                   </h3>
-                  <p className="text-xs text-muted-foreground">Assistente musicale intelligente</p>
+                  <p className="text-xs text-muted-foreground">Assistente con intelligenza artificiale</p>
                 </div>
               </div>
+
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  title="Configura AI (Opzionale)"
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors relative"
+                >
+                  <Settings2 className="w-4 h-4" />
+                  {apiKeyInput && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500" />
+                  )}
+                </button>
                 <button
                   onClick={clearChat}
                   title="Reset chat"
@@ -587,6 +626,77 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
               </div>
             </div>
 
+            {/* Modal / Tendina Impostazioni AI */}
+            <AnimatePresence>
+              {showSettings && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden border-b border-border bg-secondary/40 px-5 py-4 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" /> Motore Intelligenza Artificiale
+                    </h4>
+                    <span className="text-[10px] text-muted-foreground">Funziona anche senza chiave!</span>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    LyraAI risponde a qualsiasi domanda gratis. Se desideri usare un modello specifico (Gemini, Groq o OpenAI), inserisci qui la tua chiave API:
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Provider</label>
+                      <select
+                        value={apiProvider}
+                        onChange={(e) => setApiProvider(e.target.value as any)}
+                        className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-primary"
+                      >
+                        <option value="auto">Automatico (Gratuito)</option>
+                        <option value="gemini">Google Gemini</option>
+                        <option value="groq">Groq (Ultra Veloce)</option>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Chiave API (Opzionale)</label>
+                      <input
+                        type="password"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Incolla chiave API..."
+                        className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    {apiKeyInput && (
+                      <button
+                        onClick={() => {
+                          setApiKeyInput("");
+                          setApiProvider("auto");
+                        }}
+                        className="px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Rimuovi
+                      </button>
+                    )}
+                    <button
+                      onClick={saveSettings}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg shadow flex items-center gap-1 hover:opacity-90 transition-opacity"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Salva
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Now Playing Bar */}
             {currentTrack && (
               <div className="shrink-0 px-4 py-2.5 bg-gradient-to-r from-primary/15 via-purple-500/10 to-transparent border-b border-primary/20 flex items-center justify-between gap-3 backdrop-blur-md">
                 <div className="flex items-center gap-3 min-w-0">
@@ -615,6 +725,7 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
               </div>
             )}
 
+            {/* Messages Chat Stream */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               <AnimatePresence initial={false}>
                 {messages.map((msg) => (
@@ -626,22 +737,27 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
                     transition={{ type: "spring", damping: 22, stiffness: 280 }}
                     className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                   >
-                    <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 ${
-                      msg.role === "assistant"
-                        ? "bg-gradient-to-br from-primary to-primary/40"
-                        : "bg-secondary"
-                    }`}>
-                      {msg.role === "assistant"
-                        ? <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
-                        : <User className="w-3.5 h-3.5 text-muted-foreground" />
-                      }
+                    <div
+                      className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 ${
+                        msg.role === "assistant"
+                          ? "bg-gradient-to-br from-primary to-primary/40 shadow-sm"
+                          : "bg-secondary"
+                      }`}
+                    >
+                      {msg.role === "assistant" ? (
+                        <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+                      ) : (
+                        <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
                     </div>
 
-                    <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === "assistant"
-                        ? "bg-secondary/50 border border-border/30 rounded-tl-sm"
-                        : "bg-primary text-primary-foreground rounded-tr-sm"
-                    }`}>
+                    <div
+                      className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                        msg.role === "assistant"
+                          ? "bg-secondary/50 border border-border/30 rounded-tl-sm shadow-sm"
+                          : "bg-primary text-primary-foreground rounded-tr-sm shadow-sm"
+                      }`}
+                    >
                       {renderMd(msg.content)}
 
                       {msg.tracks && msg.tracks.length > 0 && (
@@ -695,7 +811,11 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
                         </div>
                       )}
 
-                      <p className={`text-[10px] mt-1 ${msg.role === "assistant" ? "text-muted-foreground" : "text-primary-foreground/60"}`}>
+                      <p
+                        className={`text-[10px] mt-1 ${
+                          msg.role === "assistant" ? "text-muted-foreground" : "text-primary-foreground/60"
+                        }`}
+                      >
                         {msg.timestamp.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
                       </p>
                     </div>
@@ -711,15 +831,15 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
                     exit={{ opacity: 0 }}
                     className="flex gap-2.5"
                   >
-                    <div className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center">
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center shadow-sm">
                       <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
                     </div>
-                    <div className="px-3.5 py-3 rounded-2xl rounded-tl-sm bg-secondary/50 border border-border/30 flex items-center gap-1.5">
+                    <div className="px-3.5 py-3 rounded-2xl rounded-tl-sm bg-secondary/50 border border-border/30 flex items-center gap-1.5 shadow-sm">
                       {[0, 1, 2].map((i) => (
                         <motion.div
                           key={i}
-                          className="w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                          animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
+                          className="w-1.5 h-1.5 rounded-full bg-primary"
+                          animate={{ scale: [1, 1.6, 1], opacity: [0.4, 1, 0.4] }}
                           transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.18 }}
                         />
                       ))}
@@ -732,7 +852,7 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
 
             {/* Quick prompts in 2-column grid */}
             <div className="px-4 pb-3 grid grid-cols-2 gap-2">
-              {["Cosa stai ascoltando?", "Analizza il mood", "Consigliami qualcosa", "Quanti BPM ha?"].map((p) => (
+              {["Cosa sto ascoltando?", "Chi è il cantante?", "Quanti BPM ha?", "Consigliami musica"].map((p) => (
                 <button
                   key={p}
                   onClick={() => sendMessageText(p)}
@@ -746,13 +866,13 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
 
             {/* Input bar */}
             <div className="shrink-0 px-4 pb-4 pt-2 border-t border-border">
-              <div className="flex items-center gap-2 bg-secondary/40 border border-border/50 rounded-2xl px-4 py-2.5 focus-within:border-primary/50 transition-colors">
+              <div className="flex items-center gap-2 bg-secondary/40 border border-border/50 rounded-2xl px-4 py-2.5 focus-within:border-primary/50 transition-colors shadow-inner">
                 <input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Chiedi a LyraAI..."
+                  placeholder="Chiedi qualsiasi cosa a LyraAI..."
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
                 />
                 <motion.button
@@ -761,7 +881,7 @@ export default function AIPanel({ isOpen, onClose, onPlayTrack }: AIPanelProps) 
                   disabled={!input.trim() || isTyping}
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                     input.trim() && !isTyping
-                      ? "bg-primary text-primary-foreground shadow-md"
+                      ? "bg-primary text-primary-foreground shadow-md hover:opacity-90"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
