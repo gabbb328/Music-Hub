@@ -316,7 +316,7 @@ export default function SpotifyLogin() {
                   </p>
 
                   {/* ── 2. MENU A TENDINA CON ALTRI BOTTONI (CLICK IMMEDIATO) ── */}
-                  <div className="relative pt-1">
+                  <div className="relative pt-1" style={{ display: "none" }}>       {/*da cancellare con l'uscita della versione 3.0*/}
                     <button
                       type="button"
                       onClick={() => setShowDropdown(!showDropdown)}
@@ -438,6 +438,7 @@ export default function SpotifyLogin() {
 
                 <form onSubmit={handleRequestAccess} className="space-y-4">
                   {/* Selettore del servizio */}
+                  {/*
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-muted-foreground ml-1">
                       Servizio musicale
@@ -454,6 +455,7 @@ export default function SpotifyLogin() {
                       ))}
                     </select>
                   </div>
+                  */} {/*da cancellare con l'uscita della versione 3.0*/}
 
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-muted-foreground ml-1">
@@ -507,7 +509,7 @@ export default function SpotifyLogin() {
                             : "border-border bg-background/50 text-muted-foreground hover:border-primary/50"
                         }`}
                       >
-                        Premium / HiFi
+                        Premium
                       </button>
                       <button
                         type="button"
@@ -518,7 +520,7 @@ export default function SpotifyLogin() {
                             : "border-border bg-background/50 text-muted-foreground hover:border-primary/50"
                         }`}
                       >
-                        Free / Basic
+                        Free
                       </button>
                     </div>
                   </div>
