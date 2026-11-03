@@ -1148,7 +1148,7 @@ function UsersPermissionsPanel({
     const u = all.find((u) => u.id === id);
     if (!u) return;
     
-    const currPerms = u.permissions || {};
+    const currPerms = u.permissions;
     const nextPerms = { ...currPerms, [perm]: !currPerms[perm] };
     if (perm === "canAccessAdmin" && !nextPerms.canAccessAdmin) {
       nextPerms.canAccessInfrastructure = false;
@@ -1372,7 +1372,7 @@ function UsersPermissionsPanel({
                                 }}
                               >
                                 {(() => {
-                                  const userPerms = u.permissions || {};
+                                  const userPerms: CollabUser["permissions"] = u.permissions || {} as CollabUser["permissions"];
                                   const list: [keyof CollabUser["permissions"], string][] = [
                                     ["canViewStats", "Può vedere statistiche Spotify"],
                                     ["canViewToken", "Può vedere il token OAuth"],
@@ -1622,7 +1622,7 @@ function UsersPermissionsPanel({
                             </div>
 
                             {/* Se accesso admin è attivo, mostra link e campi credenziali */}
-                            {u.permissions.canAccessAdmin && (
+                            {u.permissions?.canAccessAdmin && (
                               <div
                                 style={{
                                   background: "rgba(52,211,153,0.07)",
@@ -1813,7 +1813,37 @@ function UsersPermissionsPanel({
               value={globalSettings?.maxRequestsPerSession ?? 2}
               onChange={async (e) => {
                 const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 2));
-                const next = { maxRequestsPerSession: val };
+                const next: GlobalSettings = { ...(globalSettings!), maxRequestsPerSession: val };
+                setGlobalSettings(next);
+                await saveGlobalSettings(next);
+              }}
+              style={{
+                width: 50,
+                background: "rgba(0,0,0,0.3)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 6,
+                padding: "3px 6px",
+                color: "white",
+                fontSize: 10,
+                textAlign: "center",
+                outline: "none"
+              }}
+            />
+          </div>
+          {/* Massimo tentativi di accesso admin */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>
+              Massimo tentativi di accesso alla login page:
+            </span>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              disabled={!hasModifyGlobal}
+              value={globalSettings?.maxLoginAttempts ?? 5}
+              onChange={async (e) => {
+                const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 5));
+                const next: GlobalSettings = { ...(globalSettings!), maxLoginAttempts: val };
                 setGlobalSettings(next);
                 await saveGlobalSettings(next);
               }}

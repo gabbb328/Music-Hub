@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import {
   usePlaybackState,
   usePlayMutation,
@@ -823,7 +824,7 @@ export default function IpodNowPlayingView() {
   const prevM = usePreviousMutation();
   const seekM = useSeekMutation();
 
-  const { screen, setScreen, menuIndex, setMenuIndex, colorIndex, setColorIndex } = useIpodPersistence();
+  const { screen, setScreen, menuIndex, setMenuIndex, colorIndex, setColorIndex, setIpodMode } = useIpodPersistence();
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const settings = PRESET_COLORS[colorIndex]?.settings || PRESET_COLORS[0].settings;
 
@@ -1062,6 +1063,16 @@ export default function IpodNowPlayingView() {
         zIndex: isMobile ? 100 : "auto",
       }}
     >
+      {/* Exit Button */}
+      <button
+        onClick={() => setIpodMode(false)}
+        className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/40 hover:bg-black/60 text-white/90 backdrop-blur-md border border-white/20 transition-all active:scale-90"
+        title="Esci da modalità iPod"
+        aria-label="Esci da iPod"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
       {/* Top pill / speaker grille */}
       <div
         className="absolute"

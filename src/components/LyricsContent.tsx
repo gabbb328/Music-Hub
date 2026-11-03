@@ -307,6 +307,11 @@ export default function LyricsContent({
         setIsSynced(synced);
         setLoadingLyrics(false);
         if (trackId) lyricsStore.setLyrics(trackId, { lines, synced });
+      }).catch(() => {
+        setLyrics([]);
+        setIsSynced(false);
+        setLoadingLyrics(false);
+        if (trackId) lyricsStore.setLyrics(trackId, { lines: [], synced: false });
       });
     }
 

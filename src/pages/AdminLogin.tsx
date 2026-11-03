@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Eye, EyeOff, Lock, User, AlertTriangle } from "lucide-react";
 
-import { getCollabUsers } from "@/services/supabase-api";
+import { getCollabUsers, getGlobalSettings } from "@/services/supabase-api";
 
 // ─── SHA-256 via Web Crypto API ───────────────────────────────────────────────
 async function sha256hex(text: string): Promise<string> {
@@ -73,6 +73,12 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
   const [loading, setLoading] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [maxAttempts, setMaxAttempts] = useState(5);
+
+  // Carica il limite configurato dall'admin
+  useState(() => {
+    getGlobalSettings().then((s) => setMaxAttempts(s.maxLoginAttempts ?? 5));
+  });
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -117,17 +123,17 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
       } else {
         const next = attempts + 1;
         setAttempts(next);
-        if (next >= 5) {
+        if (next >= maxAttempts) {
           setLocked(true);
           setError("Troppi tentativi falliti. Ricarica la pagina per riprovare.");
         } else {
-          setError(`Credenziali non valide. (${5 - next} tentativi rimasti)`);
+          setError(`Credenziali non valide. (${maxAttempts - next} tentativi rimasti)`);
         }
       }
 
       setLoading(false);
     },
-    [username, password, attempts, locked, loading, onSuccess]
+    [username, password, attempts, maxAttempts, locked, loading, onSuccess]
   );
 
   return (

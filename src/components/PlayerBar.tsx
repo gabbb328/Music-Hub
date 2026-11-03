@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle,
   Volume2, Volume1, VolumeX, Mic2, ListMusic,
-  Monitor, Maximize2, ChevronUp, Lock,
+  Monitor, Maximize2, ChevronUp, ChevronRight, Lock,
 } from "lucide-react";
 import WaveformProgress from "./WaveformProgress";
 import RepeatControl from "./RepeatControl";
@@ -16,6 +16,8 @@ import {
 } from "@/hooks/useSpotify";
 
 import { useAccountTier } from "@/hooks/useAccountTier";
+import { getActiveProvider, MUSIC_PROVIDERS } from "@/services/music-providers";
+import { MusicServiceLogo } from "@/components/MusicServiceLogos";
 
 type PlayerProps = ReturnType<typeof usePlayerStore> & {
   onExpandClick: () => void;
@@ -24,6 +26,11 @@ type PlayerProps = ReturnType<typeof usePlayerStore> & {
   superMode?: boolean;
   isQuizActive?: boolean;
   isVertical?: boolean;
+  variant?: "desktop" | "pill";
+  layout?: "mobile" | "tablet" | "desktop";
+  isLateralOpen?: boolean;
+  onToggleLateral?: () => void;
+  className?: string;
 };
 
 // ── Volume slider con track colorata corretta ─────────────────────────────────
@@ -86,6 +93,8 @@ export default function PlayerBar(props: PlayerProps) {
     nextTrack: localNextTrack, prevTrack: localPrevTrack,
     onExpandClick, onNavigate, onOpenEggList, superMode = false,
     isQuizActive = false, isVertical = false,
+    variant = "desktop", layout = "desktop",
+    isLateralOpen = false, onToggleLateral, className = "",
   } = props;
 
   // ── TUTTI gli hook prima di qualsiasi early return ─────────────────────────
@@ -224,38 +233,326 @@ export default function PlayerBar(props: PlayerProps) {
     borderColor:   "rgba(255,215,0,0.4)",
     backdropFilter:"blur(20px) saturate(180%)",
     boxShadow:     "0 -4px 40px rgba(255,215,0,0.18)",
-  } : {
-    backdropFilter: "blur(20px) saturate(180%)",
-    backgroundColor: "hsl(var(--card) / 0.4)",
-    borderColor: "hsl(var(--border) / 0.5)",
-  };
+  } : {};
 
   const playBtnClass = "w-10 h-10 rounded-full flex items-center justify-center select-none touch-manipulation shrink-0";
   const playBtnStyle: React.CSSProperties = superMode
     ? { background: "linear-gradient(135deg,#FFD700,#FF8C00)", boxShadow: "0 0 18px rgba(255,215,0,0.55)" }
     : { background: "hsl(var(--foreground))" };
 
+  // ── 1. Modalità Pill Floating (Mobile & Tablet) ───────────────────────────
+  if (variant === "pill") {
+    return (
+      <div
+        className={`pointer-events-auto relative w-full h-16 rounded-full bg-background/85 dark:bg-background/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-lg shadow-black/5 dark:shadow-black/20 flex items-center justify-between px-2.5 sm:px-3 select-none overflow-hidden ${className}`}
+        style={playerBarStyle}
+        data-player-bar
+      >
+        {/* Cover + Titolo & Artista */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+          <motion.button
+            onClick={onExpandClick}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.94 }}
+            className="relative shrink-0 cursor-pointer touch-manipulation"
+            title="Espandi Now Playing"
+          >
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={currentTrack.id}
+                src={currentTrack.cover}
+                alt={currentTrack.album}
+                className={`w-11 h-11 rounded-full object-cover shadow-sm transition-all duration-300 ml-0.5 ${
+                  isQuizActive ? "blur-md scale-90" : ""
+                }`}
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                style={superMode ? { boxShadow: "0 0 12px rgba(255,215,0,0.5)" } : {}}
+              />
+            </AnimatePresence>
+            {isPlaying && (
+              <motion.div
+                className="absolute inset-0 rounded-full ring-1 ring-primary/40 ml-0.5"
+                style={{ '--tw-ring-color': superMode ? "rgba(255,215,0,0.55)" : undefined } as any}
+                animate={{ opacity: [0.3, 0.8, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
+
+          <div
+            className="min-w-0 flex-1 cursor-pointer touch-manipulation select-none"
+            onClick={onExpandClick}
+            title="Tocca per aprire Now Playing"
+          >
+            <p
+              className="text-xs sm:text-sm font-semibold truncate leading-tight"
+              style={{ color: superMode ? GOLD : undefined }}
+            >
+              {isQuizActive ? "Guess the Title" : currentTrack.title}
+            </p>
+            <div className="flex items-center gap-1.5 leading-tight mt-0.5">
+              <p className="text-[11px] text-muted-foreground truncate">
+                {isQuizActive ? "Guess the Artist" : currentTrack.artist}
+              </p>
+              {isFree && (
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/15 px-1 py-0.2 rounded border border-amber-500/25 shrink-0">
+                  <Lock className="w-2 h-2 text-amber-400" /> Free
+                </span>
+              )}
+            </div>
+            {/* Sottile barra di progresso */}
+            <div className="mt-1 h-0.5 rounded-full bg-muted-foreground/20 overflow-hidden w-full max-w-[120px] sm:max-w-[160px]">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{
+                  width: `${safeProgress}%`,
+                  background: superMode ? GOLD : undefined,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Controlli a destra del pill */}
+        <div className="flex items-center gap-1 shrink-0">
+          <motion.button
+            {...playBtnHandlers}
+            whileTap={{ scale: 0.9 }}
+            className={playBtnClass}
+            style={playBtnStyle}
+            title="Play / Pause"
+          >
+            {isPlaying ? (
+              <Pause className="w-5 h-5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+            ) : (
+              <Play className="w-5 h-5 ml-0.5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+            )}
+          </motion.button>
+
+          <CtrlBtn onClick={handleNext} superMode={superMode} title="Brano successivo">
+            <SkipForward className="w-4 h-4 fill-current" />
+          </CtrlBtn>
+
+          {/* Freccetta a destra:
+              - Su tablet: apre lateralmente
+              - Su telefono: espande la now playing view */}
+          {layout === "tablet" ? (
+            <CtrlBtn
+              onClick={onToggleLateral}
+              active={isLateralOpen}
+              superMode={superMode}
+              title={isLateralOpen ? "Chiudi pannello laterale" : "Apri pannello laterale"}
+            >
+              <motion.div
+                animate={{ rotate: isLateralOpen ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </motion.div>
+            </CtrlBtn>
+          ) : (
+            <CtrlBtn
+              onClick={onExpandClick}
+              superMode={superMode}
+              title="Espandi Now Playing"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </CtrlBtn>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── 2. Modalità Verticale (Glass Mode Desktop & Pannello Laterale Tablet) ─
+  if (isVertical) {
+    return (
+      <div
+        className={`z-50 transition-all duration-500 flex flex-col w-full h-full p-6 justify-center gap-6 sm:gap-8 select-none ${className}`}
+        style={playerBarStyle}
+        data-player-bar
+      >
+        {/* Cover + titolo verticale */}
+        <div className="flex flex-col items-center text-center gap-5">
+          <motion.button
+            onClick={onExpandClick}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.93 }}
+            className="relative shrink-0 cursor-pointer touch-manipulation"
+            title="Espandi a schermo intero"
+          >
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={currentTrack.id}
+                src={currentTrack.cover}
+                alt={currentTrack.album}
+                className={`object-cover shadow-2xl transition-all duration-500 w-48 h-48 sm:w-56 sm:h-56 rounded-2xl ${
+                  isQuizActive ? "blur-md scale-90" : ""
+                }`}
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                style={superMode ? { boxShadow: "0 0 20px rgba(255,215,0,0.5)" } : {}}
+              />
+            </AnimatePresence>
+            {isPlaying && (
+              <motion.div
+                className="absolute inset-0 rounded-2xl ring-2 ring-primary/40"
+                style={{ '--tw-ring-color': superMode ? "rgba(255,215,0,0.55)" : undefined } as any}
+                animate={{ opacity: [0.3, 0.8, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
+
+          <div className={`min-w-0 w-full px-2 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}>
+            <p
+              className="text-lg font-bold mb-1 break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden"
+              style={{ color: superMode ? GOLD : undefined }}
+            >
+              {isQuizActive ? "Guess the Title" : currentTrack.title}
+            </p>
+            <div className="flex items-center justify-center gap-1.5">
+              <p className="text-sm text-muted-foreground break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:1] [-webkit-box-orient:vertical] overflow-hidden">
+                {isQuizActive ? "Guess the Artist" : currentTrack.artist}
+              </p>
+              {isFree && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/25 shrink-0" title="Account Free: riproduzione anteprima 30s">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" /> Free
+                </span>
+              )}
+            </div>
+            {superMode && (
+              <p className="text-[10px] font-bold tracking-widest mt-1" style={{ color: GOLD, opacity: 0.85 }}>
+                ⚡ 1.5× SPEED
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Controlli playback */}
+        <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+          <div className="flex items-center justify-center gap-4">
+            <CtrlBtn onClick={handleToggleShuffle} active={shuffle} superMode={superMode}>
+              <Shuffle className="w-4 h-4" />
+            </CtrlBtn>
+            <CtrlBtn onClick={handlePrevious} superMode={superMode}>
+              <SkipBack className="w-4 h-4 fill-current" />
+            </CtrlBtn>
+
+            <motion.button
+              {...playBtnHandlers}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.9 }}
+              className={playBtnClass}
+              style={playBtnStyle}
+              title="Play/Pause — tieni premuto per Easter Eggs"
+            >
+              {isPlaying ? (
+                <Pause className="w-5 h-5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+              ) : (
+                <Play className="w-5 h-5 ml-0.5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+              )}
+            </motion.button>
+
+            <CtrlBtn onClick={handleNext} superMode={superMode}>
+              <SkipForward className="w-4 h-4 fill-current" />
+            </CtrlBtn>
+            <RepeatControl repeat={repeat} onToggle={handleToggleRepeat} />
+          </div>
+
+          {/* Scrubber timeline */}
+          <div className="space-y-1 w-full mt-2">
+            <div
+              className="relative h-1.5 bg-foreground/15 hover:bg-foreground/25 rounded-full cursor-pointer flex items-center group transition-colors"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const p = ((e.clientX - rect.left) / rect.width) * 100;
+                handleSeek(Math.max(0, Math.min(100, p)));
+              }}
+            >
+              <div
+                className="absolute left-0 top-0 bottom-0 rounded-full transition-all"
+                style={{
+                  width: `${safeProgress}%`,
+                  background: superMode ? GOLD : "hsl(var(--foreground))",
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums leading-none px-0.5">
+              <span>{formatTime(elapsed)}</span>
+              <span>{formatTime(currentTrack.duration)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Azioni secondarie e volume */}
+        <div className="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
+          <div className="flex items-center justify-center gap-3">
+            <CtrlBtn onClick={() => onNavigate?.("lyrics")} superMode={superMode} title="Testi">
+              <Mic2 className="w-4 h-4" />
+            </CtrlBtn>
+            <CtrlBtn onClick={() => onNavigate?.("queue")} superMode={superMode} title="Coda">
+              <ListMusic className="w-4 h-4" />
+            </CtrlBtn>
+            <CtrlBtn onClick={() => onNavigate?.("devices")} superMode={superMode} title="Dispositivi">
+              <Monitor className="w-4 h-4" />
+            </CtrlBtn>
+            <CtrlBtn onClick={onExpandClick} superMode={superMode} title="A tutto schermo">
+              <Maximize2 className="w-4 h-4" />
+            </CtrlBtn>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleVolumeChange(volume === 0 ? 75 : 0)}
+              className="shrink-0 transition-colors"
+              style={{ color: superMode ? GOLD_DIM : "hsl(var(--muted-foreground))" }}
+            >
+              {volume === 0 ? (
+                <VolumeX className="w-4 h-4" />
+              ) : volume < 50 ? (
+                <Volume1 className="w-4 h-4" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
+            </button>
+            <VolumeSlider value={volume} onChange={handleVolumeChange} superMode={superMode} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 3. Modalità Orizzontale Desktop (Classic Mode) ────────────────────────
   return (
     <div
-      className={`z-50 shrink-0 transition-all duration-500 flex ${
-        isVertical
-          ? "flex-col w-full h-full p-8 justify-center gap-10"
-          : "min-h-16 md:h-24 border-transparent md:border-t items-center px-2 md:px-4 py-2 md:py-0 gap-2 md:gap-4"
-      }`}
+      className={`w-full min-h-16 md:h-24 flex items-center px-4 gap-4 justify-between select-none ${className}`}
       style={playerBarStyle}
       data-player-bar
     >
       {/* ── Cover + titolo ──────────────────────────────────────────────────── */}
-      <div className={`flex ${isVertical ? "flex-col items-center text-center gap-6" : "items-center gap-2 md:gap-3 w-auto md:w-72 min-w-0 flex-1 md:flex-none"}`}>
-        <motion.button onClick={onExpandClick}
-          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.93 }}
-          className="relative shrink-0 cursor-pointer touch-manipulation">
+      <div className="flex items-center gap-3 w-72 min-w-0 shrink-0">
+        <motion.button
+          onClick={onExpandClick}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.93 }}
+          className="relative shrink-0 cursor-pointer touch-manipulation"
+        >
           <AnimatePresence mode="wait">
             <motion.img
               key={currentTrack.id}
-              src={currentTrack.cover} alt={currentTrack.album}
-              className={`rounded-lg object-cover shadow-lg transition-all duration-500 ${isQuizActive ? "blur-md scale-90" : ""} ${isVertical ? "w-56 h-56" : "w-14 h-14"}`}
-              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              src={currentTrack.cover}
+              alt={currentTrack.album}
+              className={`w-14 h-14 rounded-lg object-cover shadow-lg transition-all duration-500 ${
+                isQuizActive ? "blur-md scale-90" : ""
+              }`}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 320, damping: 28 }}
               style={superMode ? { boxShadow: "0 0 14px rgba(255,215,0,0.5)" } : {}}
@@ -263,7 +560,7 @@ export default function PlayerBar(props: PlayerProps) {
           </AnimatePresence>
           {isPlaying && (
             <motion.div
-              className="absolute inset-0 rounded-lg ring-2"
+              className="absolute inset-0 rounded-lg ring-1 ring-primary/40"
               style={{ '--tw-ring-color': superMode ? "rgba(255,215,0,0.55)" : undefined } as any}
               animate={{ opacity: [0.3, 0.8, 0.3] }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -272,12 +569,14 @@ export default function PlayerBar(props: PlayerProps) {
         </motion.button>
 
         <div className={`min-w-0 flex-1 transition-all duration-500 ${isQuizActive ? "blur-sm" : ""}`}>
-          <p className={`${isVertical ? "text-xl font-bold mb-1" : "text-sm font-semibold leading-tight"} break-words [overflow-wrap:anywhere] [display:-webkit-box] ${isVertical ? "[-webkit-line-clamp:2]" : "[-webkit-line-clamp:1]"} [-webkit-box-orient:vertical] overflow-hidden`}
-            style={{ color: superMode ? GOLD : undefined }}>
+          <p
+            className="text-sm font-semibold leading-tight truncate"
+            style={{ color: superMode ? GOLD : undefined }}
+          >
             {isQuizActive ? "Guess the Title" : currentTrack.title}
           </p>
-          <div className="flex items-center gap-1.5">
-            <p className={`${isVertical ? "text-base" : "text-xs"} text-muted-foreground leading-tight break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:1] [-webkit-box-orient:vertical] overflow-hidden`}>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <p className="text-xs text-muted-foreground leading-tight truncate">
               {isQuizActive ? "Guess the Artist" : currentTrack.artist}
             </p>
             {isFree && (
@@ -287,39 +586,15 @@ export default function PlayerBar(props: PlayerProps) {
             )}
           </div>
           {superMode && (
-            <p className="text-[9px] font-bold tracking-widest"
-              style={{ color: GOLD, opacity: 0.8 }}>
+            <p className="text-[9px] font-bold tracking-widest mt-0.5" style={{ color: GOLD, opacity: 0.8 }}>
               ⚡ 1.5× SPEED
             </p>
           )}
-          {!isVertical && (
-            <div className="md:hidden mt-1.5 pr-1">
-              <div className="flex items-center justify-between gap-2 text-[9px] text-muted-foreground tabular-nums">
-                <span>{formatTime(elapsed)}</span>
-                <span>{formatTime(currentTrack.duration)}</span>
-              </div>
-              <div className="mt-0.5 h-1 rounded-full bg-muted-foreground/20 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-300"
-                  style={{ width: `${safeProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
         </div>
-
-        {!isVertical && (
-          <motion.button onClick={onExpandClick}
-            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-            className="touch-manipulation"
-            style={{ color: superMode ? GOLD_DIM : undefined }}>
-            <ChevronUp className="w-4 h-4" />
-          </motion.button>
-        )}
       </div>
 
-      {/* ── Desktop controls ────────────────────────────────────────────────── */}
-      <div className={`${isVertical ? "flex" : "hidden md:flex"} flex-1 max-w-2xl mx-auto flex-col gap-2 w-full min-w-0`}>
+      {/* ── Controlli centrali desktop ───────────────────────────────────────── */}
+      <div className="flex flex-1 max-w-2xl mx-auto flex-col gap-2 w-full min-w-0">
         <div className="flex items-center justify-center gap-4">
           <CtrlBtn onClick={handleToggleShuffle} active={shuffle} superMode={superMode}>
             <Shuffle className="w-4 h-4" />
@@ -328,17 +603,19 @@ export default function PlayerBar(props: PlayerProps) {
             <SkipBack className="w-4 h-4 fill-current" />
           </CtrlBtn>
 
-          {/* Play/Pause con long press */}
           <motion.button
             {...playBtnHandlers}
-            whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.9 }}
             className={playBtnClass}
             style={playBtnStyle}
             title="Play/Pause — tieni premuto per Easter Eggs"
           >
-            {isPlaying
-              ? <Pause className="w-5 h-5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
-              : <Play  className="w-5 h-5 ml-0.5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />}
+            {isPlaying ? (
+              <Pause className="w-5 h-5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+            ) : (
+              <Play className="w-5 h-5 ml-0.5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
+            )}
           </motion.button>
 
           <CtrlBtn onClick={handleNext} superMode={superMode}>
@@ -347,21 +624,41 @@ export default function PlayerBar(props: PlayerProps) {
           <RepeatControl repeat={repeat} onToggle={handleToggleRepeat} />
         </div>
 
-        <div className="space-y-0.5 min-w-0">
-          <div className="w-full min-w-0">
-            <WaveformProgress progress={progress} isPlaying={isPlaying} onSeek={handleSeek} />
+        <div className="space-y-1 min-w-0 w-full max-w-md mx-auto">
+          <div
+            className="relative h-1.5 bg-foreground/15 hover:bg-foreground/25 rounded-full cursor-pointer flex items-center group transition-colors"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const p = ((e.clientX - rect.left) / rect.width) * 100;
+              handleSeek(Math.max(0, Math.min(100, p)));
+            }}
+          >
+            <div
+              className="absolute left-0 top-0 bottom-0 rounded-full transition-all"
+              style={{
+                width: `${safeProgress}%`,
+                background: superMode ? GOLD : "hsl(var(--foreground))",
+              }}
+            />
           </div>
-          <div className="text-center text-[11px] text-muted-foreground tabular-nums leading-none">
-            {formatTime(elapsed)} / {formatTime(currentTrack.duration)}
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums leading-none px-0.5">
+            <span>{formatTime(elapsed)}</span>
+            <span>{formatTime(currentTrack.duration)}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Desktop right ───────────────────────────────────────────────────── */}
-      <div className={`${isVertical ? "flex w-full justify-center mt-4" : "hidden md:flex justify-end w-56"} items-center gap-2`}>
-        <CtrlBtn onClick={() => onNavigate?.("lyrics")} superMode={superMode}><Mic2 className="w-4 h-4" /></CtrlBtn>
-        <CtrlBtn onClick={() => onNavigate?.("queue")}  superMode={superMode}><ListMusic className="w-4 h-4" /></CtrlBtn>
-        <CtrlBtn onClick={() => onNavigate?.("devices")} superMode={superMode}><Monitor className="w-4 h-4" /></CtrlBtn>
+      {/* ── Controlli destri desktop ─────────────────────────────────────────── */}
+      <div className="flex justify-end w-56 items-center gap-2">
+        <CtrlBtn onClick={() => onNavigate?.("lyrics")} superMode={superMode} title="Testi">
+          <Mic2 className="w-4 h-4" />
+        </CtrlBtn>
+        <CtrlBtn onClick={() => onNavigate?.("queue")} superMode={superMode} title="Coda">
+          <ListMusic className="w-4 h-4" />
+        </CtrlBtn>
+        <CtrlBtn onClick={() => onNavigate?.("devices")} superMode={superMode} title="Dispositivi">
+          <Monitor className="w-4 h-4" />
+        </CtrlBtn>
 
         <div className="flex items-center gap-1.5 ml-1">
           <button
@@ -369,35 +666,19 @@ export default function PlayerBar(props: PlayerProps) {
             className="shrink-0 transition-colors"
             style={{ color: superMode ? GOLD_DIM : "hsl(var(--muted-foreground))" }}
           >
-            {volume === 0
-              ? <VolumeX className="w-4 h-4" />
-              : volume < 50
-              ? <Volume1 className="w-4 h-4" />
-              : <Volume2 className="w-4 h-4" />}
+            {volume === 0 ? (
+              <VolumeX className="w-4 h-4" />
+            ) : volume < 50 ? (
+              <Volume1 className="w-4 h-4" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
           </button>
-          {/* Volume slider con track corretta — niente più barra bianca */}
           <VolumeSlider value={volume} onChange={handleVolumeChange} superMode={superMode} />
         </div>
 
-        {!isVertical && (
-          <CtrlBtn onClick={onExpandClick} superMode={superMode}><Maximize2 className="w-4 h-4" /></CtrlBtn>
-        )}
-      </div>
-
-      {/* ── Mobile controls ─────────────────────────────────────────────────── */}
-      <div className="flex md:hidden items-center justify-end gap-1">
-        <motion.button
-          {...playBtnHandlers}
-          whileTap={{ scale: 0.9 }}
-          className={playBtnClass}
-          style={playBtnStyle}
-        >
-          {isPlaying
-            ? <Pause className="w-5 h-5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />
-            : <Play  className="w-5 h-5 ml-0.5" style={{ color: superMode ? "#000" : "hsl(var(--background))" }} />}
-        </motion.button>
-        <CtrlBtn onClick={handleNext} superMode={superMode}>
-          <SkipForward className="w-5 h-5 fill-current" />
+        <CtrlBtn onClick={onExpandClick} superMode={superMode} title="A tutto schermo">
+          <Maximize2 className="w-4 h-4" />
         </CtrlBtn>
       </div>
     </div>

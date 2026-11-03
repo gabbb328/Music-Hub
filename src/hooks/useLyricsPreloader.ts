@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePlaybackState } from '@/hooks/useSpotify';
 import { lyricsStore } from '@/hooks/useLyricsStore';
 import { fetchSyncedLyrics } from '@/services/lyrics-api';
@@ -6,14 +6,17 @@ import { translateText } from '@/services/translation-api';
 
 export function useLyricsPreloader() {
   const { data: playbackState } = usePlaybackState();
-  
+  const lastPreloadIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const track = playbackState?.item;
     if (!track) return;
 
     const trackId = track.id;
-    
-    if (lyricsStore.getLyrics(trackId)) return;
+    if (lastPreloadIdRef.current === trackId) return;
+    lastPreloadIdRef.current = trackId;
+
+    if (lyricsStore.hasLyrics(trackId)) return;
 
     const loadLyrics = async () => {
       try {
@@ -22,30 +25,30 @@ export function useLyricsPreloader() {
           track.artists[0]?.name || '',
           Math.floor(track.duration_ms / 1000)
         );
-        
-        lyricsStore.setLyrics(trackId, { lines, synced });
 
-        if (!lyricsStore.getTranslation(trackId) && lines.length > 0) {
-          const translations = new Map<number, string>();
-          
-          for (let i = 0; i < Math.min(lines.length, 50); i++) {
-            const line = lines[i];
-            if (line.text.trim() && !line.text.includes('♪')) {
-              const result = await translateText(line.text, 'it');
-              if (result) {
-                translations.set(i, result.translatedText);
-              }
-            }
-            
-            if (i % 10 === 0) {
-              await new Promise(resolve => setTimeout(resolve, 50));
+        lyricsStore.setLyrics(trackId, { lines: lines || [], synced: !!synced });
+
+        if (!lyricsStore.getTranslation(trackId) && lines && lines.length > 0) {
+          const validLines = lines
+            .map((l, idx) => ({ text: l.text.trim(), idx }))
+            .filter((l) => l.text && !l.text.includes('♪'))
+            .slice(0, 30);
+
+          if (validLines.length > 0) {
+            const combined = validLines.map((l) => l.text).join('\n');
+            const result = await translateText(combined, 'it');
+            if (result?.translatedText) {
+              const split = result.translatedText.split('\n');
+              const translations = new Map<number, string>();
+              validLines.forEach((item, i) => {
+                translations.set(item.idx, split[i]?.trim() || item.text);
+              });
+              lyricsStore.setTranslation(trackId, translations);
             }
           }
-          
-          lyricsStore.setTranslation(trackId, translations);
         }
       } catch (error) {
-        console.error('Lyrics preload error:', error);
+        lyricsStore.setLyrics(trackId, { lines: [], synced: false });
       }
     };
 

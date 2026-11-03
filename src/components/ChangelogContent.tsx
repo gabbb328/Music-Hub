@@ -11,6 +11,15 @@ interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    date: "3 Novembre 2026",
+    version: "v2.5.0",
+    commits:[
+      "Miglioramento della UI del NowPlaying View da telefono e ridisegnazione di quella da pc",
+      "Nuova modalia lablet",
+      "Navbar con grafica piu moderna"
+    ],
+  },
+  {
     date: "8 Ottobre 2026",
     version: "v2.1.0",
     commits: [

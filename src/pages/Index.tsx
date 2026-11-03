@@ -56,8 +56,9 @@ import type { EasterEggType } from "@/hooks/useEasterEgg";
 import { useSpotifyContext } from "@/contexts/SpotifyContext";
 //import TouchBar from "@/components/TouchBar";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Crown, Zap, Smartphone } from "lucide-react";
+import { Crown, Zap, Smartphone, ChevronRight } from "lucide-react";
 import { useAlexa } from "@/hooks/useAlexa";
+import { useDeviceType } from "@/hooks/use-mobile";
 
 const KONAMI_KEYS = [
   "ArrowUp",
@@ -213,6 +214,12 @@ const IndexInner = () => {
 
   const { isIOS, playbackState: spPb } = useSpotifyContext();
 
+  const deviceType = useDeviceType();
+  const isMobile = deviceType === "mobile";
+  const isTablet = deviceType === "tablet";
+  const isDesktop = deviceType === "desktop";
+  const [showTabletLateralPlayer, setShowTabletLateralPlayer] = useState(false);
+
   const [activeSection, setActiveSection] = useState("home");
   const [searchQuery, setSearchQuery] = useState("");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
@@ -287,7 +294,10 @@ const IndexInner = () => {
       else player.setProgress((to / (currentTrack?.duration || 1)) * 100);
     },
     seekForward: (offset = 10) => {
-      const to = Math.min(currentTrack?.duration || 0, currentPositionSec + offset);
+      const to = Math.min(
+        currentTrack?.duration || 0,
+        currentPositionSec + offset,
+      );
       if (spotifyTrack) seekMutation.mutate(Math.floor(to * 1000));
       else player.setProgress((to / (currentTrack?.duration || 1)) * 100);
     },
@@ -580,15 +590,27 @@ const IndexInner = () => {
       </AnimatePresence>
 
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        <Sidebar
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onOpenSettings={() => {
-            setSettingsTab("aspetto");
-            setShowSettings(true);
-          }}
-        />
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-28 md:pb-0">
+        {isDesktop && (
+          <Sidebar
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onOpenSettings={() => {
+              setSettingsTab("aspetto");
+              setShowSettings(true);
+            }}
+          />
+        )}
+        <main
+          className={`flex-1 flex flex-col min-w-0 overflow-hidden relative transition-[padding] duration-300 ${
+            isMobile
+              ? hasTrack
+                ? "pb-4"
+                : "pb-0"
+              : isTablet
+                ? "pb-0"
+                : "pb-0"
+          }`}
+        >
           {isAlexa ? (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {renderContent()}
@@ -610,10 +632,26 @@ const IndexInner = () => {
               </motion.div>
             </AnimatePresence>
           )}
+
+          {/* Sfumatura sul fondo che dissolve il contenuto scrollabile — funziona sempre.
+              backdrop-filter non è usabile qui (conflitti con overflow-hidden e stacking context).
+              Il gradiente from-background crea il fade affidabile su qualsiasi browser/tema. */}
+          {(isMobile || isTablet) && (
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none absolute bottom-0 left-0 right-0 z-40 transition-[height] duration-300 ${
+                isMobile && hasTrack ? "h-40" : "h-28"
+              }`}
+              style={{
+                background:
+                  "linear-gradient(to top, hsl(var(--background)) 0%, hsl(var(--background)) 15%, transparent 100%)",
+              }}
+            />
+          )}
         </main>
         {/* Desktop Vertical Player in Glass mode */}
-        {isGlass && hasTrack && (
-          <div className="hidden md:flex flex-col w-80 shrink-0 border-l border-white/10 glass-surface z-50">
+        {isDesktop && isGlass && hasTrack && (
+          <div className="hidden lg:flex flex-col w-80 shrink-0 border-l border-white/10 glass-surface z-50">
             <PlayerBar
               {...player}
               onExpandClick={() => setShowNowPlaying(true)}
@@ -625,11 +663,53 @@ const IndexInner = () => {
             />
           </div>
         )}
+
+        {/* Tablet Lateral Drawer Player (In-flow flex item: resizes the open page side-by-side) */}
+        <AnimatePresence initial={false}>
+          {isTablet && hasTrack && showTabletLateralPlayer && (
+            <motion.aside
+              key="tablet-lateral-drawer"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 320, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 32 }}
+              className="shrink-0 h-full overflow-hidden border-l border-border/40 dark:border-white/10 bg-background/95 dark:bg-card/95 backdrop-blur-2xl flex flex-col z-40 relative shadow-2xl"
+            >
+              <div className="w-80 h-full flex flex-col pt-3 pb-4">
+                <div className="flex items-center justify-between px-5 py-2.5 border-b border-border/30 shrink-0">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    In Riproduzione
+                  </span>
+                  <button
+                    onClick={() => setShowTabletLateralPlayer(false)}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Chiudi pannello laterale"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <PlayerBar
+                    {...player}
+                    onExpandClick={() => setShowNowPlaying(true)}
+                    onNavigate={(s) => setActiveSection(s)}
+                    onOpenEggList={() => setShowEggList(true)}
+                    superMode={superMode}
+                    isQuizActive={isQuizActive}
+                    isVertical={true}
+                  />
+                </div>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Desktop Horizontal Player in Normal/Classic mode */}
-      {!isGlass && hasTrack && (
-        <div className="hidden md:block border-t border-border bg-card/95 backdrop-blur-md z-50">
+      {isDesktop && !isGlass && hasTrack && (
+        <div className="hidden lg:block border-t border-border bg-card/95 backdrop-blur-md z-50">
           <PlayerBar
             {...player}
             onExpandClick={() => setShowNowPlaying(true)}
@@ -638,33 +718,75 @@ const IndexInner = () => {
             superMode={superMode}
             isQuizActive={isQuizActive}
             isVertical={false}
+            variant="desktop"
           />
         </div>
       )}
 
-      {/* Mobile Player & Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden flex flex-col pointer-events-none bg-background/95 backdrop-blur-xl border-t border-border/40 shadow-2xl">
-        {hasTrack && (
-          <div className="pointer-events-auto">
-            <PlayerBar
-              {...player}
-              onExpandClick={() => setShowNowPlaying(true)}
-              onNavigate={setActiveSection}
-              onOpenEggList={() => setShowEggList(true)}
-              superMode={superMode}
-              isQuizActive={isQuizActive}
-              isVertical={false}
+      {/* Mobile Floating Pills Layout (Stacked vertically) */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none pb-[env(safe-area-inset-bottom)] px-3 mb-2 flex flex-col items-center gap-2">
+          {hasTrack && (
+            <div className="pointer-events-auto w-full max-w-md">
+              <PlayerBar
+                {...player}
+                onExpandClick={() => setShowNowPlaying(true)}
+                onNavigate={setActiveSection}
+                onOpenEggList={() => setShowEggList(true)}
+                superMode={superMode}
+                isQuizActive={isQuizActive}
+                variant="pill"
+                layout="mobile"
+              />
+            </div>
+          )}
+          <div className="pointer-events-auto w-full max-w-md">
+            <MobileNav
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              onOpenSettings={() => setShowSettings(true)}
+              embedded={true}
+              className="w-full"
             />
           </div>
-        )}
-        <div className="pointer-events-auto">
-          <MobileNav
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-            onOpenSettings={() => setShowSettings(true)}
-          />
         </div>
-      </div>
+      )}
+
+      {/* Tablet Floating Pills Layout (Side-by-side in same line; player bar disappears when lateral is open) */}
+      {isTablet && (
+        <div
+          className="fixed bottom-0 left-0 z-50 pointer-events-none pb-[env(safe-area-inset-bottom)] px-4 mb-3 transition-[right] duration-300 ease-out"
+          style={{ right: showTabletLateralPlayer ? "320px" : "0px" }}
+        >
+          <div className="flex flex-row items-center justify-center gap-3 w-full max-w-3xl mx-auto">
+            <div className="pointer-events-auto flex-1 max-w-sm shrink-0">
+              <MobileNav
+                activeSection={activeSection}
+                onSectionChange={setActiveSection}
+                onOpenSettings={() => setShowSettings(true)}
+                embedded={true}
+                className="w-full"
+              />
+            </div>
+            {hasTrack && !showTabletLateralPlayer && (
+              <div className="pointer-events-auto flex-1 max-w-md shrink-0">
+                <PlayerBar
+                  {...player}
+                  onExpandClick={() => setShowNowPlaying(true)}
+                  onNavigate={setActiveSection}
+                  onOpenEggList={() => setShowEggList(true)}
+                  superMode={superMode}
+                  isQuizActive={isQuizActive}
+                  variant="pill"
+                  layout="tablet"
+                  isLateralOpen={showTabletLateralPlayer}
+                  onToggleLateral={() => setShowTabletLateralPlayer(true)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {!isAlexa && (
         <>

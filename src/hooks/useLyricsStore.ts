@@ -19,6 +19,10 @@ class LyricsStore {
     return this.currentLyrics.get(trackId) || null;
   }
 
+  hasLyrics(trackId: string): boolean {
+    return this.currentLyrics.has(trackId);
+  }
+
   getTranslation(trackId: string): Map<number, string> | null {
     return this.currentTranslations.get(trackId) || null;
   }

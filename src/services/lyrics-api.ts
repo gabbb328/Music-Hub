@@ -2,6 +2,12 @@
 const LYRICS_OVH_BASE = "https://api.lyrics.ovh/v1";
 const LRCLIB_BASE = "https://lrclib.net/api";
 
+// Rate limiting & in-memory cache to completely stop redundant / loop requests
+let lrclibCooldownUntil = 0;
+const lyricsMemoryCache = new Map<string, { data: SyncedLyrics; timestamp: number }>();
+const inFlightRequests = new Map<string, Promise<SyncedLyrics>>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minuti
+
 export interface LyricWord {
   time: number;
   text: string;
@@ -208,6 +214,10 @@ export const generatePseudoSyncedLyrics = (lyrics: string, duration: number): Ly
 
 // Fetch from LRCLIB.net (has time-synced lyrics)
 const fetchFromLRCLIB = async (title: string, artist: string, duration: number): Promise<SyncedLyrics | null> => {
+  if (Date.now() < lrclibCooldownUntil) {
+    return null;
+  }
+
   try {
     const params = new URLSearchParams({
       track_name: title,
@@ -216,7 +226,7 @@ const fetchFromLRCLIB = async (title: string, artist: string, duration: number):
     });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const response = await fetch(`${LRCLIB_BASE}/get?${params.toString()}`, {
       signal: controller.signal
@@ -225,6 +235,9 @@ const fetchFromLRCLIB = async (title: string, artist: string, duration: number):
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      if (response.status === 429 || response.status === 503) {
+        lrclibCooldownUntil = Date.now() + 60_000; // 1 minuto di cooldown
+      }
       return null;
     }
 
@@ -315,12 +328,15 @@ const searchVariations = async (
   // Try exact match first
   let result = await fetchFn(title, artist, duration);
   if (result) return result;
+  // Se LRCLIB ha risposto con 429 o 503, interrompi subito le altre varianti per non spammare
+  if (Date.now() < lrclibCooldownUntil) return null;
 
   // Try without featuring artists
   const titleWithoutFeat = title.replace(/\s*[\(\[].*?feat.*?[\)\]]/gi, '').trim();
   if (titleWithoutFeat !== title) {
     result = await fetchFn(titleWithoutFeat, artist, duration);
     if (result) return result;
+    if (Date.now() < lrclibCooldownUntil) return null;
   }
 
   // Try first artist only
@@ -328,10 +344,12 @@ const searchVariations = async (
   if (firstArtist !== artist) {
     result = await fetchFn(title, firstArtist, duration);
     if (result) return result;
+    if (Date.now() < lrclibCooldownUntil) return null;
 
     if (titleWithoutFeat !== title) {
       result = await fetchFn(titleWithoutFeat, firstArtist, duration);
       if (result) return result;
+      if (Date.now() < lrclibCooldownUntil) return null;
     }
   }
 
@@ -340,6 +358,7 @@ const searchVariations = async (
   if (titleWithoutParens !== title) {
     result = await fetchFn(titleWithoutParens, artist, duration);
     if (result) return result;
+    if (Date.now() < lrclibCooldownUntil) return null;
 
     result = await fetchFn(titleWithoutParens, firstArtist, duration);
     if (result) return result;
@@ -350,6 +369,10 @@ const searchVariations = async (
 
 // Fetch from LRCLIB.net Search Endpoint (when exact /get returns null)
 const fetchFromLRCLIBSearch = async (title: string, artist: string, duration: number): Promise<SyncedLyrics | null> => {
+  if (Date.now() < lrclibCooldownUntil) {
+    return null;
+  }
+
   try {
     const cleanTitle = title.replace(/\s*[\(\[].*?[\)\]]/gi, '').trim();
     const cleanArtist = artist.split(/[,&]|feat/i)[0].trim();
@@ -361,13 +384,18 @@ const fetchFromLRCLIBSearch = async (title: string, artist: string, duration: nu
     });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     let response = await fetch(`${LRCLIB_BASE}/search?${params.toString()}`, {
       signal: controller.signal
     });
 
     if (!response.ok) {
+      if (response.status === 429 || response.status === 503) {
+        lrclibCooldownUntil = Date.now() + 60_000;
+        clearTimeout(timeoutId);
+        return null;
+      }
       response = await fetch(`${LRCLIB_BASE}/search?q=${encodeURIComponent(query)}`, {
         signal: controller.signal
       });
@@ -375,7 +403,12 @@ const fetchFromLRCLIBSearch = async (title: string, artist: string, duration: nu
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (response.status === 429 || response.status === 503) {
+        lrclibCooldownUntil = Date.now() + 60_000;
+      }
+      return null;
+    }
 
     const results = await response.json();
     if (!Array.isArray(results) || results.length === 0) return null;
@@ -406,7 +439,7 @@ const fetchFromLRCLIBSearch = async (title: string, artist: string, duration: nu
   }
 };
 
-// Main fetch function with multiple sources
+// Main fetch function with multiple sources, memory cache and in-flight deduplication
 export const fetchSyncedLyrics = async (
   title: string, 
   artist: string,
@@ -420,49 +453,81 @@ export const fetchSyncedLyrics = async (
     };
   }
 
-  try {
-    // 1. Tenta LRCLIB direct get con tutte le varianti di titolo/artista
-    let result = await searchVariations(title, artist, duration, fetchFromLRCLIB);
-    if (result && result.lines.length >= 2 && result.synced) {
-      return result;
-    }
+  const cacheKey = `${normalizeText(title)}_${normalizeText(artist)}_${Math.floor(duration)}`;
 
-    // 2. Tenta LRCLIB search (cerca con query full-text artista + brano, privilegiando testi sincronizzati)
-    result = await searchVariations(title, artist, duration, fetchFromLRCLIBSearch);
-    if (result && result.lines.length >= 2 && result.synced) {
-      return result;
-    }
+  // 1. Controlla la cache in memoria (valida per 5 minuti)
+  const cached = lyricsMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
 
-    // 3. Tenta ricerca globale solo titolo su LRCLIB
-    const cleanTitleOnly = title.replace(/\s*[\(\[].*?[\)\]]/gi, '').trim();
-    if (cleanTitleOnly && cleanTitleOnly.length > 2) {
-      result = await fetchFromLRCLIBSearch(cleanTitleOnly, "", duration);
-      if (result && result.lines.length >= 2 && result.synced) {
+  // 2. Se c'è già una richiesta in corso per questo brano, unisciti ad essa (Deduplicazione)
+  const inFlight = inFlightRequests.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const executeFetch = async (): Promise<SyncedLyrics> => {
+    try {
+      // 1. Tenta LRCLIB direct get con tutte le varianti di titolo/artista
+      if (Date.now() >= lrclibCooldownUntil) {
+        let result = await searchVariations(title, artist, duration, fetchFromLRCLIB);
+        if (result && result.lines.length >= 2 && result.synced) {
+          return result;
+        }
+
+        // 2. Tenta LRCLIB search (cerca con query full-text artista + brano)
+        if (Date.now() >= lrclibCooldownUntil) {
+          result = await searchVariations(title, artist, duration, fetchFromLRCLIBSearch);
+          if (result && result.lines.length >= 2 && result.synced) {
+            return result;
+          }
+        }
+
+        // 3. Tenta ricerca globale solo titolo su LRCLIB
+        if (Date.now() >= lrclibCooldownUntil) {
+          const cleanTitleOnly = title.replace(/\s*[\(\[].*?[\)\]]/gi, '').trim();
+          if (cleanTitleOnly && cleanTitleOnly.length > 2) {
+            result = await fetchFromLRCLIBSearch(cleanTitleOnly, "", duration);
+            if (result && result.lines.length >= 2 && result.synced) {
+              return result;
+            }
+          }
+        }
+      }
+
+      // 4. Tenta Lyrics.ovh (API alternativa con testi internazionali)
+      let result = await searchVariations(title, artist, duration, fetchFromLyricsOvh);
+      if (result && result.lines.length >= 2) {
         return result;
       }
+
+      // 5. Se trovati testi plain non sincronizzati da LRCLIB, usali solo come ultima spiaggia
+      if (Date.now() >= lrclibCooldownUntil) {
+        const plainFallback = await fetchFromLRCLIBSearch(title, artist, duration);
+        if (plainFallback && plainFallback.lines.length >= 2) {
+          return plainFallback;
+        }
+      }
+    } catch (error) {
+      console.error('Lyrics fetch error:', error);
     }
 
-    // 4. Tenta Lyrics.ovh (API alternativa con testi internazionali)
-    result = await searchVariations(title, artist, duration, fetchFromLyricsOvh);
-    if (result && result.lines.length >= 2) {
-      return result;
-    }
-
-    // 5. Se trovati testi plain non sincronizzati da LRCLIB, usali solo come ultima spiaggia
-    const plainFallback = await fetchFromLRCLIBSearch(title, artist, duration);
-    if (plainFallback && plainFallback.lines.length >= 2) {
-      return plainFallback;
-    }
-  } catch (error) {
-    console.error('Lyrics fetch error:', error);
-  }
-  
-  // Nessun testo trovato su alcun sito: restituisce lines vuoto così da mostrare esattamente la scritta richiesta
-  return {
-    lines: [],
-    synced: false,
-    source: 'none'
+    return {
+      lines: [],
+      synced: false,
+      source: 'none'
+    };
   };
+
+  const promise = executeFetch().finally(() => {
+    inFlightRequests.delete(cacheKey);
+  });
+
+  inFlightRequests.set(cacheKey, promise);
+  const finalResult = await promise;
+  lyricsMemoryCache.set(cacheKey, { data: finalResult, timestamp: Date.now() });
+  return finalResult;
 };
 
 // Get current line index

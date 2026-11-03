@@ -18,9 +18,9 @@ const STACK = [
   { name: "Tailwind CSS", desc: "Stile", color: "#06b6d4" },
   { name: "Framer Motion", desc: "Animazioni", color: "#ec4899" },
   { name: "TanStack Query", desc: "Data fetching", color: "#f59e0b" },
-  { name: "Spotify Web API", desc: "Musica", color: "#1db954" },
-  { name: "Web Audio API", desc: "EQ / Mixer", color: "#ef4444" },
-  { name: "Claude AI", desc: "AI DJ consigli", color: "#8b5cf6" },
+  { name: "Multi-Service Engine", desc: "Spotify, Apple, Tidal, Amazon, YT", color: "#1db954" },
+  { name: "Universal Web Audio", desc: "EQ / Audio Engine", color: "#ef4444" },
+  { name: "LyraAI & Claude", desc: "AI DJ consigli", color: "#8b5cf6" },
 ];
 
 const FEATURES = [

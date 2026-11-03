@@ -135,7 +135,7 @@ export default function Sidebar({
   return (
     <aside
       ref={sidebarRef}
-      className="hidden md:flex w-64 h-full flex-col bg-sidebar border-r border-sidebar-border shrink-0 relative overflow-hidden"
+      className="hidden lg:flex w-64 h-full flex-col bg-sidebar border-r border-sidebar-border shrink-0 relative overflow-hidden"
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
