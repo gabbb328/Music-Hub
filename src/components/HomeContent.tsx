@@ -18,6 +18,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { detectEasterEgg } from "@/hooks/useEasterEgg";
 
 import { GeminiAIButton } from "@/components/GeminiAIButton";
+import { getActiveProvider, MUSIC_PROVIDERS } from "@/services/music-providers";
+import { MusicServiceLogo } from "@/components/MusicServiceLogos";
 
 interface HomeContentProps {
   onPlayTrack: (track: Track) => void;

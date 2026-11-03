@@ -24,16 +24,18 @@ const STACK = [
 ];
 
 const FEATURES = [
-  "🎧 Spotify Integration completa",
-  "🎛 Neural Space Mixer 3D (HRTF)",
-  "🤖 AI DJ con consigli in tempo reale",
-  "🎵 Testi sincronizzati",
-  "📊 Analisi audio avanzata",
-  "🌈 Tema dinamico dalla copertina",
-  "⚡ Equalizzatore 10 bande",
-  "🎤 Riconoscimento brani",
-  "📻 Radio personalizzata",
-  "📱 PWA mobile-first",
+  "Integrazione Multi-Piattaforma (Spotify, Apple Music, Tidal, Amazon, YT Music, Deezer, SoundCloud, Qobuz)",
+  "Universal Audio Engine con streaming e riproduzione fluida",
+  "Neural Space Mixer 3D (HRTF)",
+  "AI DJ & LyraAI con consigli in tempo reale",
+  "Testi sincronizzati (Karaoke & Verci Mode)",
+  "Analisi audio avanzata",
+  "Tema dinamico dalla copertina",
+  "Equalizzatore 10 bande",
+  "Riconoscimento brani",
+  "Listen Along sincronizzato tra dispositivi (Jam)",
+  "Radio personalizzata",
+  "PWA mobile-first",
 ];
 
 export default function AboutContent() {

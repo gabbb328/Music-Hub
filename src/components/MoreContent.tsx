@@ -26,6 +26,8 @@ import { useSquish } from "@/hooks/useSquish";
 import { useUserProfile } from "@/hooks/useSpotify";
 import { GeminiAIButton } from "@/components/GeminiAIButton";
 import { useFeatureUsage } from "@/hooks/useFeatureUsage";
+import { getActiveProvider, MUSIC_PROVIDERS } from "@/services/music-providers";
+import { MusicServiceLogo } from "@/components/MusicServiceLogos";
 
 interface MoreContentProps {
   onSectionChange: (section: string) => void;
@@ -188,21 +190,41 @@ export default function MoreContent({
         <div className="flex items-center gap-2.5 shrink-0">
           <GeminiAIButton onOpenAI={onOpenAI} layoutId="gemini-ai-btn" />
 
-          <motion.button
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            onClick={onOpenProfile}
-            className="w-11 h-11 rounded-full overflow-hidden border border-primary/30 shadow-sm hover:ring-2 hover:ring-primary/50 transition-all flex items-center justify-center bg-secondary shrink-0"
-            title="Profilo Spotify"
-          >
-            {userAvatar ? (
-              <img src={userAvatar} alt="Spotify Profile" className="w-full h-full object-cover rounded-full" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center rounded-full">
-                <span className="text-xs font-bold text-primary-foreground">{userInitial}</span>
-              </div>
-            )}
-          </motion.button>
+          <div className="relative shrink-0">
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={onOpenProfile}
+              className="w-11 h-11 rounded-full overflow-hidden border border-primary/30 shadow-sm hover:ring-2 hover:ring-primary/50 transition-all flex items-center justify-center bg-secondary shrink-0 cursor-pointer"
+              title="Profilo"
+            >
+              {userAvatar ? (
+                <img src={userAvatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center rounded-full">
+                  <span className="text-xs font-bold text-primary-foreground">{userInitial}</span>
+                </div>
+              )}
+            </motion.button>
+
+            {/* Fiocchetto / Badge in primo piano sopra l'immagine del profilo - sempre su una sola riga */}
+            {(() => {
+              const activeProvider = getActiveProvider();
+              const providerMeta = MUSIC_PROVIDERS[activeProvider] || MUSIC_PROVIDERS.spotify;
+              return (
+                <div
+                  className="absolute -top-2.5 -right-3.5 z-20 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-lg border border-white/25 select-none pointer-events-none transform rotate-[10deg] tracking-tight shrink-0"
+                  style={{
+                    backgroundColor: providerMeta.brandColor,
+                    boxShadow: `0 3px 12px ${providerMeta.brandColor}80`,
+                  }}
+                >
+                  <MusicServiceLogo provider={activeProvider} size={11} />
+                  <span className="whitespace-nowrap">{providerMeta.shortName}</span>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </div>
 

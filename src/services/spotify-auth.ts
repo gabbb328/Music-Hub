@@ -118,6 +118,19 @@ export async function handleSpotifyCallback(code: string, state: string | null) 
 }
 
 export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  // Se è attivo un provider diverso da Spotify (es. Apple Music, Tidal, Amazon Music, ecc.)
+  const activeProvider = window.localStorage.getItem("harmony_music_provider");
+  if (activeProvider && activeProvider !== "spotify") {
+    const providerToken = window.localStorage.getItem("harmony_provider_token");
+    if (providerToken) return providerToken;
+    const token = window.localStorage.getItem("spotify_access_token");
+    if (token) return token;
+    return `provider_session_${activeProvider}`;
+  }
+
+  // Provider Spotify standard
   const token = window.localStorage.getItem("spotify_access_token");
   const expiresAt = window.localStorage.getItem("spotify_token_expires_at");
   if (!token || !expiresAt) return null;
@@ -130,7 +143,12 @@ export function getToken(): string | null {
 }
 
 export function clearToken() {
+  if (typeof window === "undefined") return;
   window.localStorage.removeItem("spotify_access_token");
   window.localStorage.removeItem("spotify_refresh_token");
   window.localStorage.removeItem("spotify_token_expires_at");
+  window.localStorage.removeItem("harmony_music_provider");
+  window.localStorage.removeItem("harmony_provider_token");
+  window.localStorage.removeItem("harmony_provider_user");
 }
+

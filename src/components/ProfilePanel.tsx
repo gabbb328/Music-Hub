@@ -29,6 +29,8 @@ import {
   saveCollabUsers,
 } from "@/services/supabase-api";
 import { saveTelegramChatId, removeTelegramChatId } from "@/services/telegram-api";
+import { getActiveProvider, MUSIC_PROVIDERS } from "@/services/music-providers";
+import { MusicServiceLogo } from "@/components/MusicServiceLogos";
 
 async function sha256hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -94,7 +96,14 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
     return () => { mounted = false; clearInterval(interval); };
   }, [userName]);
 
-  const handleLogout = () => { clearToken(); navigate("/login"); onClose(); };
+  const handleLogout = () => {
+    const activeProvider = getActiveProvider();
+    const providerName = MUSIC_PROVIDERS[activeProvider]?.name || "Spotify";
+    clearToken();
+    toast({ title: `Disconnesso da ${providerName}`, description: "Arrivederci! 👋" });
+    navigate("/login");
+    onClose();
+  };
 
   const handleSaveChatId = async () => {
     if (!tempChatId.trim() || !collabUser) return;
@@ -155,16 +164,35 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
               <div className="relative px-6 pt-6 pb-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {userAvatar ? (
-                        <img src={userAvatar} alt={userName} className="w-16 h-16 rounded-full object-cover ring-2 ring-primary/50 shadow-xl" />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center shadow-xl ring-2 ring-primary/30">
-                          <span className="text-2xl font-black text-primary-foreground">{userInitial}</span>
+                    {(() => {
+                      const activeProvider = getActiveProvider();
+                      const providerMeta = MUSIC_PROVIDERS[activeProvider] || MUSIC_PROVIDERS.spotify;
+                      return (
+                        <div className="relative">
+                          {userAvatar ? (
+                            <img src={userAvatar} alt={userName} className="w-16 h-16 rounded-full object-cover ring-2 ring-primary/50 shadow-xl" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/40 flex items-center justify-center shadow-xl ring-2 ring-primary/30">
+                              <span className="text-2xl font-black text-primary-foreground">{userInitial}</span>
+                            </div>
+                          )}
+
+                          {/* Fiocchetto / Badge in primo piano sopra l'immagine del profilo nell'angolo in alto a destra - sempre su una sola riga */}
+                          <div
+                            className="absolute -top-2.5 -right-3.5 z-20 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-lg border border-white/25 select-none pointer-events-none transform rotate-[10deg] tracking-tight shrink-0"
+                            style={{
+                              backgroundColor: providerMeta.brandColor,
+                              boxShadow: `0 3px 12px ${providerMeta.brandColor}80`,
+                            }}
+                          >
+                            <MusicServiceLogo provider={activeProvider} size={11} />
+                            <span className="whitespace-nowrap">{providerMeta.shortName}</span>
+                          </div>
+
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background" />
                         </div>
-                      )}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background" />
-                    </div>
+                      );
+                    })()}
                     <div>
                       <h2 className="text-2xl font-black tracking-tight">
                         Ciao, <span className="text-primary">{userName.split(" ")[0]}</span>
@@ -312,22 +340,40 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
 
                 ) : (
                   <motion.div key="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                    {/* Info Spotify */}
-                    <div className="rounded-2xl bg-secondary/30 p-4 space-y-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2"><Info className="w-4 h-4 text-primary" />Account Spotify</h3>
-                      <div className="space-y-3 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Piano</span>
-                          {isPremium ? (
-                            <span className="font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-xs">✨ Spotify Premium</span>
-                          ) : (
-                            <span className="font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-xs">🔒 Spotify Free</span>
-                          )}
+                    {/* Info Account */}
+                    {(() => {
+                      const providerId = getActiveProvider();
+                      const meta = MUSIC_PROVIDERS[providerId] || MUSIC_PROVIDERS.spotify;
+                      return (
+                        <div className="rounded-2xl bg-secondary/30 p-4 space-y-3">
+                          <h3 className="font-semibold text-sm flex items-center gap-2">
+                            <Info className="w-4 h-4 text-primary" />
+                            Account {meta.name}
+                          </h3>
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Piano</span>
+                              <span className="font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-xs">
+                                ✨ {meta.defaultTier} ({meta.badgeText})
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Connessione</span>
+                              <div className="flex items-center gap-1 text-green-400">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Attiva
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Dispositivo</span>
+                              <span className="font-medium truncate max-w-[140px] text-right">
+                                {playbackState?.device?.name || `${meta.shortName} Player`}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between"><span className="text-muted-foreground">Connessione</span><div className="flex items-center gap-1 text-green-400"><CheckCircle2 className="w-4 h-4" />Attiva</div></div>
-                        <div className="flex items-center justify-between"><span className="text-muted-foreground">Dispositivo</span><span className="font-medium truncate max-w-[140px] text-right">{playbackState?.device?.name || "Nessuno"}</span></div>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* App info */}
                     <div className="rounded-2xl bg-secondary/30 p-4 space-y-3">
@@ -362,7 +408,19 @@ export default function ProfilePanel({ isOpen, onClose }: ProfilePanelProps) {
 
                     {/* Logout */}
                     <div className="pt-2 border-t border-border space-y-2">
-                      <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/15 hover:bg-destructive/25 text-destructive font-semibold text-sm"><LogOut className="w-4 h-4" />Logout da Spotify</button>
+                      {(() => {
+                        const activeProvider = getActiveProvider();
+                        const providerMeta = MUSIC_PROVIDERS[activeProvider] || MUSIC_PROVIDERS.spotify;
+                        return (
+                          <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/15 hover:bg-destructive/25 text-destructive font-semibold text-sm"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Logout da {providerMeta.name}
+                          </button>
+                        );
+                      })()}
                       <p className="text-xs text-muted-foreground text-center">Modifiche salvate automaticamente</p>
                     </div>
                   </motion.div>

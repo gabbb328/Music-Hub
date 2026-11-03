@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { getToken } from "@/services/spotify-auth";
+import { getActiveProvider, universalAudioEngine, MUSIC_PROVIDERS } from "@/services/music-providers";
 
 declare global {
   interface Window {
@@ -24,13 +25,36 @@ const IS_IOS =
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 export const useSpotifyPlayer = () => {
+  const activeProvider = getActiveProvider();
   const [player, setPlayer] = useState<any>(null);
-  const [deviceId, setDeviceId] = useState<string>("");
-  const [isReady, setIsReady] = useState(false);
-  const [isPaused, setIsPaused] = useState(true);
-  const [currentTrack, setCurrentTrack] = useState<any>(null);
+  const [deviceId, setDeviceId] = useState<string>(activeProvider !== "spotify" ? `device-${activeProvider}` : "");
+  const [isReady, setIsReady] = useState(activeProvider !== "spotify");
+  const [isPaused, setIsPaused] = useState(activeProvider !== "spotify" ? !universalAudioEngine.getIsPlaying() : true);
+  const [currentTrack, setCurrentTrack] = useState<any>(activeProvider !== "spotify" ? universalAudioEngine.getCurrentTrack() : null);
 
+  // ── Se il provider NON è Spotify: usa Universal Audio Engine ──────────────────
   useEffect(() => {
+    if (activeProvider !== "spotify") {
+      setIsReady(true);
+      setDeviceId(`device-${activeProvider}`);
+      setIsPaused(!universalAudioEngine.getIsPlaying());
+      setCurrentTrack(universalAudioEngine.getCurrentTrack());
+
+      const unsubscribe = universalAudioEngine.subscribe(() => {
+        setIsPaused(!universalAudioEngine.getIsPlaying());
+        setCurrentTrack(universalAudioEngine.getCurrentTrack());
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [activeProvider]);
+
+  // ── Se il provider È Spotify: usa Web Playback SDK ufficiale ───────────────────
+  useEffect(() => {
+    if (activeProvider !== "spotify") return;
+
     if (IS_IOS) {
       console.info("[SpotifyPlayer] iOS rilevato — Web Playback SDK non caricato. Uso API REST.");
       return;
@@ -104,30 +128,50 @@ export const useSpotifyPlayer = () => {
         return null;
       });
     };
-  }, []);
+  }, [activeProvider]);
 
   const togglePlay = useCallback(() => {
+    if (activeProvider !== "spotify") {
+      universalAudioEngine.togglePlay();
+      return;
+    }
     if (player) player.togglePlay();
-  }, [player]);
+  }, [player, activeProvider]);
 
   const nextTrack = useCallback(() => {
+    if (activeProvider !== "spotify") {
+      universalAudioEngine.next();
+      return;
+    }
     if (player) player.nextTrack();
-  }, [player]);
+  }, [player, activeProvider]);
 
   const previousTrack = useCallback(() => {
+    if (activeProvider !== "spotify") {
+      universalAudioEngine.previous();
+      return;
+    }
     if (player) player.previousTrack();
-  }, [player]);
+  }, [player, activeProvider]);
 
   const seek = useCallback((positionMs: number) => {
+    if (activeProvider !== "spotify") {
+      universalAudioEngine.seek(positionMs);
+      return;
+    }
     if (player) player.seek(positionMs);
-  }, [player]);
+  }, [player, activeProvider]);
 
   const setVolume = useCallback((volume: number) => {
+    if (activeProvider !== "spotify") {
+      universalAudioEngine.setVolume(volume);
+      return;
+    }
     if (player) player.setVolume(volume / 100);
-  }, [player]);
+  }, [player, activeProvider]);
 
   return {
-    player,
+    player: activeProvider !== "spotify" ? universalAudioEngine : player,
     deviceId,
     isReady,
     isPaused,
